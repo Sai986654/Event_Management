@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Table, Tag, Button, message, Spin, Empty, Modal, Space } from 'antd';
-import { ShopOutlined, CalendarOutlined, EyeOutlined } from '@ant-design/icons';
+import { ShopOutlined, EyeOutlined } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
 import { bookingService } from '../services/bookingService';
 import { formatDate, formatCurrency, getErrorMessage } from '../utils/helpers';
