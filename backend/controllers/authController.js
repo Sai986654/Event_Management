@@ -4,8 +4,17 @@ const { prisma } = require('../config/db');
 const asyncHandler = require('../utils/asyncHandler');
 
 const generateToken = (user) => {
-  return jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRE,
+  const jwtSecret =
+    process.env.JWT_SECRET ||
+    (process.env.NODE_ENV === 'production' ? null : 'dev-test-jwt-secret');
+  const jwtExpire = process.env.JWT_EXPIRE || '7d';
+
+  if (!jwtSecret) {
+    throw new Error('JWT_SECRET is required in production');
+  }
+
+  return jwt.sign({ id: user.id, role: user.role }, jwtSecret, {
+    expiresIn: jwtExpire,
   });
 };
 

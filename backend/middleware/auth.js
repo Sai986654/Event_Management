@@ -1,6 +1,12 @@
 const jwt = require('jsonwebtoken');
 const { prisma } = require('../config/db');
 
+const getJwtSecret = () => {
+  if (process.env.JWT_SECRET) return process.env.JWT_SECRET;
+  if (process.env.NODE_ENV !== 'production') return 'dev-test-jwt-secret';
+  throw new Error('JWT_SECRET is required in production');
+};
+
 // Verify JWT token
 const protect = async (req, res, next) => {
   try {
@@ -16,7 +22,7 @@ const protect = async (req, res, next) => {
       return res.status(401).json({ message: 'Not authorized, no token' });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, getJwtSecret());
     const user = await prisma.user.findUnique({ where: { id: decoded.id } });
     if (!user) {
       return res.status(401).json({ message: 'User no longer exists' });
