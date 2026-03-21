@@ -38,6 +38,8 @@ jobs:
 
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/eventos_test
+      # Same as DATABASE_URL in CI (no pooler); required by prisma/schema.prisma directUrl
+      DIRECT_URL: postgresql://postgres:postgres@localhost:5432/eventos_test
       JWT_SECRET: ci-test-jwt-secret-min-32-chars-long!!
       NODE_ENV: test
 
