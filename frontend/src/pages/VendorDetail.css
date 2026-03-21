@@ -1,0 +1,97 @@
+.vendor-detail-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.vendor-header-card {
+  margin-bottom: 24px;
+}
+
+.vendor-description {
+  color: #555;
+  font-size: 15px;
+  line-height: 1.6;
+  margin-bottom: 16px;
+}
+
+.vendor-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  color: #666;
+}
+
+.vendor-meta span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.vendor-rating-card {
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+}
+
+/* Package Cards */
+.package-card {
+  height: 100%;
+  border-radius: 12px;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.package-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.package-featured {
+  border: 2px solid #667eea;
+}
+
+.package-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.package-price {
+  text-align: center;
+  margin-bottom: 12px;
+}
+
+.price-amount {
+  font-size: 32px;
+  font-weight: 700;
+  color: #667eea;
+}
+
+.price-type {
+  color: #888;
+  font-size: 14px;
+}
+
+.package-description {
+  text-align: center;
+  color: #666;
+  min-height: 44px;
+}
+
+.package-includes {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.package-includes li {
+  padding: 6px 0;
+  color: #333;
+  display: flex;
+  align-items: flex-start;
+}
+
+@media (max-width: 768px) {
+  .vendor-meta {
+    flex-direction: column;
+    gap: 8px;
+  }
+}

@@ -1,0 +1,63 @@
+# ─── Root monorepo ───
+.DS_Store
+Thumbs.db
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Env & secrets (never commit)
+.env
+.env.*
+!.env.example
+!.env*.example
+
+# Editors / OS
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# ─── All Node projects ───
+node_modules/
+coverage/
+dist/
+build/
+*.tsbuildinfo
+
+# ─── Backend ───
+backend/node_modules/
+backend/.env
+backend/coverage/
+backend/dist/
+
+# ─── Frontend (CRA) ───
+frontend/node_modules/
+frontend/build/
+frontend/coverage/
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+
+# ─── Mobile (Expo / RN) ───
+mobile/node_modules/
+mobile/.expo/
+mobile/dist/
+mobile/web-build/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+
+# Metro
+.metro-health-check*
+
+# Optional local EAS
+mobile/.eas/

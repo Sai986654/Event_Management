@@ -1,0 +1,115 @@
+.control-panel-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.control-panel-loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: calc(100vh - 64px);
+}
+
+/* ── Header ──────────────────────────────────────────────────────────── */
+.control-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 20px 24px;
+  border-radius: 8px;
+  margin-bottom: 24px;
+}
+
+.control-panel-header h1 {
+  margin: 0 0 4px 0;
+  font-size: 24px;
+  color: white;
+}
+
+.control-panel-header p {
+  margin: 0;
+  opacity: 0.9;
+}
+
+.connection-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: white;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+/* ── Stats row ───────────────────────────────────────────────────────── */
+.stats-row {
+  margin-bottom: 24px;
+}
+
+/* ── Panel cards ─────────────────────────────────────────────────────── */
+.panel-card {
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+}
+
+.panel-card .ant-card-head-title {
+  font-weight: 600;
+}
+
+/* ── Tasks ────────────────────────────────────────────────────────── */
+.task-completed {
+  text-decoration: line-through;
+  color: #999;
+}
+
+/* ── Activity feed ───────────────────────────────────────────────────── */
+.activity-card {
+  position: sticky;
+  top: 80px;
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
+}
+
+.activity-entry {
+  display: flex;
+  flex-direction: column;
+}
+
+.activity-time {
+  font-size: 11px;
+  color: #999;
+  margin-bottom: 2px;
+}
+
+.activity-text {
+  font-size: 13px;
+  color: #333;
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────── */
+@media (max-width: 992px) {
+  .activity-card {
+    position: relative;
+    top: auto;
+    max-height: 400px;
+    margin-top: 16px;
+  }
+}
+
+@media (max-width: 768px) {
+  .control-panel-container {
+    padding: 12px;
+  }
+
+  .control-panel-header {
+    flex-direction: column;
+    gap: 12px;
+    text-align: center;
+  }
+
+  .control-panel-header h1 {
+    font-size: 18px;
+  }
+}

@@ -1,0 +1,40 @@
+.guest-management-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.stats-card {
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.guests-card {
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.guests-actions {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+@media (max-width: 768px) {
+  .guest-management-container {
+    padding: 12px;
+  }
+
+  .guests-actions {
+    flex-direction: column;
+  }
+
+  .guests-actions button {
+    width: 100%;
+  }
+}

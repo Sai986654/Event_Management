@@ -1,0 +1,38 @@
+# Mobile: ensure dependencies install cleanly (add expo-doctor / lint when you wire them)
+name: CI — Mobile
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/ci-mobile.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/ci-mobile.yml'
+
+defaults:
+  run:
+    working-directory: mobile
+
+jobs:
+  mobile:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Uncomment when you want stricter checks:
+      # - name: Expo Doctor
+      #   run: npx expo-doctor

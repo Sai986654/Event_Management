@@ -1,0 +1,37 @@
+{
+  "expo": {
+    "name": "EventOS",
+    "slug": "eventos-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#667eea"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.eventos.mobile"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#667eea"
+      },
+      "package": "com.eventos.mobile"
+    },
+    "plugins": [
+      "expo-asset",
+      "expo-font",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow EventOS to access your photos to upload blessing images for events.",
+          "cameraPermission": "Allow EventOS to use the camera to capture blessing photos for events."
+        }
+      ]
+    ]
+  }
+}

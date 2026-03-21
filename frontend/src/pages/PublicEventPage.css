@@ -1,0 +1,99 @@
+.public-event-page {
+  background: white;
+}
+
+.event-hero {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 80px 24px;
+  text-align: center;
+}
+
+.hero-content h1 {
+  font-size: 48px;
+  font-weight: bold;
+  margin-bottom: 12px;
+}
+
+.event-subtitle {
+  font-size: 18px;
+  opacity: 0.9;
+  display: inline-block;
+  background: rgba(255, 255, 255, 0.2);
+  padding: 8px 16px;
+  border-radius: 4px;
+}
+
+.event-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.event-details-card {
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.event-details-card h2 {
+  margin-bottom: 24px;
+  font-size: 24px;
+}
+
+.detail-item {
+  margin-bottom: 24px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.detail-item:last-child {
+  border-bottom: none;
+}
+
+.detail-item h3 {
+  margin: 0 0 8px 0;
+  font-size: 16px;
+  color: #667eea;
+}
+
+.detail-item p {
+  margin: 0;
+  font-size: 16px;
+  color: #333;
+  line-height: 1.6;
+}
+
+.rsvp-card {
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  position: sticky;
+  top: 80px;
+}
+
+.rsvp-card h2 {
+  margin-bottom: 20px;
+  font-size: 24px;
+}
+
+.rsvp-card button {
+  margin-bottom: 8px;
+}
+
+@media (max-width: 768px) {
+  .event-hero {
+    padding: 48px 16px;
+  }
+
+  .hero-content h1 {
+    font-size: 28px;
+  }
+
+  .event-container {
+    padding: 12px;
+  }
+
+  .rsvp-card {
+    position: relative;
+    top: auto;
+  }
+}

@@ -1,0 +1,186 @@
+import React, { useState } from 'react';
+import { Form, Input, InputNumber, DatePicker, Select, Button, Card, message, Spin, Steps } from 'antd';
+import { useNavigate } from 'react-router-dom';
+import { eventService } from '../services/eventService';
+import { getErrorMessage } from '../utils/helpers';
+import './EventCreate.css';
+
+const EventCreate = () => {
+  const navigate = useNavigate();
+  const [form] = Form.useForm();
+  const [loading, setLoading] = useState(false);
+  const [currentStep, setCurrentStep] = useState(0);
+
+  const onFinish = async (values) => {
+    try {
+      const allValues = form.getFieldsValue(true);
+      const payloadValues = { ...allValues, ...values };
+      const rawDate = payloadValues?.date;
+      let parsedDate = null;
+
+      if (rawDate instanceof Date) {
+        parsedDate = rawDate;
+      } else if (rawDate && typeof rawDate === 'object') {
+        if (typeof rawDate.toDate === 'function') {
+          parsedDate = rawDate.toDate();
+        } else if (rawDate.$d) {
+          parsedDate = new Date(rawDate.$d);
+        } else if (typeof rawDate.valueOf === 'function') {
+          const ts = rawDate.valueOf();
+          if (Number.isFinite(ts)) parsedDate = new Date(ts);
+        }
+      } else if (typeof rawDate === 'string' || typeof rawDate === 'number') {
+        parsedDate = new Date(rawDate);
+      }
+
+      if (!parsedDate || Number.isNaN(parsedDate.getTime())) {
+        message.error('Please select a valid event date.');
+        return;
+      }
+
+      const isoDate = parsedDate.toISOString();
+
+      setLoading(true);
+      const eventData = {
+        title: payloadValues.title,
+        type: payloadValues.type,
+        date: isoDate,
+        venue: payloadValues.location,
+        description: payloadValues.description,
+        budget: payloadValues.budget,
+        guestCount: payloadValues.guestCount,
+      };
+      await eventService.createEvent(eventData);
+      message.success('Event created successfully!');
+      navigate('/dashboard');
+    } catch (error) {
+      message.error(getErrorMessage(error));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const steps = [
+    {
+      title: 'Basic Info',
+      content: (
+        <>
+          <Form.Item
+            name="title"
+            label="Event Title"
+            rules={[{ required: true, message: 'Please input event title!' }]}
+          >
+            <Input placeholder="E.g. Priya & Arjun's Wedding Reception" size="large" />
+          </Form.Item>
+
+          <Form.Item
+            name="type"
+            label="Event Type"
+            rules={[{ required: true, message: 'Please select event type!' }]}
+          >
+            <Select placeholder="Select event type" size="large">
+              <Select.Option value="wedding">Wedding</Select.Option>
+              <Select.Option value="corporate">Corporate Event</Select.Option>
+              <Select.Option value="birthday">Birthday Party</Select.Option>
+              <Select.Option value="conference">Conference</Select.Option>
+              <Select.Option value="other">Other</Select.Option>
+            </Select>
+          </Form.Item>
+
+          <Form.Item
+            name="description"
+            label="Description"
+            rules={[{ required: true, message: 'Please input event description!' }]}
+          >
+            <Input.TextArea rows={4} placeholder="Describe your event..." />
+          </Form.Item>
+        </>
+      ),
+    },
+    {
+      title: 'Details',
+      content: (
+        <>
+          <Form.Item
+            name="date"
+            label="Event Date"
+            rules={[{ required: true, message: 'Please select event date!' }]}
+          >
+            <DatePicker size="large" style={{ width: '100%' }} />
+          </Form.Item>
+
+          <Form.Item
+            name="location"
+            label="Location"
+            rules={[{ required: true, message: 'Please input location!' }]}
+          >
+            <Input placeholder="e.g. Hyderabad, Telangana or venue area" size="large" />
+          </Form.Item>
+
+          <Form.Item
+            name="guestCount"
+            label="Expected Guest Count"
+            rules={[{ required: true, message: 'Please input guest count!' }]}
+          >
+            <InputNumber min={1} placeholder="Number of guests" size="large" style={{ width: '100%' }} />
+          </Form.Item>
+        </>
+      ),
+    },
+    {
+      title: 'Budget',
+      content: (
+        <Form.Item
+          name="budget"
+          label="Total Budget"
+          rules={[{ required: true, message: 'Please input budget!' }]}
+        >
+          <InputNumber min={0} placeholder="Total budget in INR (₹)" size="large" style={{ width: '100%' }} prefix="₹" />
+        </Form.Item>
+      ),
+    },
+  ];
+
+  return (
+    <div className="event-create-container">
+      <Card className="event-create-card">
+        <h1>Create a New Event</h1>
+
+        <Steps current={currentStep} items={steps} style={{ marginBottom: '24px' }} />
+
+        <Spin spinning={loading}>
+          <Form form={form} layout="vertical" onFinish={onFinish}>
+            {steps[currentStep].content}
+
+            <div className="steps-action">
+              {currentStep > 0 && (
+                <Button style={{ margin: '0 8px' }} onClick={() => setCurrentStep(currentStep - 1)}>
+                  Previous
+                </Button>
+              )}
+              {currentStep < steps.length - 1 && (
+                <Button
+                  type="primary"
+                  onClick={() => {
+                    form.validateFields().then(() => {
+                      setCurrentStep(currentStep + 1);
+                    });
+                  }}
+                >
+                  Next
+                </Button>
+              )}
+              {currentStep === steps.length - 1 && (
+                <Button type="primary" htmlType="submit" loading={loading}>
+                  Create Event
+                </Button>
+              )}
+            </div>
+          </Form>
+        </Spin>
+      </Card>
+    </div>
+  );
+};
+
+export default EventCreate;

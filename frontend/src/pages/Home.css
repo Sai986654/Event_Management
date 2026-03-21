@@ -1,0 +1,194 @@
+.home-container {
+  width: 100%;
+  overflow-x: hidden;
+}
+
+.hero {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 80px 24px;
+  text-align: center;
+}
+
+.hero-content h1 {
+  font-size: 48px;
+  font-weight: bold;
+  margin-bottom: 16px;
+}
+
+.hero-content p {
+  font-size: 20px;
+  margin-bottom: 32px;
+  opacity: 0.9;
+}
+
+.hero-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.hero-buttons button {
+  min-width: 150px;
+}
+
+.features {
+  padding: 80px 24px;
+  background: #f9f9f9;
+}
+
+.section-header {
+  text-align: center;
+  margin-bottom: 48px;
+}
+
+.section-header h2 {
+  font-size: 36px;
+  font-weight: bold;
+  margin-bottom: 12px;
+}
+
+.section-header p {
+  font-size: 16px;
+  color: #666;
+}
+
+.features-grid {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.feature-card {
+  text-align: center;
+  padding: 24px;
+  border-radius: 8px;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  height: 100%;
+}
+
+.feature-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
+}
+
+.feature-icon {
+  margin-bottom: 16px;
+}
+
+.feature-card h3 {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.feature-card p {
+  color: #666;
+  line-height: 1.6;
+}
+
+.cta-section {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 80px 24px;
+  text-align: center;
+}
+
+.cta-content h2 {
+  font-size: 36px;
+  font-weight: bold;
+  margin-bottom: 12px;
+}
+
+.cta-content p {
+  font-size: 18px;
+  margin-bottom: 32px;
+  opacity: 0.9;
+}
+
+.how-it-works {
+  padding: 80px 24px;
+  background: white;
+}
+
+.steps-grid {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.step-card {
+  text-align: center;
+  padding: 32px 24px;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.step-card:hover {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.step-number {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: bold;
+  margin: 0 auto 16px;
+}
+
+.step-card h3 {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.step-card p {
+  color: #666;
+  line-height: 1.6;
+}
+
+@media (max-width: 768px) {
+  .hero-content h1 {
+    font-size: 32px;
+  }
+
+  .hero-content p {
+    font-size: 16px;
+  }
+
+  .section-header h2 {
+    font-size: 24px;
+  }
+
+  .cta-content h2 {
+    font-size: 24px;
+  }
+
+  .hero {
+    padding: 48px 16px;
+  }
+
+  .features,
+  .how-it-works {
+    padding: 48px 16px;
+  }
+
+  .cta-section {
+    padding: 48px 16px;
+  }
+
+  .hero-buttons {
+    flex-direction: column-reverse;
+  }
+
+  .hero-buttons button {
+    width: 100%;
+    min-width: unset;
+  }
+}
