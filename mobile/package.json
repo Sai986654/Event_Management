@@ -10,7 +10,9 @@
     "build:android": "eas build --platform android --profile production",
     "build:android:preview": "eas build --platform android --profile preview",
     "build:ios": "eas build --platform ios --profile production",
-    "build:configure": "eas build:configure"
+    "build:configure": "eas build:configure",
+    "eas:login": "eas login",
+    "eas:whoami": "eas whoami"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
@@ -34,7 +36,8 @@
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",
-    "babel-preset-expo": "~54.0.10"
+    "babel-preset-expo": "~54.0.10",
+    "eas-cli": "^16.28.0"
   },
   "private": true
 }
