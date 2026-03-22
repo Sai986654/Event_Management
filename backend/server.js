@@ -35,8 +35,15 @@ const io = new Server(server, {
 app.set('io', io);
 initSocket(io);
 
-// Middleware
-app.use(cors({ origin: corsOrigin }));
+// Middleware (explicit headers so preflight with Authorization succeeds reliably)
+app.use(
+  cors({
+    origin: corsOrigin,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    optionsSuccessStatus: 204,
+  })
+);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
