@@ -1,6 +1,8 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+// Trailing slash + paths without a leading slash avoids wrong URLs like host/login
+const rawBase = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+const API_BASE_URL = `${rawBase.replace(/\/+$/, '')}/`;
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -9,6 +11,9 @@ const api = axios.create({
 
 // Add token to every request
 api.interceptors.request.use((config) => {
+  if (typeof config.url === 'string' && config.url.startsWith('/')) {
+    config.url = config.url.slice(1);
+  }
   const token = localStorage.getItem('token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;

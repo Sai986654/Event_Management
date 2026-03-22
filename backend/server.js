@@ -6,6 +6,7 @@ const { Server } = require('socket.io');
 const { connectDB, prisma } = require('./config/db');
 const errorHandler = require('./middleware/errorHandler');
 const initSocket = require('./socket');
+const { createOriginHandler } = require('./config/corsOrigins');
 
 // Route imports
 const authRoutes = require('./routes/authRoutes');
@@ -25,15 +26,17 @@ const activityRoutes = require('./routes/activityRoutes');
 const app = express();
 const server = http.createServer(app);
 
+const corsOrigin = createOriginHandler();
+
 // Socket.io
 const io = new Server(server, {
-  cors: { origin: process.env.CLIENT_URL || '*', methods: ['GET', 'POST'] },
+  cors: { origin: corsOrigin, methods: ['GET', 'POST'] },
 });
 app.set('io', io);
 initSocket(io);
 
 // Middleware
-app.use(cors({ origin: process.env.CLIENT_URL || '*' }));
+app.use(cors({ origin: corsOrigin }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
