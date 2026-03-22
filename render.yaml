@@ -2,11 +2,12 @@ services:
   - type: web
     name: eventos-backend
     runtime: docker
-    rootDir: backend
+    # Monorepo: Dockerfile lives at repo root (see ./Dockerfile)
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
     plan: free
     autoDeploy: true
     healthCheckPath: /api/health
-    preDeployCommand: npx prisma migrate deploy
     envVars:
       - key: NODE_ENV
         value: production
