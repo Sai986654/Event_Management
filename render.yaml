@@ -15,6 +15,7 @@ services:
         value: 5000
       - key: DATABASE_URL
         sync: false
+      # Supabase: use direct db.* URL; omit only if DATABASE_URL is already direct (Dockerfile falls back)
       - key: DIRECT_URL
         sync: false
       - key: JWT_SECRET
