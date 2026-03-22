@@ -11,12 +11,10 @@
     },
     "preview": {
       "distribution": "internal",
-      "android": { "buildType": "apk" },
-      "ios": { "simulator": false }
+      "android": { "buildType": "apk" }
     },
     "production": {
-      "android": { "buildType": "app-bundle" },
-      "ios": { "resourceClass": "m-medium" }
+      "android": { "buildType": "app-bundle" }
     }
   },
   "submit": {

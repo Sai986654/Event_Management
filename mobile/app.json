@@ -21,7 +21,8 @@
       "adaptiveIcon": {
         "backgroundColor": "#667eea"
       },
-      "package": "com.eventos.mobile"
+      "package": "com.eventos.mobile",
+      "versionCode": 1
     },
     "plugins": [
       "expo-asset",
