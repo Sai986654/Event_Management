@@ -45,6 +45,7 @@ frontend/.env.test.local
 frontend/.env.production.local
 
 # ─── Mobile (Expo / RN) ───
+mobile/.env
 mobile/node_modules/
 mobile/.expo/
 mobile/dist/

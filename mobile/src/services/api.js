@@ -1,10 +1,10 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Change this to your backend IP/URL
-// For local dev with Expo Go on physical device, use your computer's LAN IP
-// e.g., 'http://192.168.1.100:5000/api'
-const API_BASE_URL = 'https://lionlike-flavourlessly-neida.ngrok-free.dev/api'; // Android emulator → host machine
+const rawBase =
+  process.env.EXPO_PUBLIC_API_URL ||
+  'https://event-management-9i4d.onrender.com/api';
+const API_BASE_URL = `${String(rawBase).replace(/\/+$/, '')}/`;
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -13,6 +13,9 @@ const api = axios.create({
 
 // Attach token to every request
 api.interceptors.request.use(async (config) => {
+  if (typeof config.url === 'string' && config.url.startsWith('/')) {
+    config.url = config.url.slice(1);
+  }
   const token = await AsyncStorage.getItem('token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;

@@ -3,6 +3,7 @@
     "name": "EventOS",
     "slug": "eventos-mobile",
     "version": "1.0.0",
+    "scheme": "eventos",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "splash": {
