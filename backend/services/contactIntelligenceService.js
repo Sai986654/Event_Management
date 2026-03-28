@@ -9,6 +9,9 @@ const {
 
 const LOG = '[ContactIntelligence]';
 
+/** Avoid repeating the same Groq/OpenAI model mismatch warning on every batch. */
+let warnedContactAiModelMismatch = false;
+
 const normalize = (value) => String(value || '').trim().toLowerCase();
 
 const normalizePhone = (value) => {
@@ -237,9 +240,12 @@ function getContactAiModel() {
   const env = String(process.env.CONTACT_AI_MODEL || '').trim();
   if (env) {
     if (provider === 'groq' && /^(gpt-|o\d)/i.test(env)) {
-      console.warn(
-        `${LOG} CONTACT_AI_MODEL=${env} is not a Groq model; using llama-3.3-70b-versatile (see Groq console for model ids)`
-      );
+      if (!warnedContactAiModelMismatch) {
+        warnedContactAiModelMismatch = true;
+        console.warn(
+          `${LOG} CONTACT_AI_MODEL=${env} is not a Groq model; using llama-3.3-70b-versatile. Clear CONTACT_AI_MODEL or set a Groq model id to silence this.`
+        );
+      }
       return 'llama-3.3-70b-versatile';
     }
     return env;
