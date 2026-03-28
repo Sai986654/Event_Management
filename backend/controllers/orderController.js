@@ -13,7 +13,10 @@ exports.createOrderQuote = asyncHandler(async (req, res) => {
   if (!event) return res.status(404).json({ message: 'Event not found' });
 
   if (req.user.role !== 'admin' && event.organizerId !== req.user.id) {
-    return res.status(403).json({ message: 'Not authorized for this event' });
+    return res.status(403).json({
+      message:
+        'You can only request a quote for events you organize. Sign in as the event owner or an admin.',
+    });
   }
 
   const order = await prisma.eventOrder.create({
@@ -29,13 +32,35 @@ exports.createOrderQuote = asyncHandler(async (req, res) => {
   let total = 0;
   const itemsData = [];
   const activitiesData = [];
+  const skipped = [];
 
   for (const s of selections) {
+    const pid = Number(s.packageId);
+    if (!Number.isFinite(pid) || pid < 1) {
+      skipped.push({ packageId: s.packageId, reason: 'invalid_package_id' });
+      continue;
+    }
     const pkg = await prisma.vendorPackage.findUnique({
-      where: { id: Number(s.packageId) },
+      where: { id: pid },
       include: { vendor: true },
     });
-    if (!pkg || !pkg.isActive || !pkg.vendor.isVerified) continue;
+    if (!pkg) {
+      skipped.push({ packageId: pid, reason: 'package_not_found' });
+      continue;
+    }
+    if (!pkg.isActive) {
+      skipped.push({ packageId: pid, reason: 'package_inactive', title: pkg.title });
+      continue;
+    }
+    if (!pkg.vendor.isVerified) {
+      skipped.push({
+        packageId: pid,
+        reason: 'vendor_not_verified',
+        vendorId: pkg.vendorId,
+        businessName: pkg.vendor.businessName,
+      });
+      continue;
+    }
 
     const quotedPrice = estimatePackagePrice(pkg, s.criteria || {});
     total += quotedPrice;
@@ -66,7 +91,11 @@ exports.createOrderQuote = asyncHandler(async (req, res) => {
 
   if (!itemsData.length) {
     await prisma.eventOrder.delete({ where: { id: order.id } });
-    return res.status(400).json({ message: 'No valid package selections found' });
+    return res.status(400).json({
+      message:
+        'No valid package selections. Packages must exist, be active, and use verified vendors (same rules as the public package list). Refresh the planner and pick packages again.',
+      skipped,
+    });
   }
 
   await prisma.eventOrderItem.createMany({ data: itemsData });

@@ -20,7 +20,18 @@ export const formatCurrency = (amount, currency = 'INR') => {
 };
 
 export const getErrorMessage = (error) => {
-  return error?.response?.data?.message || error?.message || 'An error occurred';
+  const data = error?.response?.data;
+  if (!data) return error?.message || 'An error occurred';
+  let msg = data.message || 'An error occurred';
+  if (Array.isArray(data.errors) && data.errors.length) {
+    const bits = data.errors.map((e) => e.message || e.msg || e.field).filter(Boolean);
+    if (bits.length) msg = `${msg} (${bits.join('; ')})`;
+  }
+  if (Array.isArray(data.skipped) && data.skipped.length) {
+    const bits = data.skipped.map((s) => `#${s.packageId}: ${s.reason}`);
+    msg = `${msg} — ${bits.join('; ')}`;
+  }
+  return msg;
 };
 
 export const getRoleColor = (role) => {

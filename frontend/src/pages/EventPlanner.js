@@ -203,9 +203,9 @@ const EventPlanner = () => {
     setQuoting(true);
     try {
       const payload = {
-        eventId,
+        eventId: Number(eventId),
         selections: selectedPackageList.map((pkg) => ({
-          packageId: pkg.id,
+          packageId: Number(pkg.id),
           criteria: criteriaMap[pkg.id] || {},
         })),
       };
@@ -603,13 +603,20 @@ const EventPlanner = () => {
               <div><strong>Items:</strong> {quote.items?.length || 0}</div>
             </>
           )}
-          <Space>
-            <Button type="primary" onClick={createQuote} loading={quoting}>Generate Final Quotation</Button>
-            {quote ? (
-              <Button type="primary" onClick={placeOrder} loading={placingOrder} disabled={quote.status === 'placed'}>
-                Place Order
+          <Space direction="vertical" size={8}>
+            <Space wrap>
+              <Button type="primary" onClick={createQuote} loading={quoting} disabled={quoting}>
+                Generate Final Quotation
               </Button>
-            ) : null}
+              {quote ? (
+                <Button type="primary" onClick={placeOrder} loading={placingOrder} disabled={quote.status === 'placed'}>
+                  Place Order
+                </Button>
+              ) : null}
+            </Space>
+            <Text type="secondary" style={{ display: 'block', maxWidth: 560, fontSize: 12 }}>
+              Requires an organizer (or admin) account for this event; vendor logins cannot call this API. Packages must still be active with verified vendors — refresh the page if vendors were unverified after you picked them.
+            </Text>
           </Space>
         </Space>
       </Card>

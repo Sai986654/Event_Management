@@ -253,8 +253,8 @@ const PlannerScreen = () => {
   };
 
   const generateQuote = async () => {
-    if (user?.role !== 'customer' && user?.role !== 'admin') {
-      setMsg('Only customer/admin can generate quotation');
+    if (!['customer', 'admin', 'organizer'].includes(user?.role)) {
+      setMsg('Only customer, organizer, or admin can generate a quotation');
       setMsgType('error');
       return;
     }
