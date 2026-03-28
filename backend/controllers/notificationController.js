@@ -1,6 +1,7 @@
 const { prisma } = require('../config/db');
 const { sendEmail, sendSMS, sendWhatsApp } = require('../services/notificationService');
-const { analyzeContacts } = require('../services/contactIntelligenceService');
+const { analyzeContacts, analyzeContactsPipeline } = require('../services/contactIntelligenceService');
+const { parseGoogleContactsCsv } = require('../utils/googleContactsCsv');
 const asyncHandler = require('../utils/asyncHandler');
 
 // POST /api/notifications/email
@@ -18,10 +19,19 @@ exports.sendSMSNotification = asyncHandler(async (req, res) => {
 });
 
 // POST /api/notifications/contacts/analyze
+// Body: { contacts?: [...] } OR { csv: string (Google Contacts export) }, optional useOpenAi: boolean
 exports.analyzeContactGraph = asyncHandler(async (req, res) => {
-  const contacts = Array.isArray(req.body.contacts) ? req.body.contacts : [];
-  const analyzed = analyzeContacts(contacts);
-  res.json(analyzed);
+  const useOpenAi = req.body.useOpenAi !== false;
+
+  if (req.body.csv != null && typeof req.body.csv === 'string' && req.body.csv.trim()) {
+    const { contacts: raw, meta } = parseGoogleContactsCsv(req.body.csv);
+    const result = await analyzeContactsPipeline(raw, { useOpenAi });
+    return res.json({ ...result, importMeta: meta });
+  }
+
+  const raw = Array.isArray(req.body.contacts) ? req.body.contacts : [];
+  const result = await analyzeContactsPipeline(raw, { useOpenAi });
+  res.json(result);
 });
 
 // POST /api/notifications/events/:eventId/reminders/whatsapp

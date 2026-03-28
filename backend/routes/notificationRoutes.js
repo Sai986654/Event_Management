@@ -17,7 +17,15 @@ router.post('/sms', sendSMSNotification);
 router.post(
   '/contacts/analyze',
   [
-    body('contacts').isArray().withMessage('contacts must be an array'),
+    body('contacts').optional().isArray(),
+    body('csv').optional().isString(),
+    body('useOpenAi').optional().isBoolean(),
+    body().custom((_, { req }) => {
+      const hasCsv = typeof req.body.csv === 'string' && req.body.csv.trim().length > 0;
+      const hasContacts = Array.isArray(req.body.contacts) && req.body.contacts.length > 0;
+      if (hasCsv || hasContacts) return true;
+      throw new Error('Provide contacts (non-empty array) or csv (non-empty string)');
+    }),
   ],
   validate,
   analyzeContactGraph
@@ -25,7 +33,7 @@ router.post(
 router.post(
   '/events/:eventId/reminders/whatsapp',
   [
-    body('group').optional().isIn(['all', 'relatives', 'friends', 'others']),
+    body('group').optional().isIn(['all', 'relatives', 'friends', 'work', 'others']),
     body('message').optional().isString(),
     body('templateName').optional().isString(),
   ],

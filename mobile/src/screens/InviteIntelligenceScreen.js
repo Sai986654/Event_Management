@@ -31,6 +31,7 @@ const GROUPS = [
   { value: 'all', label: 'All' },
   { value: 'relatives', label: 'Relatives' },
   { value: 'friends', label: 'Friends' },
+  { value: 'work', label: 'Work' },
   { value: 'others', label: 'Others' },
 ];
 
@@ -47,6 +48,7 @@ const InviteIntelligenceScreen = () => {
   const [events, setEvents] = useState([]);
   const [eventId, setEventId] = useState('');
   const [contactsInput, setContactsInput] = useState('');
+  const [csvPaste, setCsvPaste] = useState('');
   const [analyzed, setAnalyzed] = useState(null);
   const [targetGroup, setTargetGroup] = useState('all');
   const [reminderMessage, setReminderMessage] = useState(
@@ -84,15 +86,18 @@ const InviteIntelligenceScreen = () => {
   const parsedContacts = useMemo(() => parseContactsFromText(contactsInput), [contactsInput]);
 
   const analyzeContacts = async () => {
-    if (!parsedContacts.length) {
-      showSnack('Add at least one contact line (name, phone, relation, email).', 'error');
+    const hasCsv = Boolean(csvPaste.trim());
+    if (!hasCsv && !parsedContacts.length) {
+      showSnack('Paste Google CSV or add manual lines (name, phone, relation, email).', 'error');
       return;
     }
     setAnalyzing(true);
     try {
-      const res = await notificationService.analyzeContacts(parsedContacts);
+      const res = hasCsv
+        ? await notificationService.analyzeContacts({ csv: csvPaste, useOpenAi: true })
+        : await notificationService.analyzeContacts({ contacts: parsedContacts, useOpenAi: true });
       setAnalyzed(res);
-      showSnack('Contacts analyzed.');
+      showSnack(res.importMeta ? `Imported ${res.importMeta.imported} from CSV.` : 'Contacts analyzed.');
     } catch (err) {
       showSnack(getErrorMessage(err), 'error');
     } finally {
@@ -181,19 +186,29 @@ const InviteIntelligenceScreen = () => {
         <Card style={styles.card}>
           <Card.Content>
             <Text variant="titleMedium" style={styles.sectionTitle}>
-              1) Paste contacts
+              1) Google CSV or manual lines
             </Text>
-            <Text style={styles.hint}>One per line: name, phone, relation, email</Text>
+            <Text style={styles.hint}>Export CSV from Google Contacts and paste below, or enter manual lines.</Text>
             <TextInput
               mode="outlined"
               multiline
-              numberOfLines={6}
+              numberOfLines={5}
+              value={csvPaste}
+              onChangeText={setCsvPaste}
+              placeholder="Paste full contacts.csv content here…"
+              style={styles.textArea}
+            />
+            <Text style={styles.hint}>Manual (one per line: name, phone, relation, email)</Text>
+            <TextInput
+              mode="outlined"
+              multiline
+              numberOfLines={5}
               value={contactsInput}
               onChangeText={setContactsInput}
               placeholder="Amma, +9198..., Mother, a@x.com"
               style={styles.textArea}
             />
-            <Text style={styles.muted}>Parsed: {parsedContacts.length}</Text>
+            <Text style={styles.muted}>Manual parsed: {parsedContacts.length}</Text>
             <Button mode="contained" onPress={analyzeContacts} loading={analyzing} style={styles.btn}>
               Analyze contact graph
             </Button>
@@ -210,6 +225,7 @@ const InviteIntelligenceScreen = () => {
                 <Chip compact>Total {analyzed.summary.total}</Chip>
                 <Chip compact>Relatives {analyzed.summary.relatives}</Chip>
                 <Chip compact>Friends {analyzed.summary.friends}</Chip>
+                <Chip compact>Work {analyzed.summary.work ?? 0}</Chip>
                 <Chip compact>WhatsApp {analyzed.summary.whatsAppEligible}</Chip>
               </View>
               {(analyzed.contacts || []).slice(0, 12).map((c, i) => (

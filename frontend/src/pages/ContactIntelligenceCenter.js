@@ -35,6 +35,8 @@ const ContactIntelligenceCenter = () => {
   const [runningCollage, setRunningCollage] = useState(false);
   const [fetchingCollage, setFetchingCollage] = useState(false);
   const [collageStyle, setCollageStyle] = useState('traditional');
+  const [csvFileName, setCsvFileName] = useState('');
+  const [csvPaste, setCsvPaste] = useState('');
 
   useEffect(() => {
     (async () => {
@@ -53,20 +55,35 @@ const ContactIntelligenceCenter = () => {
   const parsedContacts = useMemo(() => parseContactsFromText(contactsInput), [contactsInput]);
 
   const analyzeContacts = async () => {
-    if (!parsedContacts.length) {
-      message.warning('Add at least one valid contact line first.');
+    const hasCsv = Boolean(csvPaste.trim());
+    if (!hasCsv && !parsedContacts.length) {
+      message.warning('Add manual lines or paste/import a Google Contacts CSV.');
       return;
     }
     setAnalyzing(true);
     try {
-      const res = await notificationService.analyzeContacts(parsedContacts);
+      const res = hasCsv
+        ? await notificationService.analyzeContacts({ csv: csvPaste, useOpenAi: true })
+        : await notificationService.analyzeContacts({ contacts: parsedContacts, useOpenAi: true });
       setAnalyzed(res);
-      message.success('Contacts analyzed successfully.');
+      message.success(
+        res.importMeta ? `Imported ${res.importMeta.imported || 0} contacts from CSV.` : 'Contacts analyzed successfully.'
+      );
     } catch (err) {
       message.error(getErrorMessage(err));
     } finally {
       setAnalyzing(false);
     }
+  };
+
+  const onCsvFile = async (e) => {
+    const f = e.target.files?.[0];
+    e.target.value = '';
+    if (!f) return;
+    const text = await f.text();
+    setCsvPaste(text);
+    setCsvFileName(f.name);
+    message.info(`Loaded ${f.name} — click Analyze to segment.`);
   };
 
   const sendReminder = async () => {
@@ -121,6 +138,12 @@ const ContactIntelligenceCenter = () => {
     { title: 'Group', dataIndex: 'group', key: 'group', render: (v) => <Tag color={v === 'relatives' ? 'green' : v === 'friends' ? 'blue' : 'default'}>{v}</Tag> },
     { title: 'Confidence', dataIndex: 'confidence', key: 'confidence', render: (v) => `${Math.round(Number(v || 0) * 100)}%` },
     { title: 'WhatsApp', dataIndex: 'canNotifyWhatsApp', key: 'canNotifyWhatsApp', render: (v) => (v ? <Tag color="green">Eligible</Tag> : <Tag>Missing Phone</Tag>) },
+    {
+      title: 'AI',
+      dataIndex: 'segmentationSource',
+      key: 'segmentationSource',
+      render: (v) => <Tag color={v === 'openai' ? 'purple' : 'default'}>{v === 'openai' ? 'LLM' : 'Rules'}</Tag>,
+    },
   ];
 
   return (
@@ -134,19 +157,33 @@ const ContactIntelligenceCenter = () => {
         <Card className="phase-card" title="1) Import Contacts and Analyze">
           <Space direction="vertical" size={10} style={{ width: '100%' }}>
             <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-              Paste one contact per line in format: <Text code>name, phone, relationLabel, email</Text>
+              <Text strong>Option A — Google Contacts CSV:</Text> export from{' '}
+              <a href="https://contacts.google.com" target="_blank" rel="noreferrer">Google Contacts</a> (Export), then upload or paste the file below.
+              Labels and Notes are used to infer relations (rules + optional OpenAI when <Text code>OPENAI_API_KEY</Text> is set on the server).
+            </Paragraph>
+            <input type="file" accept=".csv,text/csv" onChange={onCsvFile} style={{ marginBottom: 8 }} />
+            {csvFileName ? <Text type="secondary">Loaded file: {csvFileName}</Text> : null}
+            <TextArea
+              rows={5}
+              placeholder="Paste full Google Contacts CSV here (optional if you use manual lines below)"
+              value={csvPaste}
+              onChange={(e) => setCsvPaste(e.target.value)}
+            />
+            <Paragraph type="secondary" style={{ marginBottom: 0 }}>
+              <Text strong>Option B — Manual lines:</Text> one per line: <Text code>name, phone, relationLabel, email</Text>
             </Paragraph>
             <TextArea
-              rows={8}
+              rows={6}
               placeholder={'Bride Mother, +919812345678, Amma, mom@example.com\nGroom Friend Ravi, 9876543210, Bestie, ravi@mail.com'}
               value={contactsInput}
               onChange={(e) => setContactsInput(e.target.value)}
             />
-            <Space>
+            <Space wrap>
               <Button type="primary" onClick={analyzeContacts} loading={analyzing}>
-                Analyze Contact Graph
+                Analyze &amp; segment (AI)
               </Button>
-              <Text type="secondary">Parsed contacts: {parsedContacts.length}</Text>
+              <Text type="secondary">Manual lines parsed: {parsedContacts.length}</Text>
+              {csvPaste.trim() ? <Tag color="blue">CSV ready ({csvPaste.length} chars)</Tag> : null}
             </Space>
           </Space>
         </Card>
@@ -160,8 +197,10 @@ const ContactIntelligenceCenter = () => {
                 <Tag color="purple">Total: {analyzed.summary?.total || 0}</Tag>
                 <Tag color="green">Relatives: {analyzed.summary?.relatives || 0}</Tag>
                 <Tag color="blue">Friends: {analyzed.summary?.friends || 0}</Tag>
+                <Tag color="orange">Work: {analyzed.summary?.work || 0}</Tag>
                 <Tag>Others: {analyzed.summary?.others || 0}</Tag>
                 <Tag color="gold">WhatsApp Eligible: {analyzed.summary?.whatsAppEligible || 0}</Tag>
+                {analyzed.aiUsed ? <Tag color="magenta">OpenAI refinement</Tag> : <Tag>Rules-only</Tag>}
               </Space>
               <Table rowKey={(row) => `${row.index}-${row.name}`} dataSource={analyzed.contacts} columns={columns} pagination={{ pageSize: 8 }} />
             </Space>
@@ -190,6 +229,7 @@ const ContactIntelligenceCenter = () => {
                   { value: 'all', label: 'All Contacts' },
                   { value: 'relatives', label: 'Relatives' },
                   { value: 'friends', label: 'Friends' },
+                  { value: 'work', label: 'Work / colleagues' },
                   { value: 'others', label: 'Others' },
                 ]}
               />

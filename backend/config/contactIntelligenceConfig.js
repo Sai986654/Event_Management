@@ -17,6 +17,7 @@ const relationDictionary = parseJsonEnv(process.env.CONTACT_RELATION_DICTIONARY_
   aunt: ['aunt', 'pinni', 'athayya'],
   cousin: ['cousin', 'bava', 'maradalu'],
   friend: ['friend', 'frnd', 'bestie', 'buddy', 'mate'],
+  colleague: ['colleague', 'coworker', 'work', 'office', 'boss', 'manager', 'team', 'staff', 'client', 'vendor'],
 });
 
 const relativeRelations = parseJsonEnv(process.env.CONTACT_RELATIVE_RELATIONS_JSON, [
