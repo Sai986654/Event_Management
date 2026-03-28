@@ -158,6 +158,10 @@ model Event {
   isPublic    Boolean     @default(false) @map("is_public")
   timeline    Json        @default("[]")
   tasks       Json        @default("[]")
+  inviteDripEnabled      Boolean   @default(false) @map("invite_drip_enabled")
+  inviteDripIntervalDays Int       @default(2) @map("invite_drip_interval_days")
+  inviteDripLastSentAt   DateTime? @map("invite_drip_last_sent_at")
+  inviteDripVideoUrl     String?   @map("invite_drip_video_url") @db.VarChar(500)
   createdAt   DateTime    @default(now()) @map("created_at")
   updatedAt   DateTime    @updatedAt @map("updated_at")
 

@@ -48,6 +48,12 @@ app.use(
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
+// Avoid stale JSON behind browsers/CDNs (304 + empty lists confused users)
+app.use('/api', (req, res, next) => {
+  res.set('Cache-Control', 'private, no-store, no-cache, must-revalidate');
+  next();
+});
+
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/events', eventRoutes);
@@ -80,6 +86,20 @@ const start = async () => {
   server.listen(PORT, () => {
     console.log(`EventOS server running on port ${PORT}`);
   });
+
+  if (String(process.env.INVITE_DRIP_ENABLED || 'true').toLowerCase() !== 'false') {
+    try {
+      const cron = require('node-cron');
+      const { processInviteDripsTick } = require('./services/inviteDripService');
+      const schedule = process.env.INVITE_DRIP_CRON || '0 9 * * *';
+      cron.schedule(schedule, () => {
+        processInviteDripsTick().catch((err) => console.error('[InviteDrip] cron', err?.message || err));
+      });
+      console.log(`[InviteDrip] cron: ${schedule} (set INVITE_DRIP_CRON / INVITE_DRIP_ENABLED)`);
+    } catch (e) {
+      console.warn('[InviteDrip] node-cron not installed — run: npm install node-cron');
+    }
+  }
 };
 
 // Graceful shutdown

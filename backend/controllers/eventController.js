@@ -5,6 +5,7 @@ const slugify = require('slugify');
 const QRCode = require('qrcode');
 const { gifting, inviteCopy } = require('../config/inviteConfig');
 const { dispatchEventCreated } = require('../services/inAppNotificationService');
+const { triggerInviteDripForEventId } = require('../services/inviteDripService');
 
 const generateSlug = (title) =>
   slugify(title, { lower: true, strict: true }) + '-' + Date.now().toString(36);
@@ -173,4 +174,21 @@ exports.updateTimeline = asyncHandler(async (req, res) => {
     data: { timeline: req.body.timeline },
   });
   res.json({ timeline: updated.timeline });
+});
+
+// POST /api/events/:id/invite-drip/trigger — test or force-send scheduled WhatsApp drip (organizer/admin)
+exports.triggerInviteDrip = asyncHandler(async (req, res) => {
+  const eventId = Number(req.params.id);
+  const event = await prisma.event.findUnique({ where: { id: eventId } });
+  if (!event) return res.status(404).json({ message: 'Event not found' });
+  if (req.user.role !== 'admin' && event.organizerId !== req.user.id) {
+    return res.status(403).json({ message: 'Not authorized' });
+  }
+  const force = req.query.force === '1' || req.body?.force === true;
+  const result = await triggerInviteDripForEventId(eventId, { force });
+  if (result.error) {
+    const status = result.code === 'INTERVAL' ? 409 : 400;
+    return res.status(status).json(result);
+  }
+  res.json(result);
 });

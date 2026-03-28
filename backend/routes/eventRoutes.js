@@ -11,6 +11,7 @@ const {
   deleteEvent,
   updateTasks,
   updateTimeline,
+  triggerInviteDrip,
 } = require('../controllers/eventController');
 
 // Public route — get event by slug
@@ -35,6 +36,11 @@ router.post(
 );
 
 router.get('/', getEvents);
+router.post(
+  '/:id/invite-drip/trigger',
+  authorize('admin', 'organizer', 'customer'),
+  triggerInviteDrip
+);
 router.get('/:id', getEvent);
 router.put('/:id', authorize('admin', 'organizer', 'customer'), updateEvent);
 router.delete('/:id', authorize('admin', 'organizer', 'customer'), deleteEvent);

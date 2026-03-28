@@ -72,7 +72,13 @@ const ActivityTracker = () => {
             placeholder="Select order"
             onChange={loadActivities}
             options={orders.map((o) => ({ value: o.id, label: `Order #${o.id} - ${o.event?.title || 'Event'} (${o.status})` }))}
+            notFoundContent={orders.length === 0 ? 'No orders yet' : undefined}
           />
+          {orders.length === 0 && (
+            <p className="phase-subtitle" style={{ marginTop: 12, marginBottom: 0 }}>
+              Orders (and activities) show up after you request a vendor quote in Event Planner for an event you organize. If you already have quotes, refresh the page after deploying the latest API.
+            </p>
+          )}
         </Card>
 
         <Card className="phase-card phase-table" title="Activities and Progress">

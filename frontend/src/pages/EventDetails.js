@@ -1,6 +1,22 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Card, Tabs, Button, Spin, message, Modal, Table, Badge, Tag, Space, Input, Typography } from 'antd';
+import {
+  Card,
+  Tabs,
+  Button,
+  Spin,
+  message,
+  Modal,
+  Table,
+  Badge,
+  Tag,
+  Space,
+  Input,
+  Typography,
+  Switch,
+  InputNumber,
+  Divider,
+} from 'antd';
 import { EditOutlined, DeleteOutlined, ControlOutlined, ShopOutlined } from '@ant-design/icons';
 import { eventService } from '../services/eventService';
 import { guestService } from '../services/guestService';
@@ -8,10 +24,10 @@ import { bookingService } from '../services/bookingService';
 import { useEventSocket } from '../hooks/useEventSocket';
 import { formatDate, formatCurrency, getErrorMessage } from '../utils/helpers';
 import { notificationService } from '../services/notificationService';
+import './EventDetails.css';
 
 const { TextArea } = Input;
 const { Paragraph, Text } = Typography;
-import './EventDetails.css';
 
 const EventDetails = () => {
   const { eventId } = useParams();
@@ -22,6 +38,11 @@ const EventDetails = () => {
   const [loading, setLoading] = useState(true);
   const [waMessage, setWaMessage] = useState('');
   const [waSending, setWaSending] = useState(false);
+  const [dripEnabled, setDripEnabled] = useState(false);
+  const [dripInterval, setDripInterval] = useState(2);
+  const [dripVideoUrl, setDripVideoUrl] = useState('');
+  const [dripSaving, setDripSaving] = useState(false);
+  const [dripTesting, setDripTesting] = useState(false);
 
   // Real-time handlers
   const handleGuestRsvp = useCallback((data) => {
@@ -59,6 +80,13 @@ const EventDetails = () => {
     fetchEventDetails();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventId]);
+
+  useEffect(() => {
+    if (!event) return;
+    setDripEnabled(Boolean(event.inviteDripEnabled));
+    setDripInterval(Math.min(14, Math.max(1, Number(event.inviteDripIntervalDays) || 2)));
+    setDripVideoUrl(event.inviteDripVideoUrl || '');
+  }, [event]);
 
   const fetchEventDetails = async () => {
     try {
@@ -126,6 +154,37 @@ const EventDetails = () => {
       okType: 'danger',
       onOk: () => handleUpdateBookingStatus(bookingId, 'cancelled'),
     });
+  };
+
+  const saveDripSettings = async () => {
+    setDripSaving(true);
+    try {
+      const res = await eventService.updateEvent(eventId, {
+        inviteDripEnabled: dripEnabled,
+        inviteDripIntervalDays: dripInterval,
+        inviteDripVideoUrl: dripVideoUrl.trim() || null,
+      });
+      setEvent(res.event);
+      message.success('Invite drip settings saved.');
+    } catch (err) {
+      message.error(getErrorMessage(err));
+    } finally {
+      setDripSaving(false);
+    }
+  };
+
+  const testInviteDrip = async () => {
+    setDripTesting(true);
+    try {
+      const res = await eventService.triggerInviteDrip(eventId, { force: true });
+      message.success(
+        `Drip sent: ${res.sent ?? 0} guest(s). ${res.skipped ? '(No phones on guest list?)' : ''}`
+      );
+    } catch (err) {
+      message.error(getErrorMessage(err));
+    } finally {
+      setDripTesting(false);
+    }
   };
 
   const sendGuestWhatsAppBroadcast = async () => {
@@ -271,6 +330,47 @@ const EventDetails = () => {
                       and you receive in-app alerts when photos arrive. Physical invites can print a QR pointing to the
                       same URL.
                     </Paragraph>
+
+                    <Divider />
+                    <h4>Scheduled AI invite drips (WhatsApp)</h4>
+                    <Paragraph type="secondary">
+                      The server runs a <Text strong>daily job</Text> (default 09:00, cron in <Text code>INVITE_DRIP_CRON</Text>).
+                      For each enabled public event before the date, we send guests a <Text strong>fresh LLM-written</Text>{' '}
+                      reminder every <Text strong>N days</Text> (e.g. 2). This is innovative copy + your public link — not
+                      auto-rendered AI video yet. Add an optional <Text strong>teaser video URL</Text> (YouTube, etc.); the
+                      message will mention it. Real generated video would need a provider (e.g. Runway) wired separately.
+                    </Paragraph>
+                    <Space direction="vertical" size={12} style={{ width: '100%', maxWidth: 520 }}>
+                      <Space align="center">
+                        <Text>Enable drip sends</Text>
+                        <Switch checked={dripEnabled} onChange={setDripEnabled} />
+                      </Space>
+                      <Space align="center">
+                        <Text>Every</Text>
+                        <InputNumber min={1} max={14} value={dripInterval} onChange={(v) => setDripInterval(v || 2)} />
+                        <Text>days</Text>
+                      </Space>
+                      <Input
+                        placeholder="Optional teaser video URL (YouTube, Cloudinary, …)"
+                        value={dripVideoUrl}
+                        onChange={(e) => setDripVideoUrl(e.target.value)}
+                      />
+                      <Space wrap>
+                        <Button type="primary" onClick={saveDripSettings} loading={dripSaving}>
+                          Save drip settings
+                        </Button>
+                        <Button onClick={testInviteDrip} loading={dripTesting}>
+                          Send test drip now (force)
+                        </Button>
+                      </Space>
+                      {event.inviteDripLastSentAt ? (
+                        <Text type="secondary">
+                          Last automated drip: {formatDate(event.inviteDripLastSentAt)}
+                        </Text>
+                      ) : null}
+                    </Space>
+
+                    <Divider />
                     <h4>WhatsApp progress update</h4>
                     <Paragraph type="secondary">
                       Sends your text to every guest who has a phone number in the guest list (same backend as Contact

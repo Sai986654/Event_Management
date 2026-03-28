@@ -153,9 +153,22 @@ exports.placeOrder = asyncHandler(async (req, res) => {
 
 exports.getOrders = asyncHandler(async (req, res) => {
   const where = {};
-  if (req.user.role === 'customer') where.customerId = req.user.id;
-  if (req.user.role === 'organizer') where.organizerId = req.user.id;
   if (req.query.eventId) where.eventId = Number(req.query.eventId);
+
+  if (req.user.role === 'admin') {
+    // optional eventId filter only
+  } else if (req.user.role === 'vendor') {
+    const vendor = await prisma.vendor.findUnique({ where: { userId: req.user.id } });
+    if (!vendor) {
+      return res.json({ orders: [] });
+    }
+    where.items = { some: { vendorId: vendor.id } };
+  } else if (req.user.role === 'customer' || req.user.role === 'organizer') {
+    // Event owners often use role "customer"; include orders where they bought OR own the event.
+    where.OR = [{ customerId: req.user.id }, { organizerId: req.user.id }];
+  } else {
+    return res.json({ orders: [] });
+  }
 
   const orders = await prisma.eventOrder.findMany({
     where,

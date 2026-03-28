@@ -26,6 +26,12 @@ export const eventService = {
     return response.data;
   },
 
+  /** Run scheduled invite drip once (optional body: { force: true } to ignore interval). */
+  triggerInviteDrip: async (eventId, body = {}) => {
+    const response = await api.post(`/events/${eventId}/invite-drip/trigger`, body);
+    return response.data;
+  },
+
   deleteEvent: async (eventId) => {
     const response = await api.delete(`/events/${eventId}`);
     return response.data;

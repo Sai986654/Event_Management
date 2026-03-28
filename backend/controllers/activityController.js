@@ -37,12 +37,8 @@ exports.updateActivityProgress = asyncHandler(async (req, res) => {
   });
   if (!activity) return res.status(404).json({ message: 'Activity not found' });
 
-  if (!(req.user.role === 'organizer' || req.user.role === 'admin')) {
-    return res.status(403).json({ message: 'Only organizer/admin can update activity progress' });
-  }
-
-  if (req.user.role === 'organizer' && activity.order.organizerId !== req.user.id) {
-    return res.status(403).json({ message: 'Not authorized for this order activity' });
+  if (req.user.role !== 'admin' && activity.order.organizerId !== req.user.id) {
+    return res.status(403).json({ message: 'Only the event organizer can update activity progress' });
   }
 
   const progress = Math.max(0, Math.min(100, Number(req.body.progressPercent ?? activity.progressPercent)));

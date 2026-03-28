@@ -7,6 +7,10 @@ const API_BASE_URL = `${rawBase.replace(/\/+$/, '')}/`;
 const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: 10000,
+  headers: {
+    'Cache-Control': 'no-cache',
+    Pragma: 'no-cache',
+  },
 });
 
 // Add token to every request
