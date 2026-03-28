@@ -41,7 +41,8 @@ app.use(
   cors({
     origin: corsOrigin,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    // Include Cache-Control/Pragma if any client sends them (otherwise preflight fails)
+    allowedHeaders: ['Content-Type', 'Authorization', 'Cache-Control', 'Pragma'],
     optionsSuccessStatus: 204,
   })
 );
