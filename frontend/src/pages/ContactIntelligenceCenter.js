@@ -411,8 +411,11 @@ const ContactIntelligenceCenter = () => {
               value={contactsInput}
               onChange={(e) => setContactsInput(e.target.value)}
             />
+            <Paragraph type="secondary" style={{ marginBottom: 0, fontSize: 12 }}>
+              Large imports run several LLM batches; <Text strong>expect roughly 1–3 minutes</Text> for big lists. Keep this tab open — the request waits up to 3 minutes.
+            </Paragraph>
             <Space wrap>
-              <Button type="primary" onClick={analyzeContacts} loading={analyzing}>
+              <Button type="primary" onClick={analyzeContacts} loading={analyzing} disabled={analyzing}>
                 Analyze &amp; segment (AI)
               </Button>
               <Button onClick={loadSavedAnalysis}>Load last saved (this browser)</Button>
@@ -520,7 +523,12 @@ const ContactIntelligenceCenter = () => {
                 {nameFilter.trim() ? ` (search: “${nameFilter.trim()}”)` : ''}
               </Text>
               <Space wrap align="center">
-                <Button type="primary" onClick={correlateSelected} loading={correlating} disabled={selectedRowKeys.length < 2}>
+                <Button
+                  type="primary"
+                  onClick={correlateSelected}
+                  loading={correlating}
+                  disabled={selectedRowKeys.length < 2 || correlating}
+                >
                   Correlate selected with AI ({selectedRowKeys.length})
                 </Button>
                 <Button

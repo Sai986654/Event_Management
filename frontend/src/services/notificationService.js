@@ -1,20 +1,27 @@
 import api from './api';
 
+/** Groq/OpenAI runs many batches; large CSVs often need 1–3+ minutes. Default axios timeout is 10s. */
+const CONTACT_INTEL_HTTP_TIMEOUT_MS = 180000;
+
 export const notificationService = {
   /**
    * @param {{ contacts?: object[], csv?: string, useOpenAi?: boolean, listOwnerContext?: string, listOwnerNotes?: string }} payload
    */
   analyzeContacts: async (payload) => {
-    const response = await api.post('/notifications/contacts/analyze', payload);
+    const response = await api.post('/notifications/contacts/analyze', payload, {
+      timeout: CONTACT_INTEL_HTTP_TIMEOUT_MS,
+    });
     return response.data;
   },
 
   /**
-   * Multi-select correlation for analyzed contacts (OpenAI on server).
+   * Multi-select correlation for analyzed contacts (LLM on server).
    * @param {{ contacts: object[], listOwnerContext?: string, listOwnerNotes?: string }} payload
    */
   correlateContacts: async (payload) => {
-    const response = await api.post('/notifications/contacts/correlate', payload);
+    const response = await api.post('/notifications/contacts/correlate', payload, {
+      timeout: CONTACT_INTEL_HTTP_TIMEOUT_MS,
+    });
     return response.data;
   },
 

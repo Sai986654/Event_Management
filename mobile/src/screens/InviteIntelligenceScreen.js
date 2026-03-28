@@ -345,7 +345,10 @@ const InviteIntelligenceScreen = () => {
               style={styles.textArea}
             />
             <Text style={styles.muted}>Manual parsed: {parsedContacts.length}</Text>
-            <Button mode="contained" onPress={analyzeContacts} loading={analyzing} style={styles.btn}>
+            <Text style={styles.hint}>
+              Large lists use several AI batches — can take 1–3 minutes. Keep the app open; the request allows up to 3 minutes.
+            </Text>
+            <Button mode="contained" onPress={analyzeContacts} loading={analyzing} disabled={analyzing} style={styles.btn}>
               Analyze contact graph
             </Button>
           </Card.Content>
@@ -405,7 +408,7 @@ const InviteIntelligenceScreen = () => {
                 mode="contained-tonal"
                 onPress={runCorrelateSelected}
                 loading={correlating}
-                disabled={selectedForCorrelate.length < 2}
+                disabled={selectedForCorrelate.length < 2 || correlating}
                 style={styles.btn}
               >
                 Correlate selected ({selectedForCorrelate.length})
