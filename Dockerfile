@@ -15,5 +15,7 @@ RUN npx prisma generate
 
 EXPOSE 5000
 
-# directUrl is required by schema.prisma; default to DATABASE_URL if Render only sets DATABASE_URL
-CMD ["sh", "-c", "export DIRECT_URL=\"${DIRECT_URL:-$DATABASE_URL}\" && npx prisma migrate deploy && node server.js"]
+RUN chmod +x scripts/start-production.sh
+
+# Migrations run on every container start (see backend/scripts/start-production.sh).
+CMD ["npm", "run", "start:prod"]

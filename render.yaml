@@ -1,3 +1,5 @@
+# Backend container runs `npm run start:prod` → prisma migrate deploy, then node server.js.
+# Do not run migrations only in CI; production applies them on each deploy/start.
 services:
   - type: web
     name: eventos-backend

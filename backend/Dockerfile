@@ -15,4 +15,6 @@ RUN npx prisma generate
 
 EXPOSE 5000
 
-CMD ["sh", "-c", "export DIRECT_URL=\"${DIRECT_URL:-$DATABASE_URL}\" && npx prisma migrate deploy && node server.js"]
+RUN chmod +x scripts/start-production.sh
+
+CMD ["npm", "run", "start:prod"]

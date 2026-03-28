@@ -5,6 +5,8 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
+    "migrate:deploy": "prisma migrate deploy",
+    "start:prod": "sh ./scripts/start-production.sh",
     "dev": "nodemon server.js",
     "seed": "node seeds/seed.js",
     "test": "jest --forceExit --detectOpenHandles",
