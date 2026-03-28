@@ -6,6 +6,17 @@ const initSocket = (io) => {
   io.on('connection', (socket) => {
     console.log(`Socket connected: ${socket.id}`);
 
+    socket.on('join-user', (userId) => {
+      if (userId == null || userId === '') return;
+      socket.join(`user-${userId}`);
+      console.log(`Socket ${socket.id} joined user-${userId}`);
+    });
+
+    socket.on('leave-user', (userId) => {
+      if (userId == null || userId === '') return;
+      socket.leave(`user-${userId}`);
+    });
+
     // Join an event room for live updates
     socket.on('join-event', (eventId) => {
       socket.join(`event-${eventId}`);

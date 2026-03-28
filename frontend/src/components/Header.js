@@ -1,13 +1,39 @@
-import React, { useContext } from 'react';
-import { Layout, Button, Dropdown, Avatar, Tag } from 'antd';
-import { UserOutlined, LogoutOutlined } from '@ant-design/icons';
+import React, { useContext, useEffect, useState, useCallback } from 'react';
+import { Layout, Button, Dropdown, Avatar, Tag, Badge } from 'antd';
+import { UserOutlined, LogoutOutlined, BellOutlined } from '@ant-design/icons';
 import { Link, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
+import { SocketContext } from '../context/SocketContext';
+import { appNotificationService } from '../services/appNotificationService';
 import './Header.css';
 
 const Header = () => {
   const { user, logout } = useContext(AuthContext);
+  const socketCtx = useContext(SocketContext);
   const navigate = useNavigate();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  const refreshUnread = useCallback(async () => {
+    if (!user) return;
+    try {
+      const data = await appNotificationService.list({ limit: 1 });
+      setUnreadCount(data.unreadCount ?? 0);
+    } catch {
+      setUnreadCount(0);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    refreshUnread();
+  }, [refreshUnread]);
+
+  useEffect(() => {
+    if (!socketCtx?.onNotificationNew) return undefined;
+    const unsub = socketCtx.onNotificationNew(() => refreshUnread());
+    return () => {
+      if (typeof unsub === 'function') unsub();
+    };
+  }, [socketCtx, refreshUnread]);
 
   const handleLogout = () => {
     logout();
@@ -37,6 +63,7 @@ const Header = () => {
       return (
         <>
           <Link to="/dashboard">Dashboard</Link>
+          <Link to="/notifications">Alerts</Link>
           <Link to="/vendors">Vendors</Link>
           <Link to="/bookings">Bookings</Link>
         </>
@@ -47,6 +74,7 @@ const Header = () => {
       return (
         <>
           <Link to="/dashboard">Dashboard</Link>
+          <Link to="/notifications">Alerts</Link>
           <Link to="/vendors">Vendors</Link>
           <Link to="/bookings">My Bookings</Link>
         </>
@@ -57,6 +85,7 @@ const Header = () => {
       return (
         <>
           <Link to="/dashboard">Dashboard</Link>
+          <Link to="/notifications">Alerts</Link>
           <Link to="/bookings">My Bookings</Link>
         </>
       );
@@ -78,6 +107,16 @@ const Header = () => {
             <nav className="nav-menu">
               {getNavLinks()}
             </nav>
+
+            <Badge count={unreadCount} size="small" offset={[-2, 2]}>
+              <Button
+                type="text"
+                icon={<BellOutlined style={{ fontSize: 18 }} />}
+                aria-label="Notifications"
+                onClick={() => navigate('/notifications')}
+                style={{ marginRight: 8 }}
+              />
+            </Badge>
 
             <Dropdown menu={{ items: userMenuItems }} trigger={['click']}>
               <Avatar icon={<UserOutlined />} className="user-avatar" />

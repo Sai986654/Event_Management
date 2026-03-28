@@ -14,6 +14,20 @@ import { eventService } from '../services/eventService';
 import { notificationService } from '../services/notificationService';
 import { aiService } from '../services/aiService';
 import { getErrorMessage } from '../utils/helpers';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const CONTACT_INTEL_STORAGE_KEY = 'eventos_contact_intelligence_v1';
+
+const LIST_OWNER_OPTIONS = [
+  { value: 'unspecified', label: 'Unspecified' },
+  { value: 'groom', label: 'Groom' },
+  { value: 'bride', label: 'Bride' },
+  { value: 'groom_father', label: 'Groom father' },
+  { value: 'groom_mother', label: 'Groom mother' },
+  { value: 'bride_father', label: 'Bride father' },
+  { value: 'bride_mother', label: 'Bride mother' },
+  { value: 'other', label: 'Other' },
+];
 
 const parseContactsFromText = (value) =>
   String(value || '')
@@ -49,6 +63,8 @@ const InviteIntelligenceScreen = () => {
   const [eventId, setEventId] = useState('');
   const [contactsInput, setContactsInput] = useState('');
   const [csvPaste, setCsvPaste] = useState('');
+  const [listOwnerContext, setListOwnerContext] = useState('unspecified');
+  const [listOwnerNotes, setListOwnerNotes] = useState('');
   const [analyzed, setAnalyzed] = useState(null);
   const [targetGroup, setTargetGroup] = useState('all');
   const [reminderMessage, setReminderMessage] = useState(
@@ -93,10 +109,50 @@ const InviteIntelligenceScreen = () => {
     }
     setAnalyzing(true);
     try {
+      console.log('[InviteIntelligence] analyze start', {
+        listOwnerContext,
+        hasCsv,
+        manualCount: parsedContacts.length,
+      });
       const res = hasCsv
-        ? await notificationService.analyzeContacts({ csv: csvPaste, useOpenAi: true })
-        : await notificationService.analyzeContacts({ contacts: parsedContacts, useOpenAi: true });
+        ? await notificationService.analyzeContacts({
+            csv: csvPaste,
+            useOpenAi: true,
+            listOwnerContext,
+            listOwnerNotes,
+          })
+        : await notificationService.analyzeContacts({
+            contacts: parsedContacts,
+            useOpenAi: true,
+            listOwnerContext,
+            listOwnerNotes,
+          });
       setAnalyzed(res);
+      console.log('[InviteIntelligence] analyze done', {
+        aiUsed: res.aiUsed,
+        openAiRefinedCount: res.openAiRefinedCount,
+        listOwner: res.listOwnerContext,
+      });
+      try {
+        await AsyncStorage.setItem(
+          CONTACT_INTEL_STORAGE_KEY,
+          JSON.stringify({
+            version: 1,
+            savedAt: new Date().toISOString(),
+            listOwnerContext,
+            listOwnerNotes,
+            contacts: res.contacts,
+            summary: res.summary,
+            aiUsed: res.aiUsed,
+            aiOverview: res.aiOverview,
+            openAiRefinedCount: res.openAiRefinedCount,
+            importMeta: res.importMeta,
+          })
+        );
+        console.log('[InviteIntelligence] saved AsyncStorage', CONTACT_INTEL_STORAGE_KEY, res.contacts?.length);
+      } catch (e) {
+        console.warn('[InviteIntelligence] AsyncStorage save failed', e?.message);
+      }
       showSnack(res.importMeta ? `Imported ${res.importMeta.imported} from CSV.` : 'Contacts analyzed.');
     } catch (err) {
       showSnack(getErrorMessage(err), 'error');
@@ -186,7 +242,39 @@ const InviteIntelligenceScreen = () => {
         <Card style={styles.card}>
           <Card.Content>
             <Text variant="titleMedium" style={styles.sectionTitle}>
-              1) Google CSV or manual lines
+              1) Whose contact list?
+            </Text>
+            <Text style={styles.hint}>
+              AI uses this to read Telugu/English labels (Amma, Mamayya, etc.) in the right family context.
+            </Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.eventChips}>
+              {LIST_OWNER_OPTIONS.map((o) => (
+                <Chip
+                  key={o.value}
+                  selected={listOwnerContext === o.value}
+                  onPress={() => setListOwnerContext(o.value)}
+                  style={styles.eventChip}
+                >
+                  {o.label}
+                </Chip>
+              ))}
+            </ScrollView>
+            <TextInput
+              mode="outlined"
+              multiline
+              numberOfLines={2}
+              value={listOwnerNotes}
+              onChangeText={setListOwnerNotes}
+              placeholder="Optional notes for the AI (side of family, city, …)"
+              style={styles.textAreaSmall}
+            />
+          </Card.Content>
+        </Card>
+
+        <Card style={styles.card}>
+          <Card.Content>
+            <Text variant="titleMedium" style={styles.sectionTitle}>
+              2) Google CSV or manual lines
             </Text>
             <Text style={styles.hint}>Export CSV from Google Contacts and paste below, or enter manual lines.</Text>
             <TextInput
@@ -219,18 +307,28 @@ const InviteIntelligenceScreen = () => {
           <Card style={styles.card}>
             <Card.Content>
               <Text variant="titleMedium" style={styles.sectionTitle}>
-                2) Segmentation
+                3) Segmentation
               </Text>
+              {analyzed.aiOverview ? <Text style={styles.overview}>{analyzed.aiOverview}</Text> : null}
               <View style={styles.chipRow}>
                 <Chip compact>Total {analyzed.summary.total}</Chip>
                 <Chip compact>Relatives {analyzed.summary.relatives}</Chip>
                 <Chip compact>Friends {analyzed.summary.friends}</Chip>
                 <Chip compact>Work {analyzed.summary.work ?? 0}</Chip>
                 <Chip compact>WhatsApp {analyzed.summary.whatsAppEligible}</Chip>
+                {analyzed.aiUsed ? <Chip compact>AI</Chip> : null}
+                {analyzed.openAiRefinedCount != null ? (
+                  <Chip compact>LLM {analyzed.openAiRefinedCount}</Chip>
+                ) : null}
               </View>
               {(analyzed.contacts || []).slice(0, 12).map((c, i) => (
-                <Text key={`${c.name}-${i}`} style={styles.rowLine} numberOfLines={2}>
-                  {c.name} · {c.group} · {c.inferredRelation}
+                <Text key={`${c.name}-${i}`} style={styles.rowLine} numberOfLines={4}>
+                  {c.name} · {c.relationTelugu || '—'} · {c.group} · {c.inferredRelation}
+                  {c.nameSuffixHint
+                    ? c.nameSuffixHint.kind === 'employer'
+                      ? ` · work @ ${c.nameSuffixHint.token}`
+                      : ` · trade: ${c.nameSuffixHint.token}`
+                    : ''}
                 </Text>
               ))}
               {(analyzed.contacts || []).length > 12 ? (
@@ -243,7 +341,7 @@ const InviteIntelligenceScreen = () => {
         <Card style={styles.card}>
           <Card.Content>
             <Text variant="titleMedium" style={styles.sectionTitle}>
-              3) Event & WhatsApp reminder
+              4) Event & WhatsApp reminder
             </Text>
             {loadingEvents ? <ActivityIndicator /> : null}
             <Text style={styles.hint}>Pick event ID (from your events list)</Text>
@@ -293,7 +391,7 @@ const InviteIntelligenceScreen = () => {
         <Card style={styles.card}>
           <Card.Content>
             <Text variant="titleMedium" style={styles.sectionTitle}>
-              4) AI remote-blessing collage
+              5) AI remote-blessing collage
             </Text>
             <Text style={styles.hint}>Uses blessing photos guests uploaded (web public page).</Text>
             <View style={styles.chipRow}>
@@ -373,6 +471,7 @@ const styles = StyleSheet.create({
   eventChip: { marginRight: 6 },
   rowBtns: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
   rowLine: { fontSize: 13, color: '#344054', marginBottom: 4 },
+  overview: { fontSize: 13, color: '#344054', marginBottom: 10, lineHeight: 20 },
   statusBox: { marginTop: 12, padding: 10, backgroundColor: '#f8f9fc', borderRadius: 8 },
   url: { fontSize: 11, color: '#667eea', marginTop: 4 },
   snackError: { backgroundColor: '#c0392b' },

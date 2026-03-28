@@ -53,6 +53,18 @@ export const socketService = {
     }
   },
 
+  joinUser: (userId) => {
+    if (socket?.connected && userId != null) {
+      socket.emit('join-user', userId);
+    }
+  },
+
+  leaveUser: (userId) => {
+    if (socket?.connected && userId != null) {
+      socket.emit('leave-user', userId);
+    }
+  },
+
   // Emit: vendor status update
   emitVendorStatus: (eventId, vendorId, status) => {
     if (socket?.connected) {
@@ -96,5 +108,10 @@ export const socketService = {
   onBookingUpdated: (callback) => {
     socket?.on('booking:updated', callback);
     return () => socket?.off('booking:updated', callback);
+  },
+
+  onNotificationNew: (callback) => {
+    socket?.on('notification:new', callback);
+    return () => socket?.off('notification:new', callback);
   },
 };

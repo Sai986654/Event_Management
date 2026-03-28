@@ -115,8 +115,25 @@ model User {
   activityUpdates EventActivity[] @relation("ActivityUpdatedBy")
   reviews       Review[]
   media         Media[]
+  appNotifications AppNotification[]
 
   @@map("users")
+}
+
+model AppNotification {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  type      String   @db.VarChar(64)
+  title     String   @db.VarChar(200)
+  body      String   @db.Text
+  read      Boolean  @default(false)
+  metadata  Json     @default("{}")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read, createdAt(sort: Desc)])
+  @@map("app_notifications")
 }
 
 model Event {

@@ -21,6 +21,7 @@ import ActivityTrackerScreen from '../screens/ActivityTrackerScreen';
 import AdminControlScreen from '../screens/AdminControlScreen';
 import InviteIntelligenceScreen from '../screens/InviteIntelligenceScreen';
 import PublicEventScreen from '../screens/PublicEventScreen';
+import NotificationsScreen from '../screens/NotificationsScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -44,6 +45,7 @@ const DashboardStack = () => (
     <Stack.Screen name="ActivityTracker" component={ActivityTrackerScreen} options={{ title: 'Activity Tracker' }} />
     <Stack.Screen name="AdminControl" component={AdminControlScreen} options={{ title: 'Admin Control' }} />
     <Stack.Screen name="InviteIntelligence" component={InviteIntelligenceScreen} options={{ title: 'Invite Intelligence' }} />
+    <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Notifications' }} />
     <Stack.Screen
       name="PublicEvent"
       component={PublicEventScreen}

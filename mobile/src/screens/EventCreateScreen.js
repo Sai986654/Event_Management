@@ -24,6 +24,7 @@ const EventCreateScreen = ({ navigation }) => {
   const [budget, setBudget] = useState('');
   const [guestCount, setGuestCount] = useState('');
   const [description, setDescription] = useState('');
+  const [vendorIdsText, setVendorIdsText] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleCreate = async () => {
@@ -43,6 +44,13 @@ const EventCreateScreen = ({ navigation }) => {
         guestCount: guestCount ? Number(guestCount) : undefined,
         description: description.trim() || undefined,
       };
+      const vendorIds = vendorIdsText
+        .split(/[\s,]+/)
+        .map((s) => Number(String(s).trim()))
+        .filter((n) => Number.isFinite(n) && n > 0);
+      if (vendorIds.length) {
+        eventData.concernedVendorIds = vendorIds;
+      }
       await eventService.createEvent(eventData);
       Alert.alert('Success', 'Event created!', [
         { text: 'OK', onPress: () => navigation.goBack() },
@@ -138,6 +146,15 @@ const EventCreateScreen = ({ navigation }) => {
           mode="outlined"
           multiline
           numberOfLines={4}
+          style={styles.input}
+        />
+
+        <TextInput
+          label="Notify vendor IDs (optional)"
+          value={vendorIdsText}
+          onChangeText={setVendorIdsText}
+          mode="outlined"
+          placeholder="e.g. 1, 2, 3 — from marketplace"
           style={styles.input}
         />
 

@@ -1,15 +1,34 @@
-import React, { useState } from 'react';
-import { Form, Input, InputNumber, DatePicker, Select, Button, Card, message, Spin, Steps } from 'antd';
+import React, { useEffect, useState } from 'react';
+import { Form, Input, InputNumber, DatePicker, Select, Button, Card, message, Spin, Steps, Typography } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { eventService } from '../services/eventService';
+import { vendorService } from '../services/vendorService';
 import { getErrorMessage } from '../utils/helpers';
 import './EventCreate.css';
+
+const { Text } = Typography;
 
 const EventCreate = () => {
   const navigate = useNavigate();
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
+  const [vendorOptions, setVendorOptions] = useState([]);
+
+  useEffect(() => {
+    vendorService
+      .searchVendors({ limit: 200 })
+      .then((data) => {
+        const vendors = data.vendors || [];
+        setVendorOptions(
+          vendors.map((v) => ({
+            value: v.id,
+            label: `${v.businessName} (#${v.id})`,
+          }))
+        );
+      })
+      .catch(() => {});
+  }, []);
 
   const onFinish = async (values) => {
     try {
@@ -50,6 +69,9 @@ const EventCreate = () => {
         budget: payloadValues.budget,
         guestCount: payloadValues.guestCount,
       };
+      if (Array.isArray(payloadValues.concernedVendorIds) && payloadValues.concernedVendorIds.length) {
+        eventData.concernedVendorIds = payloadValues.concernedVendorIds;
+      }
       await eventService.createEvent(eventData);
       message.success('Event created successfully!');
       navigate('/dashboard');
@@ -124,6 +146,20 @@ const EventCreate = () => {
           >
             <InputNumber min={1} placeholder="Number of guests" size="large" style={{ width: '100%' }} />
           </Form.Item>
+
+          <Form.Item name="concernedVendorIds" label="Notify vendors (optional)">
+            <Select
+              mode="multiple"
+              allowClear
+              placeholder="Select vendors to notify by email & in-app alert"
+              options={vendorOptions}
+              optionFilterProp="label"
+              size="large"
+            />
+          </Form.Item>
+          <Text type="secondary" style={{ display: 'block', marginTop: -8, marginBottom: 8 }}>
+            Admins and you are always notified when the event is created. Selected vendors get the same event summary.
+          </Text>
         </>
       ),
     },

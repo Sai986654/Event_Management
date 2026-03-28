@@ -2,6 +2,7 @@ const { prisma } = require('../config/db');
 const asyncHandler = require('../utils/asyncHandler');
 const { paginate } = require('../utils/pagination');
 const { sendEmail } = require('../services/notificationService');
+const { dispatchBookingCreated } = require('../services/inAppNotificationService');
 
 // POST /api/bookings
 exports.createBooking = asyncHandler(async (req, res) => {
@@ -27,7 +28,12 @@ exports.createBooking = asyncHandler(async (req, res) => {
     html: `<p>Your booking with vendor has been created. Status: pending.</p>`,
   });
 
-  req.app.get('io')?.to(`event-${event}`).emit('booking:created', booking);
+  const io = req.app.get('io');
+  io?.to(`event-${event}`).emit('booking:created', booking);
+  const creator = await prisma.user.findUnique({ where: { id: req.user.id } });
+  await dispatchBookingCreated(io, booking, { creatorUser: creator }).catch((err) =>
+    console.error('[BookingCreate] notifications', err.message)
+  );
 
   res.status(201).json({ booking });
 });

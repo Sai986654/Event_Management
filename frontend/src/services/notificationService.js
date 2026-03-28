@@ -1,7 +1,9 @@
 import api from './api';
 
 export const notificationService = {
-  /** @param {{ contacts?: object[], csv?: string, useOpenAi?: boolean }} payload */
+  /**
+   * @param {{ contacts?: object[], csv?: string, useOpenAi?: boolean, listOwnerContext?: string, listOwnerNotes?: string }} payload
+   */
   analyzeContacts: async (payload) => {
     const response = await api.post('/notifications/contacts/analyze', payload);
     return response.data;
@@ -34,13 +36,14 @@ export const notificationService = {
     return response.data;
   },
 
+  /** In-app notifications (stored in DB). */
   getNotifications: async (params = {}) => {
-    const response = await api.get('/notifications', { params });
+    const response = await api.get('app-notifications', { params });
     return response.data;
   },
 
   markAsRead: async (notificationId) => {
-    const response = await api.put(`/notifications/${notificationId}/read`);
+    const response = await api.put(`app-notifications/${notificationId}/read`);
     return response.data;
   },
 

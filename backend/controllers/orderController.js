@@ -1,6 +1,7 @@
 const { prisma } = require('../config/db');
 const asyncHandler = require('../utils/asyncHandler');
 const { estimatePackagePrice } = require('../utils/pricing');
+const { dispatchOrderQuoted } = require('../services/inAppNotificationService');
 
 exports.createOrderQuote = asyncHandler(async (req, res) => {
   const { eventId, selections = [], notes } = req.body;
@@ -79,6 +80,11 @@ exports.createOrderQuote = asyncHandler(async (req, res) => {
 
   const io = req.app.get('io');
   io.emit('order:quoted', { orderId: updated.id, eventId: updated.eventId, total: updated.quotedTotal });
+
+  const customer = await prisma.user.findUnique({ where: { id: req.user.id } });
+  await dispatchOrderQuoted(io, updated, event, customer, updated.items || []).catch((err) =>
+    console.error('[OrderQuote] notifications', err.message)
+  );
 
   res.status(201).json({ order: updated });
 });

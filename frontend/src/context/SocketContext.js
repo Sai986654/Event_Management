@@ -1,15 +1,20 @@
-import React, { createContext, useEffect, useState, useContext } from 'react';
+import React, { createContext, useEffect, useState, useContext, useRef } from 'react';
 import { socketService } from '../services/socketService';
 import { AuthContext } from './AuthContext';
 
 export const SocketContext = createContext(null);
 
 export const SocketProvider = ({ children }) => {
-  const { isAuthenticated } = useContext(AuthContext);
+  const { isAuthenticated, user } = useContext(AuthContext);
   const [connected, setConnected] = useState(false);
+  const joinedUserRef = useRef(null);
 
   useEffect(() => {
     if (!isAuthenticated) {
+      if (joinedUserRef.current != null) {
+        socketService.leaveUser(joinedUserRef.current);
+        joinedUserRef.current = null;
+      }
       socketService.disconnect();
       setConnected(false);
       return;
@@ -23,7 +28,6 @@ export const SocketProvider = ({ children }) => {
     socket.on('connect', handleConnect);
     socket.on('disconnect', handleDisconnect);
 
-    // Set initial state if already connected
     if (socket.connected) setConnected(true);
 
     return () => {
@@ -31,6 +35,19 @@ export const SocketProvider = ({ children }) => {
       socket.off('disconnect', handleDisconnect);
     };
   }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !user?.id) {
+      return;
+    }
+    const uid = user.id;
+    socketService.joinUser(uid);
+    joinedUserRef.current = uid;
+    return () => {
+      socketService.leaveUser(uid);
+      joinedUserRef.current = null;
+    };
+  }, [isAuthenticated, user?.id]);
 
   const value = {
     connected,
@@ -44,6 +61,8 @@ export const SocketProvider = ({ children }) => {
     onGuestCheckin: socketService.onGuestCheckin,
     onBookingCreated: socketService.onBookingCreated,
     onBookingUpdated: socketService.onBookingUpdated,
+    onNotificationNew: socketService.onNotificationNew,
+    joinUser: socketService.joinUser,
   };
 
   return <SocketContext.Provider value={value}>{children}</SocketContext.Provider>;

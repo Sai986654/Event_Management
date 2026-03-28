@@ -1,6 +1,6 @@
-import React, { useContext, useEffect, useState, useCallback } from 'react';
+import React, { useContext, useEffect, useState, useCallback, useLayoutEffect } from 'react';
 import { View, StyleSheet, ScrollView, RefreshControl } from 'react-native';
-import { Text, Card, Button, Chip, FAB, ActivityIndicator } from 'react-native-paper';
+import { Text, Card, Button, Chip, FAB, ActivityIndicator, IconButton } from 'react-native-paper';
 import { AuthContext } from '../context/AuthContext';
 import { eventService } from '../services/eventService';
 import { bookingService } from '../services/bookingService';
@@ -239,6 +239,18 @@ const VendorDashboard = ({ user, navigation }) => {
 const DashboardScreen = ({ navigation }) => {
   const { user } = useContext(AuthContext);
   const role = user?.role;
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <IconButton
+          icon="bell-outline"
+          iconColor="#fff"
+          onPress={() => navigation.navigate('Notifications')}
+        />
+      ),
+    });
+  }, [navigation]);
 
   if (role === 'vendor') return <VendorDashboard user={user} navigation={navigation} />;
   return <EventsDashboard user={user} navigation={navigation} />;

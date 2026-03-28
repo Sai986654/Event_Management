@@ -19,18 +19,22 @@ exports.sendSMSNotification = asyncHandler(async (req, res) => {
 });
 
 // POST /api/notifications/contacts/analyze
-// Body: { contacts?: [...] } OR { csv: string (Google Contacts export) }, optional useOpenAi: boolean
+// Body: { contacts?: [...] } OR { csv }, optional useOpenAi, listOwnerContext, listOwnerNotes
 exports.analyzeContactGraph = asyncHandler(async (req, res) => {
   const useOpenAi = req.body.useOpenAi !== false;
+  const listOwnerContext = req.body.listOwnerContext;
+  const listOwnerNotes = req.body.listOwnerNotes;
+
+  const pipelineOpts = { useOpenAi, listOwnerContext, listOwnerNotes };
 
   if (req.body.csv != null && typeof req.body.csv === 'string' && req.body.csv.trim()) {
     const { contacts: raw, meta } = parseGoogleContactsCsv(req.body.csv);
-    const result = await analyzeContactsPipeline(raw, { useOpenAi });
+    const result = await analyzeContactsPipeline(raw, pipelineOpts);
     return res.json({ ...result, importMeta: meta });
   }
 
   const raw = Array.isArray(req.body.contacts) ? req.body.contacts : [];
-  const result = await analyzeContactsPipeline(raw, { useOpenAi });
+  const result = await analyzeContactsPipeline(raw, pipelineOpts);
   res.json(result);
 });
 

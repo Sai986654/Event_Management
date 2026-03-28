@@ -22,7 +22,10 @@
         "backgroundColor": "#667eea"
       },
       "package": "com.eventos.mobile",
-      "versionCode": 1
+      "versionCode": 1,
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "plugins": [
       "expo-asset",
@@ -34,6 +37,11 @@
           "cameraPermission": "Allow EventOS to use the camera to capture blessing photos for events."
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "c72f450a-d76e-4d32-a59b-0a6dbe60b68c"
+      }
+    }
   }
 }

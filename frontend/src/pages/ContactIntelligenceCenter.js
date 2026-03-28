@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Button, Card, Empty, Input, Select, Space, Table, Tag, Typography, message } from 'antd';
+import { Alert, Button, Card, Empty, Input, Select, Space, Table, Tag, Typography, message } from 'antd';
 import { eventService } from '../services/eventService';
 import { notificationService } from '../services/notificationService';
 import { aiService } from '../services/aiService';
@@ -8,6 +8,45 @@ import './PhaseFlows.css';
 
 const { Text, Paragraph } = Typography;
 const { TextArea } = Input;
+
+/** Browser cache for last analyzed segmentation (not sent to server). */
+const CONTACT_INTEL_STORAGE_KEY = 'eventos_contact_intelligence_v1';
+
+const LIST_OWNER_OPTIONS = [
+  { value: 'unspecified', label: 'Whose list? — Not specified' },
+  { value: 'groom', label: "Groom's phone / account" },
+  { value: 'bride', label: "Bride's phone / account" },
+  { value: 'groom_father', label: "Groom's father" },
+  { value: 'groom_mother', label: "Groom's mother" },
+  { value: 'bride_father', label: "Bride's father" },
+  { value: 'bride_mother', label: "Bride's mother" },
+  { value: 'other', label: 'Other (use notes below)' },
+];
+
+function saveContactAnalysisLocal(payload) {
+  try {
+    const record = { version: 1, savedAt: new Date().toISOString(), ...payload };
+    localStorage.setItem(CONTACT_INTEL_STORAGE_KEY, JSON.stringify(record));
+    console.log('[ContactIntelligence UI] saved to localStorage', {
+      key: CONTACT_INTEL_STORAGE_KEY,
+      contacts: record.contacts?.length,
+      listOwner: record.listOwnerContext,
+    });
+  } catch (e) {
+    console.warn('[ContactIntelligence UI] localStorage save failed', e?.message);
+  }
+}
+
+function loadContactAnalysisLocal() {
+  try {
+    const raw = localStorage.getItem(CONTACT_INTEL_STORAGE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch (e) {
+    console.warn('[ContactIntelligence UI] localStorage load failed', e?.message);
+    return null;
+  }
+}
 
 const parseContactsFromText = (value) => {
   return String(value || '')
@@ -37,6 +76,11 @@ const ContactIntelligenceCenter = () => {
   const [collageStyle, setCollageStyle] = useState('traditional');
   const [csvFileName, setCsvFileName] = useState('');
   const [csvPaste, setCsvPaste] = useState('');
+  const [listOwnerContext, setListOwnerContext] = useState('unspecified');
+  const [listOwnerNotes, setListOwnerNotes] = useState('');
+  /** Table filter: segment + optional name search */
+  const [segmentFilter, setSegmentFilter] = useState('all');
+  const [nameFilter, setNameFilter] = useState('');
 
   useEffect(() => {
     (async () => {
@@ -52,6 +96,13 @@ const ContactIntelligenceCenter = () => {
     })();
   }, []);
 
+  useEffect(() => {
+    const prev = loadContactAnalysisLocal();
+    if (prev?.savedAt) {
+      console.log('[ContactIntelligence UI] previous local cache', prev.savedAt, 'owner=', prev.listOwnerContext);
+    }
+  }, []);
+
   const parsedContacts = useMemo(() => parseContactsFromText(contactsInput), [contactsInput]);
 
   const analyzeContacts = async () => {
@@ -62,10 +113,43 @@ const ContactIntelligenceCenter = () => {
     }
     setAnalyzing(true);
     try {
+      console.log('[ContactIntelligence UI] analyze start', {
+        listOwnerContext,
+        listOwnerNotes: listOwnerNotes?.slice(0, 120),
+        hasCsv,
+        manualCount: parsedContacts.length,
+      });
       const res = hasCsv
-        ? await notificationService.analyzeContacts({ csv: csvPaste, useOpenAi: true })
-        : await notificationService.analyzeContacts({ contacts: parsedContacts, useOpenAi: true });
+        ? await notificationService.analyzeContacts({
+            csv: csvPaste,
+            useOpenAi: true,
+            listOwnerContext,
+            listOwnerNotes,
+          })
+        : await notificationService.analyzeContacts({
+            contacts: parsedContacts,
+            useOpenAi: true,
+            listOwnerContext,
+            listOwnerNotes,
+          });
+      setSegmentFilter('all');
+      setNameFilter('');
       setAnalyzed(res);
+      console.log('[ContactIntelligence UI] analyze done', {
+        aiUsed: res.aiUsed,
+        openAiRefinedCount: res.openAiRefinedCount,
+        listOwner: res.listOwnerContext,
+      });
+      saveContactAnalysisLocal({
+        listOwnerContext,
+        listOwnerNotes,
+        contacts: res.contacts,
+        summary: res.summary,
+        aiUsed: res.aiUsed,
+        aiOverview: res.aiOverview,
+        openAiRefinedCount: res.openAiRefinedCount,
+        importMeta: res.importMeta,
+      });
       message.success(
         res.importMeta ? `Imported ${res.importMeta.imported || 0} contacts from CSV.` : 'Contacts analyzed successfully.'
       );
@@ -131,9 +215,99 @@ const ContactIntelligenceCenter = () => {
     }
   };
 
+  const loadSavedAnalysis = () => {
+    const prev = loadContactAnalysisLocal();
+    if (!prev?.contacts?.length) {
+      message.warning('No saved analysis in this browser.');
+      return;
+    }
+    setListOwnerContext(prev.listOwnerContext || 'unspecified');
+    setListOwnerNotes(prev.listOwnerNotes || '');
+    setSegmentFilter('all');
+    setNameFilter('');
+    setAnalyzed({
+      contacts: prev.contacts,
+      summary: prev.summary,
+      aiUsed: prev.aiUsed,
+      aiOverview: prev.aiOverview,
+      openAiRefinedCount: prev.openAiRefinedCount,
+      importMeta: prev.importMeta,
+      listOwnerContext: prev.listOwnerContext,
+    });
+    message.info('Loaded last saved segmentation from this browser.');
+    console.log('[ContactIntelligence UI] restored from localStorage', prev.savedAt);
+  };
+
+  const filteredContacts = useMemo(() => {
+    const list = analyzed?.contacts || [];
+    let rows = list;
+    switch (segmentFilter) {
+      case 'relatives':
+        rows = rows.filter((c) => c.group === 'relatives');
+        break;
+      case 'friends':
+        rows = rows.filter((c) => c.group === 'friends');
+        break;
+      case 'work':
+        rows = rows.filter((c) => c.group === 'work');
+        break;
+      case 'others':
+        rows = rows.filter((c) => c.group === 'others');
+        break;
+      case 'wa_yes':
+        rows = rows.filter((c) => c.canNotifyWhatsApp);
+        break;
+      case 'wa_no':
+        rows = rows.filter((c) => !c.canNotifyWhatsApp);
+        break;
+      default:
+        break;
+    }
+    const q = nameFilter.trim().toLowerCase();
+    if (q) {
+      rows = rows.filter(
+        (c) =>
+          String(c.name || '')
+            .toLowerCase()
+            .includes(q) ||
+          String(c.phone || '').includes(q) ||
+          String(c.inferredRelation || '')
+            .toLowerCase()
+            .includes(q) ||
+          String(c.group || '')
+            .toLowerCase()
+            .includes(q)
+      );
+    }
+    return rows;
+  }, [analyzed?.contacts, segmentFilter, nameFilter]);
+
+  const applySegmentFilter = (key) => {
+    setSegmentFilter(key);
+    if (key === 'all' || key === 'relatives' || key === 'friends' || key === 'work' || key === 'others') {
+      setTargetGroup(key);
+    }
+  };
+
   const columns = [
     { title: 'Name', dataIndex: 'name', key: 'name' },
     { title: 'Phone', dataIndex: 'phone', key: 'phone' },
+    {
+      title: 'Telugu (AI / rules)',
+      dataIndex: 'relationTelugu',
+      key: 'relationTelugu',
+      render: (v) => <Text>{v || '—'}</Text>,
+    },
+    {
+      title: 'Name suffix',
+      key: 'nameSuffixHint',
+      render: (_, row) => {
+        const h = row.nameSuffixHint;
+        if (!h) return <Text type="secondary">—</Text>;
+        const label = h.kind === 'employer' ? `Work @ ${h.token}` : `Trade: ${h.token}`;
+        return <Tag color={h.kind === 'employer' ? 'geekblue' : 'cyan'}>{label}</Tag>;
+      },
+    },
     { title: 'Inferred Relation', dataIndex: 'inferredRelation', key: 'inferredRelation', render: (v) => <Tag>{v}</Tag> },
     { title: 'Group', dataIndex: 'group', key: 'group', render: (v) => <Tag color={v === 'relatives' ? 'green' : v === 'friends' ? 'blue' : 'default'}>{v}</Tag> },
     { title: 'Confidence', dataIndex: 'confidence', key: 'confidence', render: (v) => `${Math.round(Number(v || 0) * 100)}%` },
@@ -156,6 +330,21 @@ const ContactIntelligenceCenter = () => {
 
         <Card className="phase-card" title="1) Import Contacts and Analyze">
           <Space direction="vertical" size={10} style={{ width: '100%' }}>
+            <Paragraph type="secondary" style={{ marginBottom: 0 }}>
+              <Text strong>Whose contact list is this?</Text> The AI uses this to read Telugu/English labels correctly (e.g. Amma, Athamma, Mamayya) relative to groom or bride side.
+            </Paragraph>
+            <Select
+              style={{ width: '100%', maxWidth: 420 }}
+              value={listOwnerContext}
+              onChange={setListOwnerContext}
+              options={LIST_OWNER_OPTIONS}
+            />
+            <TextArea
+              rows={2}
+              placeholder="Optional notes for the AI (e.g. “Groom side Hyderabad”, “Include colleagues from office”)"
+              value={listOwnerNotes}
+              onChange={(e) => setListOwnerNotes(e.target.value)}
+            />
             <Paragraph type="secondary" style={{ marginBottom: 0 }}>
               <Text strong>Option A — Google Contacts CSV:</Text> export from{' '}
               <a href="https://contacts.google.com" target="_blank" rel="noreferrer">Google Contacts</a> (Export), then upload or paste the file below.
@@ -182,9 +371,13 @@ const ContactIntelligenceCenter = () => {
               <Button type="primary" onClick={analyzeContacts} loading={analyzing}>
                 Analyze &amp; segment (AI)
               </Button>
+              <Button onClick={loadSavedAnalysis}>Load last saved (this browser)</Button>
               <Text type="secondary">Manual lines parsed: {parsedContacts.length}</Text>
               {csvPaste.trim() ? <Tag color="blue">CSV ready ({csvPaste.length} chars)</Tag> : null}
             </Space>
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              After each successful run, the table is cached in <Text code>localStorage</Text> ({CONTACT_INTEL_STORAGE_KEY}) for offline review — open DevTools → Console to see save logs.
+            </Text>
           </Space>
         </Card>
 
@@ -193,22 +386,124 @@ const ContactIntelligenceCenter = () => {
             <Empty description="No analysis yet" />
           ) : (
             <Space direction="vertical" size={10} style={{ width: '100%' }}>
-              <Space wrap>
-                <Tag color="purple">Total: {analyzed.summary?.total || 0}</Tag>
-                <Tag color="green">Relatives: {analyzed.summary?.relatives || 0}</Tag>
-                <Tag color="blue">Friends: {analyzed.summary?.friends || 0}</Tag>
-                <Tag color="orange">Work: {analyzed.summary?.work || 0}</Tag>
-                <Tag>Others: {analyzed.summary?.others || 0}</Tag>
-                <Tag color="gold">WhatsApp Eligible: {analyzed.summary?.whatsAppEligible || 0}</Tag>
-                {analyzed.aiUsed ? <Tag color="magenta">OpenAI refinement</Tag> : <Tag>Rules-only</Tag>}
+              <Paragraph type="secondary" style={{ marginBottom: 0 }}>
+                <Text strong>Filter the table:</Text> click a segment to show only that group. Use search to narrow by name, phone, or relation. The WhatsApp reminder audience (step 3) follows the segment when you pick Relatives, Friends, Work, or Others.
+              </Paragraph>
+              <Space wrap align="center">
+                <Text type="secondary">Segment</Text>
+                <Tag
+                  color={segmentFilter === 'all' ? 'purple' : 'default'}
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => applySegmentFilter('all')}
+                >
+                  All ({analyzed.summary?.total || 0})
+                </Tag>
+                <Tag
+                  color={segmentFilter === 'relatives' ? 'green' : 'default'}
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => applySegmentFilter('relatives')}
+                >
+                  Relatives ({analyzed.summary?.relatives || 0})
+                </Tag>
+                <Tag
+                  color={segmentFilter === 'friends' ? 'blue' : 'default'}
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => applySegmentFilter('friends')}
+                >
+                  Friends ({analyzed.summary?.friends || 0})
+                </Tag>
+                <Tag
+                  color={segmentFilter === 'work' ? 'orange' : 'default'}
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => applySegmentFilter('work')}
+                >
+                  Work ({analyzed.summary?.work || 0})
+                </Tag>
+                <Tag
+                  color={segmentFilter === 'others' ? 'geekblue' : 'default'}
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => applySegmentFilter('others')}
+                >
+                  Others ({analyzed.summary?.others || 0})
+                </Tag>
+                <Tag
+                  color={segmentFilter === 'wa_yes' ? 'gold' : 'default'}
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => applySegmentFilter('wa_yes')}
+                >
+                  WhatsApp OK ({analyzed.summary?.whatsAppEligible || 0})
+                </Tag>
+                <Tag
+                  color={segmentFilter === 'wa_no' ? 'red' : 'default'}
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => applySegmentFilter('wa_no')}
+                >
+                  No phone (
+                  {Math.max(
+                    0,
+                    (analyzed.summary?.total || 0) - (analyzed.summary?.whatsAppEligible || 0)
+                  )}
+                  )
+                </Tag>
               </Space>
-              <Table rowKey={(row) => `${row.index}-${row.name}`} dataSource={analyzed.contacts} columns={columns} pagination={{ pageSize: 8 }} />
+              <Space wrap align="center" style={{ width: '100%' }}>
+                <Input.Search
+                  allowClear
+                  placeholder="Search name, phone, relation, group…"
+                  value={nameFilter}
+                  onChange={(e) => setNameFilter(e.target.value)}
+                  style={{ maxWidth: 400 }}
+                />
+                {analyzed.aiUsed ? <Tag color="magenta">OpenAI refinement</Tag> : <Tag>Rules-only</Tag>}
+                {analyzed.openAiRefinedCount != null ? (
+                  <Tag color="cyan">LLM rows: {analyzed.openAiRefinedCount}</Tag>
+                ) : null}
+              </Space>
+              {analyzed.aiOverview ? (
+                <Paragraph style={{ marginBottom: 0 }}>
+                  <Text strong>AI summary: </Text>
+                  {analyzed.aiOverview}
+                </Paragraph>
+              ) : null}
+              <Text type="secondary">
+                Showing {filteredContacts.length} of {analyzed.contacts.length} contacts
+                {nameFilter.trim() ? ` (search: “${nameFilter.trim()}”)` : ''}
+              </Text>
+              <Table
+                rowKey={(row) => `${row.index}-${row.name}`}
+                dataSource={filteredContacts}
+                columns={columns}
+                pagination={{ pageSize: 8, showSizeChanger: true, pageSizeOptions: [8, 16, 32, 64] }}
+              />
             </Space>
           )}
         </Card>
 
         <Card className="phase-card" title="3) Trigger WhatsApp Reminder">
           <Space direction="vertical" size={10} style={{ width: '100%' }}>
+            <Alert
+              type="info"
+              showIcon
+              message="WhatsApp integration (backend)"
+              description={
+                <Space direction="vertical" size={6}>
+                  <Text>
+                    By default the API uses <Text code>WHATSAPP_PROVIDER=mock</Text> and <Text code>WHATSAPP_DRY_RUN=true</Text> — no real messages are sent; payloads are logged on the server. That is why the table only shows “Eligible”: it means a phone number exists, not that a message was delivered.
+                  </Text>
+                  <Text>
+                    For real sends, use Meta’s{' '}
+                    <a href="https://developers.facebook.com/docs/whatsapp/cloud-api/get-started" target="_blank" rel="noreferrer">
+                      WhatsApp Business Platform (Cloud API)
+                    </a>{' '}
+                    or a provider such as Twilio WhatsApp. You need a verified business, a WhatsApp sender number, and approved message templates for India.
+                  </Text>
+                  <Text>
+                    On your host (e.g. Render), set <Text code>WHATSAPP_DRY_RUN=false</Text>, <Text code>WHATSAPP_FROM_NUMBER</Text>, and either keep <Text code>mock</Text> until you wire code, or add your provider’s URL and secret as <Text code>WHATSAPP_API_BASE_URL</Text> / <Text code>WHATSAPP_API_KEY</Text>. Implement the actual HTTP call inside{' '}
+                    <Text code>backend/services/notificationService.js</Text> (<Text code>sendWhatsApp</Text>) to match your provider’s API; the repo currently logs the payload when not in mock mode.
+                  </Text>
+                </Space>
+              }
+            />
             <Select
               loading={loadingEvents}
               placeholder="Select event"

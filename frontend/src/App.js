@@ -26,6 +26,7 @@ import AdminControlCenter from './pages/AdminControlCenter';
 import EventPlanner from './pages/EventPlanner';
 import ActivityTracker from './pages/ActivityTracker';
 import ContactIntelligenceCenter from './pages/ContactIntelligenceCenter';
+import NotificationsPage from './pages/NotificationsPage';
 
 import './App.css';
 
@@ -96,6 +97,16 @@ const AppInner = () => {
             <ProtectedRoute>
               <AppLayout>
                 <Dashboard />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/notifications"
+          element={
+            <ProtectedRoute>
+              <AppLayout>
+                <NotificationsPage />
               </AppLayout>
             </ProtectedRoute>
           }

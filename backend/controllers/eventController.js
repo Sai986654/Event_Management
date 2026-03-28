@@ -4,19 +4,49 @@ const { paginate } = require('../utils/pagination');
 const slugify = require('slugify');
 const QRCode = require('qrcode');
 const { gifting } = require('../config/inviteConfig');
+const { dispatchEventCreated } = require('../services/inAppNotificationService');
 
 const generateSlug = (title) =>
   slugify(title, { lower: true, strict: true }) + '-' + Date.now().toString(36);
 
 // POST /api/events
 exports.createEvent = asyncHandler(async (req, res) => {
-  const event = await prisma.event.create({
-    data: {
-      ...req.body,
-      organizerId: req.user.id,
-      slug: generateSlug(req.body.title),
-    },
-  });
+  const { concernedVendorIds, ...raw } = req.body;
+  const vendorIds = Array.isArray(concernedVendorIds) ? concernedVendorIds : [];
+
+  const data = {
+    title: raw.title,
+    type: raw.type,
+    description: raw.description,
+    date: raw.date != null ? new Date(raw.date) : undefined,
+    endDate: raw.endDate != null ? new Date(raw.endDate) : undefined,
+    venue: raw.venue,
+    address: raw.address,
+    city: raw.city,
+    state: raw.state,
+    lat: raw.lat,
+    lng: raw.lng,
+    budget: raw.budget != null ? raw.budget : undefined,
+    guestCount: raw.guestCount != null ? raw.guestCount : undefined,
+    status: raw.status,
+    coverImage: raw.coverImage,
+    isPublic: raw.isPublic,
+    timeline: raw.timeline,
+    tasks: raw.tasks,
+    organizerId: req.user.id,
+    slug: generateSlug(raw.title),
+  };
+
+  Object.keys(data).forEach((k) => data[k] === undefined && delete data[k]);
+
+  const event = await prisma.event.create({ data });
+
+  const creator = await prisma.user.findUnique({ where: { id: req.user.id } });
+  const io = req.app.get('io');
+  await dispatchEventCreated(io, event, creator, vendorIds).catch((err) =>
+    console.error('[EventCreate] notifications', err.message)
+  );
+
   res.status(201).json({ event });
 });
 
