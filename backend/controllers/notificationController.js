@@ -51,7 +51,7 @@ exports.correlateContactSelection = asyncHandler(async (req, res) => {
     listOwnerNotes: req.body.listOwnerNotes,
   });
   if (result.error) {
-    const status = result.code === 'OPENAI_HTTP' ? 502 : 400;
+    const status = result.code === 'LLM_HTTP' || result.code === 'OPENAI_HTTP' ? 502 : 400;
     return res.status(status).json({
       message: result.error,
       code: result.code,

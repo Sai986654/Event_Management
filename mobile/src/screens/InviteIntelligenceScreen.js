@@ -198,7 +198,9 @@ const InviteIntelligenceScreen = () => {
         listOwnerNotes,
       });
       setCorrelationResult(res);
-      showSnack(res.source === 'openai' ? 'AI correlation ready.' : 'Rules-only (no OpenAI on server).');
+      showSnack(
+        res.source === 'openai' || res.source === 'groq' ? 'AI correlation ready.' : 'Rules-only (no LLM on server).'
+      );
       console.log('[InviteIntelligence] correlate done', res.source);
     } catch (err) {
       showSnack(getErrorMessage(err), 'error');
@@ -410,7 +412,13 @@ const InviteIntelligenceScreen = () => {
               </Button>
               {correlationResult?.correlationSummary ? (
                 <View style={styles.correlationBox}>
-                  <Text variant="labelLarge">{correlationResult.source === 'openai' ? 'OpenAI' : 'Rules-only'}</Text>
+                  <Text variant="labelLarge">
+                    {correlationResult.source === 'groq'
+                      ? 'Groq'
+                      : correlationResult.source === 'openai'
+                        ? 'OpenAI'
+                        : 'Rules-only'}
+                  </Text>
                   <Text style={styles.overview}>{correlationResult.correlationSummary}</Text>
                   {Array.isArray(correlationResult.relationshipNotes) && correlationResult.relationshipNotes.length ? (
                     correlationResult.relationshipNotes.map((n, j) => (

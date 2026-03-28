@@ -321,7 +321,11 @@ const ContactIntelligenceCenter = () => {
       });
       setCorrelationResult(res);
       console.log('[ContactIntelligence UI] correlate done', { source: res.source, pairs: res.pairs?.length });
-      message.success(res.source === 'openai' ? 'AI correlation ready.' : 'Rules-only correlation (no OpenAI key on server).');
+      message.success(
+        res.source === 'openai' || res.source === 'groq'
+          ? 'AI correlation ready.'
+          : 'Rules-only correlation (no LLM key on server).'
+      );
     } catch (err) {
       message.error(getErrorMessage(err));
     } finally {
@@ -534,8 +538,16 @@ const ContactIntelligenceCenter = () => {
                 <Card size="small" title="AI correlation (selected contacts)">
                   <Paragraph style={{ marginBottom: 8 }}>{correlationResult.correlationSummary}</Paragraph>
                   {correlationResult.source ? (
-                    <Tag color={correlationResult.source === 'openai' ? 'purple' : 'default'}>
-                      {correlationResult.source === 'openai' ? 'OpenAI' : 'Rules-only'}
+                    <Tag
+                      color={
+                        correlationResult.source === 'openai' || correlationResult.source === 'groq' ? 'purple' : 'default'
+                      }
+                    >
+                      {correlationResult.source === 'groq'
+                        ? 'Groq'
+                        : correlationResult.source === 'openai'
+                          ? 'OpenAI'
+                          : 'Rules-only'}
                     </Tag>
                   ) : null}
                   {Array.isArray(correlationResult.relationshipNotes) && correlationResult.relationshipNotes.length ? (

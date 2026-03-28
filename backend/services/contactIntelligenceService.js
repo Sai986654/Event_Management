@@ -207,6 +207,46 @@ function getOpenAiBatchSize() {
   return 12;
 }
 
+/** `groq` | `openai` — Groq when CONTACT_AI_PROVIDER=groq, or only GROQ_API_KEY is set; else OpenAI if key present. */
+function getContactAiProvider() {
+  const explicit = String(process.env.CONTACT_AI_PROVIDER || '').toLowerCase().trim();
+  if (explicit === 'groq' || explicit === 'openai') return explicit;
+  const hasGroq = Boolean(process.env.GROQ_API_KEY);
+  const hasOpenai = Boolean(process.env.OPENAI_API_KEY);
+  if (hasGroq && !hasOpenai) return 'groq';
+  if (hasOpenai && !hasGroq) return 'openai';
+  if (hasGroq && hasOpenai) return 'openai';
+  return 'openai';
+}
+
+function getContactAiApiKey() {
+  return getContactAiProvider() === 'groq'
+    ? String(process.env.GROQ_API_KEY || '').trim()
+    : String(process.env.OPENAI_API_KEY || '').trim();
+}
+
+function getContactAiChatCompletionsUrl() {
+  return getContactAiProvider() === 'groq'
+    ? 'https://api.groq.com/openai/v1/chat/completions'
+    : 'https://api.openai.com/v1/chat/completions';
+}
+
+/** CONTACT_AI_MODEL overrides; otherwise provider defaults (Groq: Llama 3.3, OpenAI: gpt-4o-mini). */
+function getContactAiModel() {
+  const provider = getContactAiProvider();
+  const env = String(process.env.CONTACT_AI_MODEL || '').trim();
+  if (env) {
+    if (provider === 'groq' && /^(gpt-|o\d)/i.test(env)) {
+      console.warn(
+        `${LOG} CONTACT_AI_MODEL=${env} is not a Groq model; using llama-3.3-70b-versatile (see Groq console for model ids)`
+      );
+      return 'llama-3.3-70b-versatile';
+    }
+    return env;
+  }
+  return provider === 'groq' ? 'llama-3.3-70b-versatile' : 'gpt-4o-mini';
+}
+
 function parseOpenAiMessageJson(raw) {
   let s = String(raw || '').trim();
   if (s.startsWith('```')) {
@@ -231,10 +271,11 @@ function parseOpenAiMessageJson(raw) {
  * One Chat Completions call for a batch of contacts (keeps JSON output small enough to parse).
  */
 async function refineOneOpenAiBatch(batchContacts, aiOptions, { includeOverview }) {
-  const apiKey = process.env.OPENAI_API_KEY;
+  const provider = getContactAiProvider();
+  const apiKey = getContactAiApiKey();
   const listOwnerContext = aiOptions.listOwnerContext || 'unspecified';
   const listOwnerNotes = String(aiOptions.listOwnerNotes || '').trim();
-  const model = process.env.CONTACT_AI_MODEL || 'gpt-4o-mini';
+  const model = getContactAiModel();
 
   const payload = batchContacts.map((c) => ({
     index: c.index,
@@ -273,7 +314,7 @@ async function refineOneOpenAiBatch(batchContacts, aiOptions, { includeOverview 
     ],
   };
 
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+  const res = await fetch(getContactAiChatCompletionsUrl(), {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${apiKey}`,
@@ -284,7 +325,7 @@ async function refineOneOpenAiBatch(batchContacts, aiOptions, { includeOverview 
 
   if (!res.ok) {
     const errText = await res.text();
-    console.error(`${LOG} openai:http_error`, res.status, errText.slice(0, 800));
+    console.error(`${LOG} llm:http_error provider=${provider}`, res.status, errText.slice(0, 800));
     return {
       contacts: batchContacts.map((c) => ({ ...c, segmentationSource: 'rules' })),
       overview: null,
@@ -295,7 +336,7 @@ async function refineOneOpenAiBatch(batchContacts, aiOptions, { includeOverview 
   const data = await res.json();
   const finishReason = data?.choices?.[0]?.finish_reason;
   if (finishReason === 'length') {
-    console.warn(`${LOG} openai:truncated finish_reason=length — reduce CONTACT_AI_BATCH_SIZE (now ${getOpenAiBatchSize()})`);
+    console.warn(`${LOG} llm:truncated provider=${provider} finish_reason=length — reduce CONTACT_AI_BATCH_SIZE (now ${getOpenAiBatchSize()})`);
   }
 
   const raw = data?.choices?.[0]?.message?.content || '{}';
@@ -303,13 +344,13 @@ async function refineOneOpenAiBatch(batchContacts, aiOptions, { includeOverview 
   const itemsLen = Array.isArray(parsed.items) ? parsed.items.length : 0;
   if (itemsLen === 0) {
     console.warn(
-      `${LOG} openai:empty_items batchSize=${batchContacts.length} contentLen=${raw.length} preview=${String(raw).slice(0, 200)}`
+      `${LOG} llm:empty_items provider=${provider} batchSize=${batchContacts.length} contentLen=${raw.length} preview=${String(raw).slice(0, 200)}`
     );
   }
 
   const overview = typeof parsed.overview === 'string' && parsed.overview.trim() ? parsed.overview.trim() : null;
   if (overview && includeOverview) {
-    console.log(`${LOG} openai:overview`, overview.slice(0, 400));
+    console.log(`${LOG} llm:overview`, overview.slice(0, 400));
   }
 
   const byIndex = new Map();
@@ -342,22 +383,23 @@ async function refineOneOpenAiBatch(batchContacts, aiOptions, { includeOverview 
   });
 
   console.log(
-    `${LOG} openai:batch done batch=${batchContacts.length} refined=${openAiRefinedCount} tokens=${data?.usage?.total_tokens ?? 'n/a'}`
+    `${LOG} llm:batch_done provider=${provider} batch=${batchContacts.length} refined=${openAiRefinedCount} tokens=${data?.usage?.total_tokens ?? 'n/a'}`
   );
 
   return { contacts: next, overview: includeOverview ? overview : null, openAiRefinedCount };
 }
 
 /**
- * Optional OpenAI refinement (set OPENAI_API_KEY). Large lists are processed in batches to avoid truncated JSON.
+ * Optional LLM refinement (OpenAI or Groq). Large lists are processed in batches to avoid truncated JSON.
  */
 async function refineWithOpenAI(analyzedContacts, aiOptions = {}) {
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = getContactAiApiKey();
+  const provider = getContactAiProvider();
   const listOwnerContext = aiOptions.listOwnerContext || 'unspecified';
 
   if (!apiKey || analyzedContacts.length === 0) {
     console.log(
-      `${LOG} openai:skip reason=${!apiKey ? 'no OPENAI_API_KEY' : 'empty contacts'} owner=${listOwnerContext}`
+      `${LOG} llm:skip reason=${!apiKey ? 'no GROQ_API_KEY or OPENAI_API_KEY' : 'empty contacts'} owner=${listOwnerContext}`
     );
     return {
       contacts: analyzedContacts,
@@ -375,11 +417,11 @@ async function refineWithOpenAI(analyzedContacts, aiOptions = {}) {
   let batchNum = 0;
 
   console.log(
-    `${LOG} openai:start model=${process.env.CONTACT_AI_MODEL || 'gpt-4o-mini'} total=${analyzedContacts.length} batchSize=${batchSize} owner=${listOwnerContext}`
+    `${LOG} llm:start provider=${provider} model=${getContactAiModel()} total=${analyzedContacts.length} batchSize=${batchSize} owner=${listOwnerContext}`
   );
 
   if (process.env.CONTACT_AI_DEBUG === 'true') {
-    console.log(`${LOG} openai:debug first indexes`, analyzedContacts.slice(0, 3).map((c) => c.index));
+    console.log(`${LOG} llm:debug first indexes`, analyzedContacts.slice(0, 3).map((c) => c.index));
   }
 
   for (let i = 0; i < analyzedContacts.length; i += batchSize) {
@@ -394,7 +436,7 @@ async function refineWithOpenAI(analyzedContacts, aiOptions = {}) {
         mergedByIndex.set(c.index, c);
       }
     } catch (e) {
-      console.error(`${LOG} openai:batch_exception`, e.message);
+      console.error(`${LOG} llm:batch_exception`, e.message);
     }
   }
 
@@ -403,14 +445,14 @@ async function refineWithOpenAI(analyzedContacts, aiOptions = {}) {
   let openAiWarning;
   if (totalRefined === 0 && analyzedContacts.length > 0) {
     openAiWarning =
-      'OpenAI returned no refined rows (empty or invalid JSON). Check server logs, API key/quota, or set CONTACT_AI_BATCH_SIZE=8. Table shows rule-based results only.';
-    console.warn(`${LOG} openai:no_refines totalContacts=${analyzedContacts.length} batches=${batchNum}`);
+      'LLM returned no refined rows (empty or invalid JSON). Check server logs, API key/quota, CONTACT_AI_PROVIDER, or set CONTACT_AI_BATCH_SIZE=8. Table shows rule-based results only.';
+    console.warn(`${LOG} llm:no_refines totalContacts=${analyzedContacts.length} batches=${batchNum}`);
   } else if (totalRefined < analyzedContacts.length) {
     openAiWarning = `LLM refined ${totalRefined} of ${analyzedContacts.length} contacts; some rows remain rule-based (check batch logs).`;
   }
 
   console.log(
-    `${LOG} openai:done refined=${totalRefined}/${analyzedContacts.length} batches=${batchNum}`
+    `${LOG} llm:done refined=${totalRefined}/${analyzedContacts.length} batches=${batchNum}`
   );
 
   return {
@@ -444,7 +486,7 @@ async function analyzeContactsPipeline(rawContacts = [], options = {}) {
   let openAiWarning;
   let openAiBatches = 0;
 
-  if (useOpenAi && process.env.OPENAI_API_KEY) {
+  if (useOpenAi && getContactAiApiKey()) {
     const refined = await refineWithOpenAI(contacts, { listOwnerContext, listOwnerNotes });
     contacts = refined.contacts;
     overview = refined.overview;
@@ -452,11 +494,11 @@ async function analyzeContactsPipeline(rawContacts = [], options = {}) {
     openAiWarning = refined.openAiWarning;
     openAiBatches = refined.openAiBatches || 0;
   } else {
-    console.log(`${LOG} openai:skipped useOpenAi=${useOpenAi} hasKey=${Boolean(process.env.OPENAI_API_KEY)}`);
+    console.log(`${LOG} llm:skipped useOpenAi=${useOpenAi} hasKey=${Boolean(getContactAiApiKey())}`);
   }
 
   const summary = buildSummary(contacts);
-  const aiUsed = Boolean(process.env.OPENAI_API_KEY) && useOpenAi;
+  const aiUsed = Boolean(getContactAiApiKey()) && useOpenAi;
 
   console.log(
     `${LOG} pipeline:done aiUsed=${aiUsed} llmRows=${openAiRefinedCount} batches=${openAiBatches} whatsAppEligible=${summary.whatsAppEligible}`
@@ -476,7 +518,7 @@ async function analyzeContactsPipeline(rawContacts = [], options = {}) {
 }
 
 /**
- * Correlate a user-selected subset of analyzed contacts (OpenAI + duplicate-phone hints).
+ * Correlate a user-selected subset of analyzed contacts (LLM + duplicate-phone hints).
  * @param {object[]} contacts - Analyzed contact rows from analyzeContactsPipeline / analyzeContacts
  * @param {{ listOwnerContext?: string, listOwnerNotes?: string }} options
  */
@@ -513,7 +555,8 @@ async function correlateContactsSubset(contacts, options = {}) {
     segmentationSource: c.segmentationSource,
   }));
 
-  const apiKey = process.env.OPENAI_API_KEY;
+  const provider = getContactAiProvider();
+  const apiKey = getContactAiApiKey();
   if (!apiKey) {
     const dupSummary = duplicatePhones.length
       ? duplicatePhones
@@ -521,7 +564,7 @@ async function correlateContactsSubset(contacts, options = {}) {
           .join('; ')
       : 'No duplicate normalized phone numbers in this selection.';
     return {
-      correlationSummary: `OpenAI is not configured on the server (${LOG}). Rules-only: ${dupSummary}`,
+      correlationSummary: `No LLM API key on the server (${LOG}; set GROQ_API_KEY or OPENAI_API_KEY). Rules-only: ${dupSummary}`,
       relationshipNotes: [],
       pairs: [],
       duplicatePhones,
@@ -529,7 +572,7 @@ async function correlateContactsSubset(contacts, options = {}) {
     };
   }
 
-  const model = process.env.CONTACT_AI_MODEL || 'gpt-4o-mini';
+  const model = getContactAiModel();
   const maxTokens = Number(process.env.CONTACT_AI_CORRELATE_MAX_TOKENS);
   const systemParts = [
     'You help Indian wedding organizers understand how SELECTED guests may relate to each other.',
@@ -559,9 +602,11 @@ async function correlateContactsSubset(contacts, options = {}) {
     ],
   };
 
-  console.log(`${LOG} correlate:subset n=${contacts.length} owner=${listOwnerContext} dupPhones=${duplicatePhones.length}`);
+  console.log(
+    `${LOG} correlate:subset provider=${provider} n=${contacts.length} owner=${listOwnerContext} dupPhones=${duplicatePhones.length}`
+  );
 
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+  const res = await fetch(getContactAiChatCompletionsUrl(), {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${apiKey}`,
@@ -572,10 +617,10 @@ async function correlateContactsSubset(contacts, options = {}) {
 
   if (!res.ok) {
     const errText = await res.text();
-    console.error(`${LOG} correlate:openai_http`, res.status, errText.slice(0, 600));
+    console.error(`${LOG} correlate:llm_http provider=${provider}`, res.status, errText.slice(0, 600));
     return {
-      error: 'OpenAI request failed for correlation.',
-      code: 'OPENAI_HTTP',
+      error: 'LLM request failed for correlation.',
+      code: 'LLM_HTTP',
       status: res.status,
       duplicatePhones,
     };
@@ -596,7 +641,7 @@ async function correlateContactsSubset(contacts, options = {}) {
     relationshipNotes: Array.isArray(parsed.relationshipNotes) ? parsed.relationshipNotes : [],
     pairs: Array.isArray(parsed.pairs) ? parsed.pairs : [],
     duplicatePhones,
-    source: 'openai',
+    source: provider === 'groq' ? 'groq' : 'openai',
   };
 }
 
