@@ -1,4 +1,13 @@
 module.exports = {
+  /** Shown on public invite page and organizer Event details — editable via env. */
+  inviteCopy: {
+    tagline:
+      process.env.INVITE_PUBLIC_TAGLINE ||
+      "If you can't join us in person, you're still part of our day — scan the QR on your invitation.",
+    details:
+      process.env.INVITE_PUBLIC_DETAILS ||
+      'Send blessings, gift via UPI using the QR, and upload photos for our album and AI collage. Our organizer will receive everything and honour your presence at the celebration.',
+  },
   gifting: {
     enabled: String(process.env.INVITE_GIFTING_ENABLED || 'true').toLowerCase() !== 'false',
     upiId: process.env.INVITE_GIFT_UPI_ID || '',

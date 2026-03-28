@@ -40,7 +40,11 @@ const OrganizerDashboard = ({ user }) => {
   const columns = [
     { title: 'Event Name', dataIndex: 'title', key: 'title', render: (t, r) => <Link to={`/events/${r.id}`}>{t}</Link> },
     { title: 'Date', dataIndex: 'date', key: 'date', render: (d) => formatDate(d) },
-    { title: 'Location', dataIndex: 'location', key: 'location' },
+    {
+      title: 'Location',
+      key: 'location',
+      render: (_, r) => r.venue || [r.city, r.state].filter(Boolean).join(', ') || '—',
+    },
     { title: 'Budget', dataIndex: 'budget', key: 'budget', render: (b) => formatCurrency(b) },
     { title: 'Guests', dataIndex: 'guestCount', key: 'guestCount' },
     { title: 'Action', key: 'action', render: (_, r) => <Link to={`/events/${r.id}`}><Button type="link">View</Button></Link> },
@@ -195,7 +199,11 @@ const CustomerDashboard = ({ user }) => {
   const eventCols = [
     { title: 'Event', dataIndex: 'title', key: 'title', render: (t, r) => <Link to={`/events/${r.id}`}>{t}</Link> },
     { title: 'Date', dataIndex: 'date', key: 'date', render: (d) => formatDate(d) },
-    { title: 'Location', dataIndex: 'location', key: 'location' },
+    {
+      title: 'Location',
+      key: 'location',
+      render: (_, r) => r.venue || [r.city, r.state].filter(Boolean).join(', ') || '—',
+    },
   ];
 
   const bookingCols = [
@@ -270,29 +278,6 @@ const GuestDashboard = ({ user }) => (
   </>
 );
 
-const OrganizerProgressDashboard = ({ user }) => (
-  <>
-    <div className="dashboard-header">
-      <h1>Welcome, {user?.name}! 👋</h1>
-      <Space>
-        <Link to="/activities">
-          <Button type="primary" size="large">Update Activity Progress</Button>
-        </Link>
-        <Link to="/contact-intelligence">
-          <Button size="large">Contact Intelligence</Button>
-        </Link>
-      </Space>
-    </div>
-    <Card style={{ marginTop: 24 }}>
-      <p>You can update progress for each activity and track actual spend for transparency.</p>
-      <Space wrap>
-        <Link to="/activities"><Button type="primary">Open Activity Tracker</Button></Link>
-        <Link to="/contact-intelligence"><Button>Manage Invite Segments & WhatsApp</Button></Link>
-      </Space>
-    </Card>
-  </>
-);
-
 /* ─── Main Dashboard ─── */
 const Dashboard = () => {
   const { user } = useContext(AuthContext);
@@ -303,7 +288,21 @@ const Dashboard = () => {
       {role === 'vendor' && <VendorDashboard user={user} />}
       {role === 'guest' && <GuestDashboard user={user} />}
       {role === 'admin' && <OrganizerDashboard user={user} />}
-      {role === 'organizer' && <OrganizerProgressDashboard user={user} />}
+      {role === 'organizer' && (
+        <>
+          <OrganizerDashboard user={user} />
+          <Card title="Organizer tools" style={{ marginTop: 24 }}>
+            <p style={{ marginBottom: 12, color: '#667085' }}>
+              Track vendor activities, contact segments, and WhatsApp reminders from here.
+            </p>
+            <Space wrap>
+              <Link to="/activities"><Button type="primary">Activity Tracker</Button></Link>
+              <Link to="/contact-intelligence"><Button>Contact Intelligence &amp; WhatsApp</Button></Link>
+              <Link to="/planner"><Button>Event Planner &amp; quotes</Button></Link>
+            </Space>
+          </Card>
+        </>
+      )}
       {role === 'customer' && <CustomerDashboard user={user} />}
     </Layout.Content>
   );

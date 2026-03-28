@@ -74,7 +74,7 @@ exports.sendEventWhatsAppReminders = asyncHandler(async (req, res) => {
   });
   if (!event) return res.status(404).json({ message: 'Event not found' });
 
-  if (req.user.role === 'organizer' && event.organizerId !== req.user.id) {
+  if (req.user.role !== 'admin' && event.organizerId !== req.user.id) {
     return res.status(403).json({ message: 'Not authorized for this event' });
   }
 
@@ -110,6 +110,47 @@ exports.sendEventWhatsAppReminders = asyncHandler(async (req, res) => {
     totalGuests: event.guests.length,
     eligible: target.length,
     sentCount: results.filter((r) => r.sent).length,
+    results,
+  });
+});
+
+// POST /api/notifications/events/:eventId/guests/whatsapp-broadcast
+// Body: { message: string, templateName?: string } — progress / RSVP updates to every guest with a phone on file.
+exports.sendEventGuestWhatsAppBroadcast = asyncHandler(async (req, res) => {
+  const eventId = Number(req.params.eventId);
+  const messageText = String(req.body.message || '').trim();
+  if (!messageText) {
+    return res.status(400).json({ message: 'message is required' });
+  }
+
+  const event = await prisma.event.findUnique({
+    where: { id: eventId },
+    include: { guests: true },
+  });
+  if (!event) return res.status(404).json({ message: 'Event not found' });
+  if (req.user.role !== 'admin' && event.organizerId !== req.user.id) {
+    return res.status(403).json({ message: 'Not authorized for this event' });
+  }
+
+  const templateName = req.body.templateName || 'event_progress_update';
+  const results = [];
+  for (const g of event.guests || []) {
+    const phone = g.phone && String(g.phone).trim();
+    if (!phone) continue;
+    const sent = await sendWhatsApp({
+      to: phone,
+      templateName,
+      text: `${messageText}\n\n— ${event.title}`,
+    });
+    results.push({ guestId: g.id, name: g.name, to: phone, ...sent });
+  }
+
+  res.json({
+    eventId,
+    eventTitle: event.title,
+    sentCount: results.filter((r) => r.sent).length,
+    guestsWithPhone: results.length,
+    skippedNoPhone: (event.guests || []).length - results.length,
     results,
   });
 });

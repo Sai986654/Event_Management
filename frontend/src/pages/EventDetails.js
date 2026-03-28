@@ -1,20 +1,27 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Card, Tabs, Button, Spin, message, Modal, Table, Badge, Tag, Space } from 'antd';
+import { Card, Tabs, Button, Spin, message, Modal, Table, Badge, Tag, Space, Input, Typography } from 'antd';
 import { EditOutlined, DeleteOutlined, ControlOutlined, ShopOutlined } from '@ant-design/icons';
 import { eventService } from '../services/eventService';
 import { guestService } from '../services/guestService';
 import { bookingService } from '../services/bookingService';
 import { useEventSocket } from '../hooks/useEventSocket';
 import { formatDate, formatCurrency, getErrorMessage } from '../utils/helpers';
+import { notificationService } from '../services/notificationService';
+
+const { TextArea } = Input;
+const { Paragraph, Text } = Typography;
 import './EventDetails.css';
 
 const EventDetails = () => {
   const { eventId } = useParams();
   const [event, setEvent] = useState(null);
+  const [inviteCopy, setInviteCopy] = useState(null);
   const [guests, setGuests] = useState([]);
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [waMessage, setWaMessage] = useState('');
+  const [waSending, setWaSending] = useState(false);
 
   // Real-time handlers
   const handleGuestRsvp = useCallback((data) => {
@@ -58,6 +65,7 @@ const EventDetails = () => {
       setLoading(true);
       const eventData = await eventService.getEventById(eventId);
       setEvent(eventData.event);
+      setInviteCopy(eventData.inviteCopy || null);
 
       const guestsData = await guestService.getEventGuests(eventId);
       setGuests(guestsData.guests || []);
@@ -92,6 +100,7 @@ const EventDetails = () => {
 
   const guestColumns = [
     { title: 'Name', dataIndex: 'name', key: 'name' },
+    { title: 'Phone', dataIndex: 'phone', key: 'phone', render: (p) => p || '—' },
     { title: 'Email', dataIndex: 'email', key: 'email' },
     { title: 'RSVP Status', dataIndex: 'rsvpStatus', key: 'rsvpStatus' },
     { title: 'Check-in', dataIndex: 'checkedIn', key: 'checkedIn', render: (val) => val ? 'Yes' : 'No' },
@@ -117,6 +126,26 @@ const EventDetails = () => {
       okType: 'danger',
       onOk: () => handleUpdateBookingStatus(bookingId, 'cancelled'),
     });
+  };
+
+  const sendGuestWhatsAppBroadcast = async () => {
+    const text = waMessage.trim();
+    if (!text) {
+      message.warning('Write an update message for your guests.');
+      return;
+    }
+    setWaSending(true);
+    try {
+      const res = await notificationService.sendGuestWhatsAppBroadcast(eventId, { message: text });
+      message.success(
+        `WhatsApp queued/sent for ${res.sentCount ?? 0} of ${res.guestsWithPhone ?? 0} guests with phone on file.`
+      );
+      setWaMessage('');
+    } catch (err) {
+      message.error(getErrorMessage(err));
+    } finally {
+      setWaSending(false);
+    }
   };
 
   const bookingStatusColor = {
@@ -214,6 +243,52 @@ const EventDetails = () => {
           <Tabs
             items={[
               {
+                key: 'guest_comms',
+                label: 'Invite & guest updates',
+                children: (
+                  <Card>
+                    {inviteCopy ? (
+                      <>
+                        <Paragraph strong>{inviteCopy.tagline}</Paragraph>
+                        <Paragraph type="secondary">{inviteCopy.details}</Paragraph>
+                      </>
+                    ) : null}
+                    <Paragraph>
+                      <Text strong>Public page (QR destination): </Text>
+                      {event.isPublic && event.slug ? (
+                        <a href={`${window.location.origin}/public/${event.slug}`} target="_blank" rel="noreferrer">
+                          {`${window.location.origin}/public/${event.slug}`}
+                        </a>
+                      ) : (
+                        <Text type="warning">
+                          Turn on <Text code>isPublic</Text> for this event so the link works for guests. You can
+                          update the event via API or your admin tools.
+                        </Text>
+                      )}
+                    </Paragraph>
+                    <Paragraph type="secondary">
+                      Guests can use that page to send UPI gifts, upload remote-blessing photos for your AI collage,
+                      and you receive in-app alerts when photos arrive. Physical invites can print a QR pointing to the
+                      same URL.
+                    </Paragraph>
+                    <h4>WhatsApp progress update</h4>
+                    <Paragraph type="secondary">
+                      Sends your text to every guest who has a phone number in the guest list (same backend as Contact
+                      Intelligence reminders; mock mode logs until WhatsApp is wired).
+                    </Paragraph>
+                    <TextArea
+                      rows={4}
+                      value={waMessage}
+                      onChange={(e) => setWaMessage(e.target.value)}
+                      placeholder="Example: Hi! 5 days to go — we can't wait. RSVP link in your invite. Love, [names]"
+                    />
+                    <Button type="primary" style={{ marginTop: 12 }} loading={waSending} onClick={sendGuestWhatsAppBroadcast}>
+                      Send WhatsApp to guests with phone
+                    </Button>
+                  </Card>
+                ),
+              },
+              {
                 key: 'overview',
                 label: 'Overview',
                 children: (
@@ -233,7 +308,7 @@ const EventDetails = () => {
                         </tr>
                         <tr>
                           <td>Location:</td>
-                          <td>{event.location}</td>
+                          <td>{[event.venue, event.city, event.state].filter(Boolean).join(', ') || '—'}</td>
                         </tr>
                         <tr>
                           <td>Budget:</td>

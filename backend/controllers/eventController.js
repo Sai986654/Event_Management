@@ -3,7 +3,7 @@ const asyncHandler = require('../utils/asyncHandler');
 const { paginate } = require('../utils/pagination');
 const slugify = require('slugify');
 const QRCode = require('qrcode');
-const { gifting } = require('../config/inviteConfig');
+const { gifting, inviteCopy } = require('../config/inviteConfig');
 const { dispatchEventCreated } = require('../services/inAppNotificationService');
 
 const generateSlug = (title) =>
@@ -81,7 +81,7 @@ exports.getEvent = asyncHandler(async (req, res) => {
     include: { organizer: { select: { id: true, name: true, email: true } } },
   });
   if (!event) return res.status(404).json({ message: 'Event not found' });
-  res.json({ event });
+  res.json({ event, inviteCopy });
 });
 
 // GET /api/events/slug/:slug  (public)
@@ -106,7 +106,7 @@ exports.getEventBySlug = asyncHandler(async (req, res) => {
     };
   }
 
-  res.json({ event, gift });
+  res.json({ event, gift, inviteCopy });
 });
 
 // PUT /api/events/:id

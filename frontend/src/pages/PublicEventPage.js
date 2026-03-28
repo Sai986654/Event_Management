@@ -13,6 +13,7 @@ const PublicEventPage = () => {
   const [event, setEvent] = useState(null);
   const [gallery, setGallery] = useState([]);
   const [gift, setGift] = useState({ enabled: false });
+  const [inviteCopy, setInviteCopy] = useState(null);
   const [loading, setLoading] = useState(true);
   const [uploadingBlessing, setUploadingBlessing] = useState(false);
   const [form] = Form.useForm();
@@ -29,6 +30,7 @@ const PublicEventPage = () => {
       const eventData = await eventService.getPublicEventBySlug(eventSlug);
       setEvent(eventData.event);
       setGift(eventData.gift || { enabled: false });
+      setInviteCopy(eventData.inviteCopy || null);
 
       const galleryData = await mediaService.getEventMedia(eventData.event.id, { approved: true });
       setGallery(galleryData.media || []);
@@ -96,6 +98,12 @@ const PublicEventPage = () => {
       </div>
 
       <div className="event-container">
+        {inviteCopy ? (
+          <Card style={{ marginBottom: 24, borderColor: '#667eea', background: '#f8f9ff' }}>
+            <h2 style={{ marginTop: 0 }}>{inviteCopy.tagline}</h2>
+            <p style={{ marginBottom: 0, fontSize: 16, lineHeight: 1.6 }}>{inviteCopy.details}</p>
+          </Card>
+        ) : null}
         {/* Event Details */}
         <Row gutter={[24, 24]}>
           <Col xs={24} md={16}>

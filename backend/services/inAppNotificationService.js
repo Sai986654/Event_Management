@@ -199,41 +199,98 @@ async function dispatchOrderQuoted(io, order, event, customer, items = []) {
 
   const meta = { eventId: event.id, orderId: order.id, type: 'order_quoted' };
 
-  for (const uid of await getAdminUserIds()) {
-    await createNotification(io, {
+  const adminIds = await getAdminUserIds();
+  const tasks = adminIds.map((uid) =>
+    createNotification(io, {
       userId: uid,
       type: 'order_quoted',
       title: `[Admin] Quote placed: ${event.title}`,
       body: lines,
       metadata: { ...meta, audience: 'admin' },
-    });
-  }
+    })
+  );
 
-  await createNotification(io, {
-    userId: organizer.id,
-    type: 'order_quoted',
-    title: `New vendor quote: ${event.title}`,
-    body: lines,
-    metadata: { ...meta, audience: 'organizer' },
-  });
+  tasks.push(
+    createNotification(io, {
+      userId: organizer.id,
+      type: 'order_quoted',
+      title: `New vendor quote: ${event.title}`,
+      body: lines,
+      metadata: { ...meta, audience: 'organizer' },
+    })
+  );
 
   if (customer.id !== organizer.id) {
-    await createNotification(io, {
-      userId: customer.id,
-      type: 'order_quoted',
-      title: `Quote ready: ${event.title}`,
-      body: lines,
-      metadata: { ...meta, audience: 'customer' },
-    });
+    tasks.push(
+      createNotification(io, {
+        userId: customer.id,
+        type: 'order_quoted',
+        title: `Quote ready: ${event.title}`,
+        body: lines,
+        metadata: { ...meta, audience: 'customer' },
+      })
+    );
   }
 
   for (const v of vendors) {
+    tasks.push(
+      createNotification(io, {
+        userId: v.userId,
+        type: 'order_quoted',
+        title: `Included in quote — ${event.title}`,
+        body: `${lines}\n\nYour business: ${v.businessName}`,
+        metadata: { ...meta, audience: 'vendor', vendorId: v.id },
+      })
+    );
+  }
+
+  await Promise.all(tasks);
+}
+
+/**
+ * Guest uploaded a remote-blessing photo from the public page — notify organizer (and admins).
+ */
+async function dispatchRemoteBlessingUploaded(io, { event, media, guestName }) {
+  if (!event?.organizerId) return;
+  const organizer = await prisma.user.findUnique({ where: { id: event.organizerId } });
+  if (!organizer) return;
+
+  const who = guestName && String(guestName).trim() ? String(guestName).trim() : 'A guest';
+  const lines = [
+    `${who} uploaded a remote blessing photo for "${event.title}".`,
+    `Include it in your review / AI collage workflow.`,
+    media?.id ? `Media ID: ${media.id}` : null,
+    event.slug ? `Public page: /public/${event.slug}` : null,
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  const meta = {
+    eventId: event.id,
+    mediaId: media?.id,
+    type: 'remote_blessing_uploaded',
+  };
+
+  await createNotification(io, {
+    userId: organizer.id,
+    type: 'remote_blessing',
+    title: `Remote blessing photo — ${event.title}`,
+    body: lines,
+    metadata: { ...meta, audience: 'organizer' },
+  });
+  await sendEmail({
+    to: organizer.email,
+    subject: `[EventOS] Remote blessing photo — ${event.title}`,
+    html: `<p>${lines.replace(/\n/g, '<br/>')}</p>`,
+  }).catch(() => {});
+
+  for (const uid of await getAdminUserIds()) {
     await createNotification(io, {
-      userId: v.userId,
-      type: 'order_quoted',
-      title: `Included in quote — ${event.title}`,
-      body: `${lines}\n\nYour business: ${v.businessName}`,
-      metadata: { ...meta, audience: 'vendor', vendorId: v.id },
+      userId: uid,
+      type: 'remote_blessing',
+      title: `[Admin] Remote blessing — ${event.title}`,
+      body: lines,
+      metadata: { ...meta, audience: 'admin' },
     });
   }
 }
@@ -244,5 +301,6 @@ module.exports = {
   dispatchEventCreated,
   dispatchBookingCreated,
   dispatchOrderQuoted,
+  dispatchRemoteBlessingUploaded,
   eventDetailLines,
 };

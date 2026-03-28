@@ -19,6 +19,7 @@ const PublicEventScreen = ({ route, navigation }) => {
   const [loading, setLoading] = useState(!!paramSlug);
   const [event, setEvent] = useState(null);
   const [gift, setGift] = useState(null);
+  const [inviteCopy, setInviteCopy] = useState(null);
   const [gallery, setGallery] = useState([]);
   const [guestName, setGuestName] = useState('');
   const [caption, setCaption] = useState('');
@@ -37,6 +38,7 @@ const PublicEventScreen = ({ route, navigation }) => {
       const data = await eventService.getPublicEventBySlug(slug);
       setEvent(data.event);
       setGift(data.gift || { enabled: false });
+      setInviteCopy(data.inviteCopy || null);
       navigation.setOptions({ title: data.event?.title || 'Event' });
       if (data.event?.id) {
         const gal = await mediaService.getEventMedia(data.event.id, { approved: true });
@@ -48,6 +50,7 @@ const PublicEventScreen = ({ route, navigation }) => {
       Alert.alert('Error', getErrorMessage(err));
       setEvent(null);
       setGift(null);
+      setInviteCopy(null);
       setGallery([]);
     } finally {
       setLoading(false);
@@ -168,6 +171,17 @@ const PublicEventScreen = ({ route, navigation }) => {
         </Card.Content>
       </Card>
 
+      {inviteCopy ? (
+        <Card style={[styles.card, styles.inviteBanner]}>
+          <Card.Content>
+            <Text variant="titleMedium" style={styles.bannerTitle}>
+              {inviteCopy.tagline}
+            </Text>
+            <Text style={styles.bannerBody}>{inviteCopy.details}</Text>
+          </Card.Content>
+        </Card>
+      ) : null}
+
       <Card style={styles.card}>
         <Card.Content>
           <Text variant="titleMedium">Details</Text>
@@ -259,6 +273,9 @@ const styles = StyleSheet.create({
   heroTitle: { color: '#fff', fontWeight: '800' },
   meta: { color: 'rgba(255,255,255,0.9)', marginTop: 4 },
   card: { marginBottom: 12, borderRadius: 14, backgroundColor: '#fff' },
+  inviteBanner: { backgroundColor: '#f4f6ff', borderWidth: 1, borderColor: '#c7d2fe' },
+  bannerTitle: { marginBottom: 8, color: '#1e293b' },
+  bannerBody: { fontSize: 14, lineHeight: 22, color: '#475467' },
   title: { fontWeight: '800', marginBottom: 8 },
   sub: { color: '#667085', marginBottom: 12, fontSize: 13 },
   line: { marginTop: 6, color: '#344054' },

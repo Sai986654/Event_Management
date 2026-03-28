@@ -34,6 +34,15 @@ export const notificationService = {
     return response.data;
   },
 
+  /** Progress / reminder text to every guest with a phone (organizer or admin). */
+  sendGuestWhatsAppBroadcast: async (eventId, { message, templateName } = {}) => {
+    const response = await api.post(`/notifications/events/${eventId}/guests/whatsapp-broadcast`, {
+      message,
+      templateName,
+    });
+    return response.data;
+  },
+
   sendReminder: async (eventId, recipientType) => {
     const response = await api.post('/notifications/send-reminder', {
       eventId,

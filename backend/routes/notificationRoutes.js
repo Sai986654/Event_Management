@@ -8,10 +8,11 @@ const {
   analyzeContactGraph,
   correlateContactSelection,
   sendEventWhatsAppReminders,
+  sendEventGuestWhatsAppBroadcast,
 } = require('../controllers/notificationController');
 
 router.use(protect);
-router.use(authorize('admin', 'organizer'));
+router.use(authorize('admin', 'organizer', 'customer'));
 
 router.post('/email', sendEmailNotification);
 router.post('/sms', sendSMSNotification);
@@ -50,6 +51,15 @@ router.post(
   ],
   validate,
   sendEventWhatsAppReminders
+);
+router.post(
+  '/events/:eventId/guests/whatsapp-broadcast',
+  [
+    body('message').trim().notEmpty().withMessage('message is required'),
+    body('templateName').optional().isString(),
+  ],
+  validate,
+  sendEventGuestWhatsAppBroadcast
 );
 
 module.exports = router;

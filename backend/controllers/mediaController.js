@@ -3,6 +3,7 @@ const asyncHandler = require('../utils/asyncHandler');
 const { uploadFile, deleteFile } = require('../services/fileService');
 const { paginate } = require('../utils/pagination');
 const { remoteBlessings } = require('../config/inviteConfig');
+const { dispatchRemoteBlessingUploaded } = require('../services/inAppNotificationService');
 
 // POST /api/media
 exports.uploadMedia = asyncHandler(async (req, res) => {
@@ -135,6 +136,13 @@ exports.uploadPublicBlessing = asyncHandler(async (req, res) => {
       isFlagged: false,
     },
   });
+
+  const io = req.app.get('io');
+  dispatchRemoteBlessingUploaded(io, {
+    event,
+    media,
+    guestName: req.body.guestName,
+  }).catch((err) => console.error('[PublicBlessing] notify organizer', err.message));
 
   res.status(201).json({
     media,

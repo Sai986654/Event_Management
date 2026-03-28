@@ -34,16 +34,26 @@ exports.createOrderQuote = asyncHandler(async (req, res) => {
   const activitiesData = [];
   const skipped = [];
 
+  const uniquePackageIds = [
+    ...new Set(
+      selections
+        .map((s) => Number(s.packageId))
+        .filter((n) => Number.isFinite(n) && n > 0)
+    ),
+  ];
+  const packagesLoaded = await prisma.vendorPackage.findMany({
+    where: { id: { in: uniquePackageIds } },
+    include: { vendor: true },
+  });
+  const pkgById = new Map(packagesLoaded.map((p) => [p.id, p]));
+
   for (const s of selections) {
     const pid = Number(s.packageId);
     if (!Number.isFinite(pid) || pid < 1) {
       skipped.push({ packageId: s.packageId, reason: 'invalid_package_id' });
       continue;
     }
-    const pkg = await prisma.vendorPackage.findUnique({
-      where: { id: pid },
-      include: { vendor: true },
-    });
+    const pkg = pkgById.get(pid);
     if (!pkg) {
       skipped.push({ packageId: pid, reason: 'package_not_found' });
       continue;
@@ -111,7 +121,8 @@ exports.createOrderQuote = asyncHandler(async (req, res) => {
   io.emit('order:quoted', { orderId: updated.id, eventId: updated.eventId, total: updated.quotedTotal });
 
   const customer = await prisma.user.findUnique({ where: { id: req.user.id } });
-  await dispatchOrderQuoted(io, updated, event, customer, updated.items || []).catch((err) =>
+  // Don’t block the HTTP response on N notification rows (avoids client timeout on slow DB/network).
+  dispatchOrderQuoted(io, updated, event, customer, updated.items || []).catch((err) =>
     console.error('[OrderQuote] notifications', err.message)
   );
 
