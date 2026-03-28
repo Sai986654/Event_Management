@@ -200,23 +200,43 @@ const analyzeContacts = (contacts = []) => {
   return { contacts: analyzed, summary: buildSummary(analyzed) };
 };
 
+/** Default batch size: large CSVs (40+ contacts) often hit output truncation in one call. Override via CONTACT_AI_BATCH_SIZE. */
+function getOpenAiBatchSize() {
+  const n = Number(process.env.CONTACT_AI_BATCH_SIZE);
+  if (Number.isFinite(n) && n >= 3 && n <= 50) return Math.floor(n);
+  return 12;
+}
+
+function parseOpenAiMessageJson(raw) {
+  let s = String(raw || '').trim();
+  if (s.startsWith('```')) {
+    s = s.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '');
+  }
+  try {
+    return JSON.parse(s);
+  } catch {
+    const m = s.match(/\{[\s\S]*\}/);
+    if (m) {
+      try {
+        return JSON.parse(m[0]);
+      } catch {
+        return {};
+      }
+    }
+    return {};
+  }
+}
+
 /**
- * Optional OpenAI refinement (set OPENAI_API_KEY). Falls back to rules-only on error / no key.
+ * One Chat Completions call for a batch of contacts (keeps JSON output small enough to parse).
  */
-async function refineWithOpenAI(analyzedContacts, aiOptions = {}) {
+async function refineOneOpenAiBatch(batchContacts, aiOptions, { includeOverview }) {
   const apiKey = process.env.OPENAI_API_KEY;
   const listOwnerContext = aiOptions.listOwnerContext || 'unspecified';
   const listOwnerNotes = String(aiOptions.listOwnerNotes || '').trim();
-
-  if (!apiKey || analyzedContacts.length === 0) {
-    console.log(
-      `${LOG} openai:skip reason=${!apiKey ? 'no OPENAI_API_KEY' : 'empty contacts'} owner=${listOwnerContext}`
-    );
-    return { contacts: analyzedContacts, overview: null, openAiRefinedCount: 0 };
-  }
-
   const model = process.env.CONTACT_AI_MODEL || 'gpt-4o-mini';
-  const payload = analyzedContacts.map((c) => ({
+
+  const payload = batchContacts.map((c) => ({
     index: c.index,
     name: c.name,
     hints: c.relationLabelRaw || '',
@@ -227,108 +247,179 @@ async function refineWithOpenAI(analyzedContacts, aiOptions = {}) {
   }));
 
   const systemParts = [
-    'You classify contacts for Indian (Telugu) wedding guest lists.',
+    'You classify contacts for Indian (Telugu) wedding guest lists. Output a single JSON object only.',
     `CONTEXT — ${listOwnerPromptLine(listOwnerContext)}`,
     listOwnerNotes ? `Organizer notes: ${listOwnerNotes}` : '',
-    'NAMING HABITS: People often save contacts as "FirstName Employer" (e.g. Lakshmi Accenture) meaning they work together at that company — treat as colleague when labels do not say family.',
-    'They also save "Name Profession" (e.g. Ravi Plumber, Suresh Electrician) meaning a service provider or trade — use relation "other" unless labels clearly say family/friend.',
-    'Respect explicit Google Labels / Notes / kin terms over name suffix guesses.',
-    'Use Google Labels, Notes, job titles, and Telugu/English names.',
-    'For each contact, output:',
-    '- relation: exactly one of father, mother, brother, sister, spouse, uncle, aunt, cousin, friend, colleague, other, unknown',
-    '- relationTelugu: a short kinship or role label in Telugu script (natural for invitations), e.g. మామయ్య, అత్త, అల్లుడు, కోడలు.',
-    '- confidence: 0–1',
-    'Respond with JSON only, shape:',
-    '{"overview":"2-4 English sentences summarizing segmentation for the organizer","items":[{"index":number,"relation":string,"confidence":number,"relationTelugu":string}]}',
+    'NAMING HABITS: "FirstName Employer" (e.g. Lakshmi Accenture) → colleague if not family-labeled. "Name Profession" (e.g. Ravi Plumber) → relation other unless family.',
+    'Respect Google Labels / Notes / kin terms over guesses.',
+    'For EACH contact in the input batch, output one object in items with the SAME index number as provided.',
+    'relation: one of father, mother, brother, sister, spouse, uncle, aunt, cousin, friend, colleague, other, unknown',
+    'relationTelugu: short Telugu label for invitations.',
+    'confidence: 0–1',
+    includeOverview
+      ? 'Include overview: 2–4 English sentences summarizing this batch for the organizer.'
+      : 'Set overview to an empty string "".',
+    'JSON shape: {"overview":"string","items":[{"index":number,"relation":string,"confidence":number,"relationTelugu":string}]}',
   ].filter(Boolean);
 
   const body = {
     model,
     temperature: 0.2,
+    max_tokens: Number(process.env.CONTACT_AI_MAX_TOKENS) || 8192,
+    response_format: { type: 'json_object' },
     messages: [
       { role: 'system', content: systemParts.join('\n') },
       { role: 'user', content: JSON.stringify({ listOwnerContext, contacts: payload }) },
     ],
   };
 
-  console.log(`${LOG} openai:start model=${model} contacts=${analyzedContacts.length} owner=${listOwnerContext}`);
-  if (process.env.CONTACT_AI_DEBUG === 'true') {
-    console.log(`${LOG} openai:debug payload.sample`, JSON.stringify(payload.slice(0, 3)));
-  }
+  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
 
-  try {
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
-    });
-
-    if (!res.ok) {
-      const errText = await res.text();
-      console.error(`${LOG} openai:http_error`, res.status, errText.slice(0, 500));
-      return {
-        contacts: analyzedContacts.map((c) => ({ ...c, segmentationSource: 'rules' })),
-        overview: null,
-        openAiRefinedCount: 0,
-      };
-    }
-
-    const data = await res.json();
-    const raw = data?.choices?.[0]?.message?.content || '{}';
-    let parsed;
-    try {
-      parsed = JSON.parse(raw);
-    } catch {
-      const m = raw.match(/\{[\s\S]*\}/);
-      parsed = m ? JSON.parse(m[0]) : {};
-    }
-
-    const overview = typeof parsed.overview === 'string' ? parsed.overview : null;
-    if (overview) {
-      console.log(`${LOG} openai:overview`, overview.slice(0, 400));
-    }
-
-    const byIndex = new Map((parsed.items || []).map((it) => [Number(it.index), it]));
-    let openAiRefinedCount = 0;
-
-    const next = analyzedContacts.map((c) => {
-      const ai = byIndex.get(c.index);
-      if (!ai || !ai.relation) {
-        return { ...c, segmentationSource: 'rules' };
-      }
-      const rel = String(ai.relation).toLowerCase();
-      const confidence = Math.min(1, Math.max(0, Number(ai.confidence) || 0.75));
-      const relationTelugu =
-        typeof ai.relationTelugu === 'string' && ai.relationTelugu.trim()
-          ? ai.relationTelugu.trim()
-          : teluguFallbackForRelation(rel);
-      openAiRefinedCount += 1;
-      return {
-        ...c,
-        inferredRelation: rel,
-        relationTelugu,
-        confidence,
-        group: classifyGroup(rel),
-        segmentationSource: 'openai',
-      };
-    });
-
-    console.log(
-      `${LOG} openai:done refined=${openAiRefinedCount}/${analyzedContacts.length} tokens=${data?.usage?.total_tokens ?? 'n/a'}`
-    );
-
-    return { contacts: next, overview, openAiRefinedCount };
-  } catch (e) {
-    console.error(`${LOG} openai:exception`, e.message);
+  if (!res.ok) {
+    const errText = await res.text();
+    console.error(`${LOG} openai:http_error`, res.status, errText.slice(0, 800));
     return {
-      contacts: analyzedContacts.map((c) => ({ ...c, segmentationSource: 'rules' })),
+      contacts: batchContacts.map((c) => ({ ...c, segmentationSource: 'rules' })),
       overview: null,
       openAiRefinedCount: 0,
     };
   }
+
+  const data = await res.json();
+  const finishReason = data?.choices?.[0]?.finish_reason;
+  if (finishReason === 'length') {
+    console.warn(`${LOG} openai:truncated finish_reason=length — reduce CONTACT_AI_BATCH_SIZE (now ${getOpenAiBatchSize()})`);
+  }
+
+  const raw = data?.choices?.[0]?.message?.content || '{}';
+  const parsed = parseOpenAiMessageJson(raw);
+  const itemsLen = Array.isArray(parsed.items) ? parsed.items.length : 0;
+  if (itemsLen === 0) {
+    console.warn(
+      `${LOG} openai:empty_items batchSize=${batchContacts.length} contentLen=${raw.length} preview=${String(raw).slice(0, 200)}`
+    );
+  }
+
+  const overview = typeof parsed.overview === 'string' && parsed.overview.trim() ? parsed.overview.trim() : null;
+  if (overview && includeOverview) {
+    console.log(`${LOG} openai:overview`, overview.slice(0, 400));
+  }
+
+  const byIndex = new Map();
+  for (const it of parsed.items || []) {
+    const idx = Number(it.index);
+    if (Number.isFinite(idx)) byIndex.set(idx, it);
+  }
+
+  let openAiRefinedCount = 0;
+  const next = batchContacts.map((c) => {
+    const ai = byIndex.get(c.index);
+    if (!ai || !ai.relation) {
+      return { ...c, segmentationSource: 'rules' };
+    }
+    const rel = String(ai.relation).toLowerCase();
+    const confidence = Math.min(1, Math.max(0, Number(ai.confidence) || 0.75));
+    const relationTelugu =
+      typeof ai.relationTelugu === 'string' && ai.relationTelugu.trim()
+        ? ai.relationTelugu.trim()
+        : teluguFallbackForRelation(rel);
+    openAiRefinedCount += 1;
+    return {
+      ...c,
+      inferredRelation: rel,
+      relationTelugu,
+      confidence,
+      group: classifyGroup(rel),
+      segmentationSource: 'openai',
+    };
+  });
+
+  console.log(
+    `${LOG} openai:batch done batch=${batchContacts.length} refined=${openAiRefinedCount} tokens=${data?.usage?.total_tokens ?? 'n/a'}`
+  );
+
+  return { contacts: next, overview: includeOverview ? overview : null, openAiRefinedCount };
+}
+
+/**
+ * Optional OpenAI refinement (set OPENAI_API_KEY). Large lists are processed in batches to avoid truncated JSON.
+ */
+async function refineWithOpenAI(analyzedContacts, aiOptions = {}) {
+  const apiKey = process.env.OPENAI_API_KEY;
+  const listOwnerContext = aiOptions.listOwnerContext || 'unspecified';
+
+  if (!apiKey || analyzedContacts.length === 0) {
+    console.log(
+      `${LOG} openai:skip reason=${!apiKey ? 'no OPENAI_API_KEY' : 'empty contacts'} owner=${listOwnerContext}`
+    );
+    return {
+      contacts: analyzedContacts,
+      overview: null,
+      openAiRefinedCount: 0,
+      openAiWarning: undefined,
+      openAiBatches: 0,
+    };
+  }
+
+  const batchSize = getOpenAiBatchSize();
+  const mergedByIndex = new Map(analyzedContacts.map((c) => [c.index, { ...c }]));
+  let totalRefined = 0;
+  let overview = null;
+  let batchNum = 0;
+
+  console.log(
+    `${LOG} openai:start model=${process.env.CONTACT_AI_MODEL || 'gpt-4o-mini'} total=${analyzedContacts.length} batchSize=${batchSize} owner=${listOwnerContext}`
+  );
+
+  if (process.env.CONTACT_AI_DEBUG === 'true') {
+    console.log(`${LOG} openai:debug first indexes`, analyzedContacts.slice(0, 3).map((c) => c.index));
+  }
+
+  for (let i = 0; i < analyzedContacts.length; i += batchSize) {
+    const batch = analyzedContacts.slice(i, i + batchSize);
+    batchNum += 1;
+    const includeOverview = i === 0;
+    try {
+      const r = await refineOneOpenAiBatch(batch, aiOptions, { includeOverview });
+      totalRefined += r.openAiRefinedCount;
+      if (r.overview) overview = r.overview;
+      for (const c of r.contacts) {
+        mergedByIndex.set(c.index, c);
+      }
+    } catch (e) {
+      console.error(`${LOG} openai:batch_exception`, e.message);
+    }
+  }
+
+  const merged = analyzedContacts.map((c) => mergedByIndex.get(c.index) || c);
+
+  let openAiWarning;
+  if (totalRefined === 0 && analyzedContacts.length > 0) {
+    openAiWarning =
+      'OpenAI returned no refined rows (empty or invalid JSON). Check server logs, API key/quota, or set CONTACT_AI_BATCH_SIZE=8. Table shows rule-based results only.';
+    console.warn(`${LOG} openai:no_refines totalContacts=${analyzedContacts.length} batches=${batchNum}`);
+  } else if (totalRefined < analyzedContacts.length) {
+    openAiWarning = `LLM refined ${totalRefined} of ${analyzedContacts.length} contacts; some rows remain rule-based (check batch logs).`;
+  }
+
+  console.log(
+    `${LOG} openai:done refined=${totalRefined}/${analyzedContacts.length} batches=${batchNum}`
+  );
+
+  return {
+    contacts: merged,
+    overview,
+    openAiRefinedCount: totalRefined,
+    openAiWarning,
+    openAiBatches: batchNum,
+  };
 }
 
 /**
@@ -350,12 +441,16 @@ async function analyzeContactsPipeline(rawContacts = [], options = {}) {
   let contacts = base.contacts;
   let overview = null;
   let openAiRefinedCount = 0;
+  let openAiWarning;
+  let openAiBatches = 0;
 
   if (useOpenAi && process.env.OPENAI_API_KEY) {
     const refined = await refineWithOpenAI(contacts, { listOwnerContext, listOwnerNotes });
     contacts = refined.contacts;
     overview = refined.overview;
     openAiRefinedCount = refined.openAiRefinedCount;
+    openAiWarning = refined.openAiWarning;
+    openAiBatches = refined.openAiBatches || 0;
   } else {
     console.log(`${LOG} openai:skipped useOpenAi=${useOpenAi} hasKey=${Boolean(process.env.OPENAI_API_KEY)}`);
   }
@@ -364,7 +459,7 @@ async function analyzeContactsPipeline(rawContacts = [], options = {}) {
   const aiUsed = Boolean(process.env.OPENAI_API_KEY) && useOpenAi;
 
   console.log(
-    `${LOG} pipeline:done aiUsed=${aiUsed} llmRows=${openAiRefinedCount} whatsAppEligible=${summary.whatsAppEligible}`
+    `${LOG} pipeline:done aiUsed=${aiUsed} llmRows=${openAiRefinedCount} batches=${openAiBatches} whatsAppEligible=${summary.whatsAppEligible}`
   );
 
   return {
@@ -375,12 +470,140 @@ async function analyzeContactsPipeline(rawContacts = [], options = {}) {
     listOwnerNotes: listOwnerNotes || undefined,
     aiOverview: overview || undefined,
     openAiRefinedCount,
+    openAiWarning: openAiWarning || undefined,
+    openAiBatches: openAiBatches || undefined,
+  };
+}
+
+/**
+ * Correlate a user-selected subset of analyzed contacts (OpenAI + duplicate-phone hints).
+ * @param {object[]} contacts - Analyzed contact rows from analyzeContactsPipeline / analyzeContacts
+ * @param {{ listOwnerContext?: string, listOwnerNotes?: string }} options
+ */
+async function correlateContactsSubset(contacts, options = {}) {
+  if (!Array.isArray(contacts) || contacts.length < 2) {
+    return { error: 'Select at least two contacts.', code: 'MIN_CONTACTS' };
+  }
+
+  const listOwnerContext = normalizeListOwnerContext(options.listOwnerContext);
+  const listOwnerNotes = String(options.listOwnerNotes || '').trim();
+
+  const phoneNorm = (p) => String(p || '').replace(/\D/g, '');
+  const byPhone = new Map();
+  for (const c of contacts) {
+    const p = phoneNorm(c.phone);
+    if (p.length >= 10) {
+      if (!byPhone.has(p)) byPhone.set(p, []);
+      byPhone.get(p).push({ index: c.index, name: c.name });
+    }
+  }
+  const duplicatePhones = [...byPhone.entries()]
+    .filter(([, arr]) => arr.length > 1)
+    .map(([digits, people]) => ({ digits, people }));
+
+  const simplified = contacts.map((c) => ({
+    index: c.index,
+    name: c.name,
+    phone: c.phone,
+    relationLabelRaw: c.relationLabelRaw,
+    inferredRelation: c.inferredRelation,
+    relationTelugu: c.relationTelugu,
+    group: c.group,
+    nameSuffixHint: c.nameSuffixHint || null,
+    segmentationSource: c.segmentationSource,
+  }));
+
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    const dupSummary = duplicatePhones.length
+      ? duplicatePhones
+          .map((d) => `${d.digits}: ${d.people.map((p) => p.name).join(', ')}`)
+          .join('; ')
+      : 'No duplicate normalized phone numbers in this selection.';
+    return {
+      correlationSummary: `OpenAI is not configured on the server (${LOG}). Rules-only: ${dupSummary}`,
+      relationshipNotes: [],
+      pairs: [],
+      duplicatePhones,
+      source: 'rules',
+    };
+  }
+
+  const model = process.env.CONTACT_AI_MODEL || 'gpt-4o-mini';
+  const maxTokens = Number(process.env.CONTACT_AI_CORRELATE_MAX_TOKENS);
+  const systemParts = [
+    'You help Indian wedding organizers understand how SELECTED guests may relate to each other.',
+    `List owner context: ${listOwnerPromptLine(listOwnerContext)}`,
+    listOwnerNotes ? `Organizer notes: ${listOwnerNotes}` : '',
+    'Use each person\'s labels (relationLabelRaw), inferredRelation, Telugu label, group, and name suffix hints.',
+    'duplicatePhoneHints: same normalized phone on multiple rows may mean shared family phone or duplicate entries — mention cautiously.',
+    'Do not invent blood ties without label support; use "likely" or "possibly" when uncertain.',
+    'Output JSON only: {"summary":"2-6 sentences in English","relationshipNotes":["short bullet strings"],"pairs":[{"personA":"","personB":"","relationshipHypothesis":""}]}',
+  ].filter(Boolean);
+
+  const body = {
+    model,
+    temperature: 0.35,
+    max_tokens: Number.isFinite(maxTokens) && maxTokens >= 512 ? Math.floor(maxTokens) : 4096,
+    response_format: { type: 'json_object' },
+    messages: [
+      { role: 'system', content: systemParts.join('\n') },
+      {
+        role: 'user',
+        content: JSON.stringify({
+          listOwnerContext,
+          duplicatePhoneHints: duplicatePhones,
+          contacts: simplified,
+        }),
+      },
+    ],
+  };
+
+  console.log(`${LOG} correlate:subset n=${contacts.length} owner=${listOwnerContext} dupPhones=${duplicatePhones.length}`);
+
+  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    console.error(`${LOG} correlate:openai_http`, res.status, errText.slice(0, 600));
+    return {
+      error: 'OpenAI request failed for correlation.',
+      code: 'OPENAI_HTTP',
+      status: res.status,
+      duplicatePhones,
+    };
+  }
+
+  const data = await res.json();
+  const raw = data?.choices?.[0]?.message?.content;
+  const parsed = parseOpenAiMessageJson(raw);
+  const summary =
+    typeof parsed.summary === 'string'
+      ? parsed.summary
+      : typeof parsed.correlationSummary === 'string'
+        ? parsed.correlationSummary
+        : '';
+
+  return {
+    correlationSummary: summary,
+    relationshipNotes: Array.isArray(parsed.relationshipNotes) ? parsed.relationshipNotes : [],
+    pairs: Array.isArray(parsed.pairs) ? parsed.pairs : [],
+    duplicatePhones,
+    source: 'openai',
   };
 }
 
 module.exports = {
   analyzeContacts,
   analyzeContactsPipeline,
+  correlateContactsSubset,
   normalizePhone,
   inferRelation,
   inferNameSuffixHint,

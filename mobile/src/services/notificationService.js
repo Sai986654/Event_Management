@@ -6,6 +6,11 @@ export const notificationService = {
     return response.data;
   },
 
+  correlateContacts: async (payload) => {
+    const response = await api.post('/notifications/contacts/correlate', payload);
+    return response.data;
+  },
+
   sendWhatsAppReminders: async ({ eventId, group = 'all', message, templateName }) => {
     const response = await api.post(`/notifications/events/${eventId}/reminders/whatsapp`, {
       group,

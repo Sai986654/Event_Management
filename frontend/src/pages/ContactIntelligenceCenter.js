@@ -81,6 +81,9 @@ const ContactIntelligenceCenter = () => {
   /** Table filter: segment + optional name search */
   const [segmentFilter, setSegmentFilter] = useState('all');
   const [nameFilter, setNameFilter] = useState('');
+  const [selectedRowKeys, setSelectedRowKeys] = useState([]);
+  const [correlating, setCorrelating] = useState(false);
+  const [correlationResult, setCorrelationResult] = useState(null);
 
   useEffect(() => {
     (async () => {
@@ -134,6 +137,8 @@ const ContactIntelligenceCenter = () => {
           });
       setSegmentFilter('all');
       setNameFilter('');
+      setSelectedRowKeys([]);
+      setCorrelationResult(null);
       setAnalyzed(res);
       console.log('[ContactIntelligence UI] analyze done', {
         aiUsed: res.aiUsed,
@@ -148,6 +153,8 @@ const ContactIntelligenceCenter = () => {
         aiUsed: res.aiUsed,
         aiOverview: res.aiOverview,
         openAiRefinedCount: res.openAiRefinedCount,
+        openAiWarning: res.openAiWarning,
+        openAiBatches: res.openAiBatches,
         importMeta: res.importMeta,
       });
       message.success(
@@ -225,12 +232,16 @@ const ContactIntelligenceCenter = () => {
     setListOwnerNotes(prev.listOwnerNotes || '');
     setSegmentFilter('all');
     setNameFilter('');
+    setSelectedRowKeys([]);
+    setCorrelationResult(null);
     setAnalyzed({
       contacts: prev.contacts,
       summary: prev.summary,
       aiUsed: prev.aiUsed,
       aiOverview: prev.aiOverview,
       openAiRefinedCount: prev.openAiRefinedCount,
+      openAiWarning: prev.openAiWarning,
+      openAiBatches: prev.openAiBatches,
       importMeta: prev.importMeta,
       listOwnerContext: prev.listOwnerContext,
     });
@@ -286,6 +297,35 @@ const ContactIntelligenceCenter = () => {
     setSegmentFilter(key);
     if (key === 'all' || key === 'relatives' || key === 'friends' || key === 'work' || key === 'others') {
       setTargetGroup(key);
+    }
+  };
+
+  const correlateSelected = async () => {
+    if (selectedRowKeys.length < 2) {
+      message.warning('Select at least two rows in the table.');
+      return;
+    }
+    const keySet = new Set(selectedRowKeys.map(String));
+    const selected = (analyzed.contacts || []).filter((c) => keySet.has(String(c.index)));
+    if (selected.length < 2) {
+      message.warning('Could not resolve selected contacts. Try analyzing again.');
+      return;
+    }
+    setCorrelating(true);
+    setCorrelationResult(null);
+    try {
+      const res = await notificationService.correlateContacts({
+        contacts: selected,
+        listOwnerContext,
+        listOwnerNotes,
+      });
+      setCorrelationResult(res);
+      console.log('[ContactIntelligence UI] correlate done', { source: res.source, pairs: res.pairs?.length });
+      message.success(res.source === 'openai' ? 'AI correlation ready.' : 'Rules-only correlation (no OpenAI key on server).');
+    } catch (err) {
+      message.error(getErrorMessage(err));
+    } finally {
+      setCorrelating(false);
     }
   };
 
@@ -458,7 +498,13 @@ const ContactIntelligenceCenter = () => {
                 {analyzed.openAiRefinedCount != null ? (
                   <Tag color="cyan">LLM rows: {analyzed.openAiRefinedCount}</Tag>
                 ) : null}
+                {analyzed.openAiBatches != null ? (
+                  <Tag color="default">OpenAI batches: {analyzed.openAiBatches}</Tag>
+                ) : null}
               </Space>
+              {analyzed.openAiWarning ? (
+                <Alert type="warning" showIcon closable message="LLM output" description={analyzed.openAiWarning} />
+              ) : null}
               {analyzed.aiOverview ? (
                 <Paragraph style={{ marginBottom: 0 }}>
                   <Text strong>AI summary: </Text>
@@ -469,10 +515,66 @@ const ContactIntelligenceCenter = () => {
                 Showing {filteredContacts.length} of {analyzed.contacts.length} contacts
                 {nameFilter.trim() ? ` (search: “${nameFilter.trim()}”)` : ''}
               </Text>
+              <Space wrap align="center">
+                <Button type="primary" onClick={correlateSelected} loading={correlating} disabled={selectedRowKeys.length < 2}>
+                  Correlate selected with AI ({selectedRowKeys.length})
+                </Button>
+                <Button
+                  onClick={() => {
+                    setSelectedRowKeys([]);
+                    setCorrelationResult(null);
+                  }}
+                  disabled={!selectedRowKeys.length && !correlationResult}
+                >
+                  Clear selection &amp; result
+                </Button>
+                <Text type="secondary">Pick two or more rows, then run OpenAI correlation using labels above.</Text>
+              </Space>
+              {correlationResult?.correlationSummary ? (
+                <Card size="small" title="AI correlation (selected contacts)">
+                  <Paragraph style={{ marginBottom: 8 }}>{correlationResult.correlationSummary}</Paragraph>
+                  {correlationResult.source ? (
+                    <Tag color={correlationResult.source === 'openai' ? 'purple' : 'default'}>
+                      {correlationResult.source === 'openai' ? 'OpenAI' : 'Rules-only'}
+                    </Tag>
+                  ) : null}
+                  {Array.isArray(correlationResult.relationshipNotes) && correlationResult.relationshipNotes.length ? (
+                    <ul style={{ marginTop: 8, paddingLeft: 20 }}>
+                      {correlationResult.relationshipNotes.map((n, i) => (
+                        <li key={i}>
+                          <Text>{n}</Text>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                  {Array.isArray(correlationResult.pairs) && correlationResult.pairs.length ? (
+                    <Space direction="vertical" size={4} style={{ marginTop: 8, width: '100%' }}>
+                      <Text strong>Pairs</Text>
+                      {correlationResult.pairs.map((p, i) => (
+                        <Text key={i}>
+                          {p.personA || '?'} ↔ {p.personB || '?'}
+                          {p.relationshipHypothesis ? ` — ${p.relationshipHypothesis}` : ''}
+                        </Text>
+                      ))}
+                    </Space>
+                  ) : null}
+                  {Array.isArray(correlationResult.duplicatePhones) && correlationResult.duplicatePhones.length ? (
+                    <Paragraph type="secondary" style={{ marginTop: 8, marginBottom: 0 }}>
+                      <Text strong>Duplicate phone hints: </Text>
+                      {correlationResult.duplicatePhones.map((d) => `${d.digits} (${d.people.map((x) => x.name).join(', ')})`).join('; ')}
+                    </Paragraph>
+                  ) : null}
+                </Card>
+              ) : null}
               <Table
-                rowKey={(row) => `${row.index}-${row.name}`}
+                rowKey={(row) => String(row.index)}
                 dataSource={filteredContacts}
                 columns={columns}
+                rowSelection={{
+                  selectedRowKeys,
+                  onChange: setSelectedRowKeys,
+                  preserveSelectedRowKeys: true,
+                }}
                 pagination={{ pageSize: 8, showSizeChanger: true, pageSizeOptions: [8, 16, 32, 64] }}
               />
             </Space>

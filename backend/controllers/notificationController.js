@@ -1,6 +1,10 @@
 const { prisma } = require('../config/db');
 const { sendEmail, sendSMS, sendWhatsApp } = require('../services/notificationService');
-const { analyzeContacts, analyzeContactsPipeline } = require('../services/contactIntelligenceService');
+const {
+  analyzeContacts,
+  analyzeContactsPipeline,
+  correlateContactsSubset,
+} = require('../services/contactIntelligenceService');
 const { parseGoogleContactsCsv } = require('../utils/googleContactsCsv');
 const asyncHandler = require('../utils/asyncHandler');
 
@@ -35,6 +39,25 @@ exports.analyzeContactGraph = asyncHandler(async (req, res) => {
 
   const raw = Array.isArray(req.body.contacts) ? req.body.contacts : [];
   const result = await analyzeContactsPipeline(raw, pipelineOpts);
+  res.json(result);
+});
+
+// POST /api/notifications/contacts/correlate
+// Body: { contacts: [...] } (min 2 analyzed rows), optional listOwnerContext, listOwnerNotes
+exports.correlateContactSelection = asyncHandler(async (req, res) => {
+  const contacts = req.body.contacts;
+  const result = await correlateContactsSubset(contacts, {
+    listOwnerContext: req.body.listOwnerContext,
+    listOwnerNotes: req.body.listOwnerNotes,
+  });
+  if (result.error) {
+    const status = result.code === 'OPENAI_HTTP' ? 502 : 400;
+    return res.status(status).json({
+      message: result.error,
+      code: result.code,
+      duplicatePhones: result.duplicatePhones,
+    });
+  }
   res.json(result);
 });
 

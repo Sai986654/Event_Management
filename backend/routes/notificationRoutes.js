@@ -6,6 +6,7 @@ const {
   sendEmailNotification,
   sendSMSNotification,
   analyzeContactGraph,
+  correlateContactSelection,
   sendEventWhatsAppReminders,
 } = require('../controllers/notificationController');
 
@@ -29,6 +30,16 @@ router.post(
   ],
   validate,
   analyzeContactGraph
+);
+router.post(
+  '/contacts/correlate',
+  [
+    body('contacts').isArray({ min: 2 }),
+    body('listOwnerContext').optional().isString(),
+    body('listOwnerNotes').optional().isString(),
+  ],
+  validate,
+  correlateContactSelection
 );
 router.post(
   '/events/:eventId/reminders/whatsapp',

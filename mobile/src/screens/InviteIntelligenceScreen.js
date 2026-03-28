@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   Button,
   Card,
+  Checkbox,
   Chip,
   Text,
   TextInput,
@@ -78,6 +79,9 @@ const InviteIntelligenceScreen = () => {
   const [sending, setSending] = useState(false);
   const [runningCollage, setRunningCollage] = useState(false);
   const [fetchingCollage, setFetchingCollage] = useState(false);
+  const [selectedForCorrelate, setSelectedForCorrelate] = useState([]);
+  const [correlating, setCorrelating] = useState(false);
+  const [correlationResult, setCorrelationResult] = useState(null);
 
   const [snack, setSnack] = useState({ visible: false, text: '', type: 'info' });
 
@@ -127,6 +131,8 @@ const InviteIntelligenceScreen = () => {
             listOwnerContext,
             listOwnerNotes,
           });
+      setSelectedForCorrelate([]);
+      setCorrelationResult(null);
       setAnalyzed(res);
       console.log('[InviteIntelligence] analyze done', {
         aiUsed: res.aiUsed,
@@ -146,6 +152,8 @@ const InviteIntelligenceScreen = () => {
             aiUsed: res.aiUsed,
             aiOverview: res.aiOverview,
             openAiRefinedCount: res.openAiRefinedCount,
+            openAiWarning: res.openAiWarning,
+            openAiBatches: res.openAiBatches,
             importMeta: res.importMeta,
           })
         );
@@ -153,11 +161,49 @@ const InviteIntelligenceScreen = () => {
       } catch (e) {
         console.warn('[InviteIntelligence] AsyncStorage save failed', e?.message);
       }
-      showSnack(res.importMeta ? `Imported ${res.importMeta.imported} from CSV.` : 'Contacts analyzed.');
+      if (res.openAiWarning) {
+        showSnack(res.openAiWarning, 'error');
+      } else {
+        showSnack(res.importMeta ? `Imported ${res.importMeta.imported} from CSV.` : 'Contacts analyzed.');
+      }
     } catch (err) {
       showSnack(getErrorMessage(err), 'error');
     } finally {
       setAnalyzing(false);
+    }
+  };
+
+  const toggleCorrelateSelect = (index) => {
+    setSelectedForCorrelate((prev) =>
+      prev.includes(index) ? prev.filter((i) => i !== index) : [...prev, index].sort((a, b) => a - b)
+    );
+  };
+
+  const runCorrelateSelected = async () => {
+    if (selectedForCorrelate.length < 2) {
+      showSnack('Select at least two contacts below.', 'error');
+      return;
+    }
+    const contacts = (analyzed?.contacts || []).filter((c) => selectedForCorrelate.includes(c.index));
+    if (contacts.length < 2) {
+      showSnack('Could not resolve selected rows. Run Analyze again.', 'error');
+      return;
+    }
+    setCorrelating(true);
+    setCorrelationResult(null);
+    try {
+      const res = await notificationService.correlateContacts({
+        contacts,
+        listOwnerContext,
+        listOwnerNotes,
+      });
+      setCorrelationResult(res);
+      showSnack(res.source === 'openai' ? 'AI correlation ready.' : 'Rules-only (no OpenAI on server).');
+      console.log('[InviteIntelligence] correlate done', res.source);
+    } catch (err) {
+      showSnack(getErrorMessage(err), 'error');
+    } finally {
+      setCorrelating(false);
     }
   };
 
@@ -310,6 +356,10 @@ const InviteIntelligenceScreen = () => {
                 3) Segmentation
               </Text>
               {analyzed.aiOverview ? <Text style={styles.overview}>{analyzed.aiOverview}</Text> : null}
+              {analyzed.openAiWarning ? <Text style={styles.warnText}>{analyzed.openAiWarning}</Text> : null}
+              {analyzed.openAiBatches != null ? (
+                <Text style={styles.muted}>OpenAI batches: {analyzed.openAiBatches}</Text>
+              ) : null}
               <View style={styles.chipRow}>
                 <Chip compact>Total {analyzed.summary.total}</Chip>
                 <Chip compact>Relatives {analyzed.summary.relatives}</Chip>
@@ -333,6 +383,51 @@ const InviteIntelligenceScreen = () => {
               ))}
               {(analyzed.contacts || []).length > 12 ? (
                 <Text style={styles.muted}>+{(analyzed.contacts || []).length - 12} more</Text>
+              ) : null}
+              <Text variant="titleSmall" style={styles.subsectionTitle}>
+                Correlate with AI (select 2+)
+              </Text>
+              <Text style={styles.hint}>Check people you want related; uses OpenAI on the server with your list-owner context.</Text>
+              {(analyzed.contacts || []).map((c) => (
+                <View key={`cb-${c.index}`} style={styles.correlateRow}>
+                  <Checkbox
+                    status={selectedForCorrelate.includes(c.index) ? 'checked' : 'unchecked'}
+                    onPress={() => toggleCorrelateSelect(c.index)}
+                  />
+                  <Text style={styles.correlateRowText} numberOfLines={3}>
+                    {c.name} · {c.inferredRelation} · {c.relationTelugu || '—'}
+                  </Text>
+                </View>
+              ))}
+              <Button
+                mode="contained-tonal"
+                onPress={runCorrelateSelected}
+                loading={correlating}
+                disabled={selectedForCorrelate.length < 2}
+                style={styles.btn}
+              >
+                Correlate selected ({selectedForCorrelate.length})
+              </Button>
+              {correlationResult?.correlationSummary ? (
+                <View style={styles.correlationBox}>
+                  <Text variant="labelLarge">{correlationResult.source === 'openai' ? 'OpenAI' : 'Rules-only'}</Text>
+                  <Text style={styles.overview}>{correlationResult.correlationSummary}</Text>
+                  {Array.isArray(correlationResult.relationshipNotes) && correlationResult.relationshipNotes.length ? (
+                    correlationResult.relationshipNotes.map((n, j) => (
+                      <Text key={`rn-${j}`} style={styles.rowLine}>
+                        • {n}
+                      </Text>
+                    ))
+                  ) : null}
+                  {Array.isArray(correlationResult.pairs) && correlationResult.pairs.length ? (
+                    correlationResult.pairs.map((p, j) => (
+                      <Text key={`pr-${j}`} style={styles.rowLine} numberOfLines={3}>
+                        {p.personA} ↔ {p.personB}
+                        {p.relationshipHypothesis ? ` — ${p.relationshipHypothesis}` : ''}
+                      </Text>
+                    ))
+                  ) : null}
+                </View>
               ) : null}
             </Card.Content>
           </Card>
@@ -459,6 +554,17 @@ const styles = StyleSheet.create({
   heroSubtitle: { color: 'rgba(255,255,255,0.9)', marginTop: 6 },
   card: { marginBottom: 12, borderRadius: 14, backgroundColor: '#fff' },
   sectionTitle: { fontWeight: '700', marginBottom: 8 },
+  subsectionTitle: { fontWeight: '600', marginTop: 12, marginBottom: 6 },
+  correlateRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 4 },
+  correlateRowText: { flex: 1, fontSize: 13, color: '#344054', paddingTop: 6 },
+  correlationBox: {
+    marginTop: 12,
+    padding: 10,
+    backgroundColor: '#f4f0ff',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e0d4ff',
+  },
   hint: { color: '#667085', fontSize: 12, marginBottom: 6 },
   muted: { color: '#98a2b3', fontSize: 12, marginVertical: 6 },
   textArea: { minHeight: 120, marginBottom: 8 },
@@ -472,6 +578,7 @@ const styles = StyleSheet.create({
   rowBtns: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
   rowLine: { fontSize: 13, color: '#344054', marginBottom: 4 },
   overview: { fontSize: 13, color: '#344054', marginBottom: 10, lineHeight: 20 },
+  warnText: { fontSize: 12, color: '#c0392b', marginBottom: 8, lineHeight: 18 },
   statusBox: { marginTop: 12, padding: 10, backgroundColor: '#f8f9fc', borderRadius: 8 },
   url: { fontSize: 11, color: '#667eea', marginTop: 4 },
   snackError: { backgroundColor: '#c0392b' },
