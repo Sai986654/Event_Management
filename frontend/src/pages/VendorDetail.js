@@ -2,7 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Card, Row, Col, Button, Spin, message, Rate, Tag, Divider, List, Modal,
-  Form, Select, DatePicker, InputNumber, Input, Badge, Empty,
+  Form, Select, DatePicker, InputNumber, Input, Badge, Empty, Image,
 } from 'antd';
 import {
   ShopOutlined, EnvironmentOutlined, PhoneOutlined, MailOutlined,
@@ -101,6 +101,7 @@ const VendorDetail = () => {
   }
 
   const packages = Array.isArray(vendor.packages) ? vendor.packages : [];
+  const portfolioItems = Array.isArray(vendor.portfolio) ? vendor.portfolio : [];
 
   return (
     <div className="vendor-detail-container">
@@ -217,6 +218,27 @@ const VendorDetail = () => {
           ))}
         </Row>
       )}
+
+      {/* Portfolio Section */}
+      <Divider orientation="left"><h2 style={{ margin: 0 }}>Portfolio</h2></Divider>
+      <Card>
+        {portfolioItems.length === 0 ? (
+          <Empty description="No portfolio uploads yet" />
+        ) : (
+          <div className="vendor-portfolio-grid">
+            {portfolioItems.map((item) => (
+              <div className="vendor-portfolio-item" key={item.id || item.url}>
+                {item.type === 'video' ? (
+                  <video className="vendor-portfolio-video" controls src={item.url} />
+                ) : (
+                  <Image src={item.url} alt={item.caption || 'portfolio'} className="vendor-portfolio-image" />
+                )}
+                {item.caption ? <p>{item.caption}</p> : null}
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
 
       {/* Reviews Section */}
       <Divider orientation="left"><h2 style={{ margin: 0 }}>Reviews</h2></Divider>

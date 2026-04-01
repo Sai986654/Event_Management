@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Button, Card, Col, Empty, InputNumber, Row, Select, Space, Tag, Typography, message } from 'antd';
+import { Button, Card, Col, Empty, Input, InputNumber, Progress, Row, Select, Space, Tag, Typography, message } from 'antd';
 import { eventService } from '../services/eventService';
 import { packageService } from '../services/packageService';
 import { orderService } from '../services/orderService';
@@ -70,6 +70,10 @@ const EventPlanner = () => {
   const [scenarioGuests, setScenarioGuests] = useState();
   const [scenarioBudget, setScenarioBudget] = useState();
   const [budgetOptimization, setBudgetOptimization] = useState(null);
+  const [checklistInput, setChecklistInput] = useState('');
+  const [checklistItems, setChecklistItems] = useState([]);
+  const [checklistSaving, setChecklistSaving] = useState(false);
+  const [publishingWebsite, setPublishingWebsite] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -146,6 +150,90 @@ const EventPlanner = () => {
     () => events.find((e) => e.id === eventId),
     [events, eventId]
   );
+
+  useEffect(() => {
+    if (!selectedEvent) {
+      setChecklistItems([]);
+      return;
+    }
+    const eventTasks = Array.isArray(selectedEvent.tasks) ? selectedEvent.tasks : [];
+    const normalized = eventTasks.map((task, index) => {
+      if (typeof task === 'string') {
+        return { id: `task-${index}`, title: task, done: false };
+      }
+      const title = task?.title || task?.name || `Task ${index + 1}`;
+      const done = Boolean(task?.done || task?.completed || String(task?.status || '').toLowerCase() === 'done');
+      const id = task?.id || `task-${index}`;
+      return { id, title, done };
+    });
+    setChecklistItems(normalized);
+  }, [selectedEvent]);
+
+  const persistChecklist = async (nextItems) => {
+    if (!eventId) return;
+    setChecklistSaving(true);
+    try {
+      const payload = {
+        tasks: nextItems.map((item) => ({
+          id: item.id,
+          title: item.title,
+          done: item.done,
+          status: item.done ? 'done' : 'pending',
+        })),
+      };
+      const res = await eventService.updateEvent(eventId, payload);
+      setEvents((prev) => prev.map((evt) => (evt.id === eventId ? { ...evt, ...res.event } : evt)));
+      setChecklistItems(nextItems);
+    } catch (err) {
+      message.error(getErrorMessage(err));
+    } finally {
+      setChecklistSaving(false);
+    }
+  };
+
+  const addChecklistItem = async () => {
+    const title = checklistInput.trim();
+    if (!title) return;
+    const next = [...checklistItems, { id: `task-${Date.now()}`, title, done: false }];
+    setChecklistInput('');
+    await persistChecklist(next);
+    message.success('Checklist item added');
+  };
+
+  const toggleChecklistItem = async (id) => {
+    const next = checklistItems.map((item) => (item.id === id ? { ...item, done: !item.done } : item));
+    await persistChecklist(next);
+  };
+
+  const removeChecklistItem = async (id) => {
+    const next = checklistItems.filter((item) => item.id !== id);
+    await persistChecklist(next);
+  };
+
+  const toggleEventWebsite = async () => {
+    if (!selectedEvent?.id) return;
+    setPublishingWebsite(true);
+    try {
+      const res = await eventService.updateEvent(selectedEvent.id, { isPublic: !selectedEvent.isPublic });
+      setEvents((prev) => prev.map((evt) => (evt.id === selectedEvent.id ? { ...evt, ...res.event } : evt)));
+      message.success(res.event.isPublic ? 'Event page is now public' : 'Event page is now private');
+    } catch (err) {
+      message.error(getErrorMessage(err));
+    } finally {
+      setPublishingWebsite(false);
+    }
+  };
+
+  const copyPublicLink = async () => {
+    if (!selectedEvent?.slug) return;
+    const link = `${window.location.origin}/public/${selectedEvent.slug}`;
+    try {
+      await navigator.clipboard.writeText(link);
+      message.success('Public link copied');
+    } catch {
+      message.info(link);
+    }
+  };
 
   const updateCriteria = (packageId, field, value) => {
     setCriteriaMap((prev) => ({
@@ -372,28 +460,111 @@ const EventPlanner = () => {
 
   const renderStepContent = () => {
     if (currentStep === 0) {
+      const completedCount = checklistItems.filter((item) => item.done).length;
+      const checklistProgress = checklistItems.length
+        ? Math.round((completedCount / checklistItems.length) * 100)
+        : 0;
+      const websiteLink = selectedEvent?.slug ? `${window.location.origin}/public/${selectedEvent.slug}` : '';
+      const pref = selectedEvent?.customerPreferences || {};
+      const sectors = selectedEvent?.sectorCustomizations || {};
       return (
-        <Card className="phase-card" title="Step 1: Choose Event">
-          <Select
-            style={{ width: 520, maxWidth: '100%' }}
-            placeholder="Select event"
-            value={eventId}
-            onChange={setEventId}
-            options={events.map((e) => ({
-              value: e.id,
-              label: `${e.title} (${new Date(e.date).toLocaleDateString('en-IN')})`,
-            }))}
-          />
-          <div className="phase-note" style={{ marginTop: 10 }}>
-            This selected event will be used to build your end-to-end quote.
-          </div>
-          <Space style={{ marginTop: 12 }}>
-            <Button type="primary" ghost onClick={applyAiPlan} loading={aiPlanning} disabled={!eventId}>
-              Generate with AI Co-Pilot
-            </Button>
-            <Text type="secondary">Auto-picks best-fit vendor/package per sector for you.</Text>
-          </Space>
-        </Card>
+        <Space direction="vertical" size={16} style={{ width: '100%' }}>
+          <Card className="phase-card" title="Step 1: Choose Event">
+            <Select
+              style={{ width: 520, maxWidth: '100%' }}
+              placeholder="Select event"
+              value={eventId}
+              onChange={setEventId}
+              options={events.map((e) => ({
+                value: e.id,
+                label: `${e.title} (${new Date(e.date).toLocaleDateString('en-IN')})`,
+              }))}
+            />
+            <div className="phase-note" style={{ marginTop: 10 }}>
+              This selected event will be used to build your end-to-end quote.
+            </div>
+            <Space style={{ marginTop: 12 }}>
+              <Button type="primary" ghost onClick={applyAiPlan} loading={aiPlanning} disabled={!eventId}>
+                Generate with AI Co-Pilot
+              </Button>
+              <Text type="secondary">Auto-picks best-fit vendor/package per sector for you.</Text>
+            </Space>
+          </Card>
+
+          {selectedEvent ? (
+            <Card className="phase-card" title="Customer Planning Hub">
+              <Row gutter={[16, 16]}>
+                <Col xs={24} lg={12}>
+                  <h3 className="phase-section-title">Checklist Tool</h3>
+                  <Progress percent={checklistProgress} status="active" />
+                  <div className="planner-checklist-list">
+                    {checklistItems.length === 0 ? (
+                      <div className="phase-empty">No checklist items yet. Add your first task.</div>
+                    ) : checklistItems.map((item) => (
+                      <div key={item.id} className={`planner-checklist-item ${item.done ? 'done' : ''}`}>
+                        <Button size="small" type={item.done ? 'primary' : 'default'} onClick={() => toggleChecklistItem(item.id)} loading={checklistSaving}>
+                          {item.done ? 'Done' : 'Mark done'}
+                        </Button>
+                        <span>{item.title}</span>
+                        <Button size="small" danger type="text" onClick={() => removeChecklistItem(item.id)} loading={checklistSaving}>
+                          Remove
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                  <Space.Compact style={{ width: '100%', marginTop: 8 }}>
+                    <Input
+                      value={checklistInput}
+                      onChange={(e) => setChecklistInput(e.target.value)}
+                      placeholder="Add checklist task"
+                      onPressEnter={addChecklistItem}
+                    />
+                    <Button type="primary" onClick={addChecklistItem} loading={checklistSaving}>Add</Button>
+                  </Space.Compact>
+                </Col>
+
+                <Col xs={24} lg={12}>
+                  <h3 className="phase-section-title">Event Website and Inspiration</h3>
+                  <Space direction="vertical" size={10} style={{ width: '100%' }}>
+                    <div className="planner-website-card">
+                      <div><strong>Public Event Page:</strong> {selectedEvent.isPublic ? 'Published' : 'Private'}</div>
+                      {selectedEvent.slug ? (
+                        <Text type="secondary">{websiteLink}</Text>
+                      ) : (
+                        <Text type="secondary">Link will be available once slug is generated.</Text>
+                      )}
+                      <Space wrap style={{ marginTop: 6 }}>
+                        <Button onClick={toggleEventWebsite} loading={publishingWebsite}>
+                          {selectedEvent.isPublic ? 'Unpublish' : 'Publish'} Page
+                        </Button>
+                        <Button type="primary" ghost onClick={copyPublicLink} disabled={!selectedEvent.slug || !selectedEvent.isPublic}>
+                          Copy Link
+                        </Button>
+                      </Space>
+                    </div>
+
+                    <div className="planner-inspiration-card">
+                      <Tag color="cyan">Vibe: {pref.vibe || 'Not set'}</Tag>
+                      <Tag color="blue">Palette: {pref.palette || 'Not set'}</Tag>
+                      <div className="phase-note" style={{ marginTop: 8 }}>
+                        Must-have moments: {pref.mustHaveMoments || 'Add from Event Create customization.'}
+                      </div>
+                      <div className="planner-sector-tag-cloud">
+                        {Object.keys(sectors).length === 0 ? (
+                          <Tag>Sector customizations not set yet</Tag>
+                        ) : Object.entries(sectors).map(([sector, config]) => (
+                          <Tag key={sector} color={config.priority === 'high' ? 'volcano' : config.priority === 'low' ? 'default' : 'geekblue'}>
+                            {sector}: {config.priority || 'medium'}
+                          </Tag>
+                        ))}
+                      </div>
+                    </div>
+                  </Space>
+                </Col>
+              </Row>
+            </Card>
+          ) : null}
+        </Space>
       );
     }
 

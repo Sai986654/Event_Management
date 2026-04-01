@@ -32,6 +32,8 @@ exports.createEvent = asyncHandler(async (req, res) => {
     status: raw.status,
     coverImage: raw.coverImage,
     isPublic: raw.isPublic,
+    sectorCustomizations: raw.sectorCustomizations,
+    customerPreferences: raw.customerPreferences,
     timeline: raw.timeline,
     tasks: raw.tasks,
     organizerId: req.user.id,
@@ -120,6 +122,9 @@ exports.updateEvent = asyncHandler(async (req, res) => {
   }
 
   const data = { ...req.body };
+
+  if (data.date != null) data.date = new Date(data.date);
+  if (data.endDate != null) data.endDate = new Date(data.endDate);
   if (data.title && data.title !== event.title) {
     data.slug = generateSlug(data.title);
   }

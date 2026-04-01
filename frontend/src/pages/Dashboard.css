@@ -2,6 +2,7 @@
   max-width: 1400px;
   margin: 0 auto;
   padding: 28px 24px 32px;
+  animation: dashboardFade 440ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .dashboard-header {
@@ -16,6 +17,12 @@
   border-radius: 16px;
   color: white;
   box-shadow: 0 18px 40px rgba(102, 126, 234, 0.28);
+  transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.dashboard-header:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 22px 44px rgba(102, 126, 234, 0.31);
 }
 
 .dashboard-header h1 {
@@ -31,10 +38,23 @@
 
 .events-card {
   margin-bottom: 24px;
+  animation: dashboardFade 540ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .quick-actions {
   margin-bottom: 24px;
+  animation: dashboardFade 600ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes dashboardFade {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .quick-actions h2 {

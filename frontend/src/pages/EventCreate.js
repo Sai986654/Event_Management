@@ -8,6 +8,16 @@ import './EventCreate.css';
 
 const { Text } = Typography;
 
+const sectorOptions = [
+  { key: 'catering', label: 'Catering' },
+  { key: 'decor', label: 'Decor' },
+  { key: 'photography', label: 'Photography' },
+  { key: 'videography', label: 'Videography' },
+  { key: 'music', label: 'Music' },
+  { key: 'venue', label: 'Venue' },
+  { key: 'transportation', label: 'Transportation' },
+];
+
 const EventCreate = () => {
   const navigate = useNavigate();
   const [form] = Form.useForm();
@@ -68,6 +78,26 @@ const EventCreate = () => {
         description: payloadValues.description,
         budget: payloadValues.budget,
         guestCount: payloadValues.guestCount,
+        customerPreferences: {
+          vibe: payloadValues.eventVibe,
+          palette: payloadValues.colorPalette,
+          mustHaveMoments: payloadValues.mustHaveMoments,
+          accessibilityNeeds: payloadValues.accessibilityNeeds,
+          dietaryNotes: payloadValues.dietaryNotes,
+        },
+        sectorCustomizations: sectorOptions.reduce((acc, sector) => {
+          const budget = payloadValues[`${sector.key}Budget`];
+          const note = payloadValues[`${sector.key}Note`];
+          const priority = payloadValues[`${sector.key}Priority`];
+          if (budget || note || priority) {
+            acc[sector.key] = {
+              budget: Number(budget || 0),
+              priority: priority || 'medium',
+              note: note || '',
+            };
+          }
+          return acc;
+        }, {}),
       };
       if (Array.isArray(payloadValues.concernedVendorIds) && payloadValues.concernedVendorIds.length) {
         eventData.concernedVendorIds = payloadValues.concernedVendorIds;
@@ -164,15 +194,67 @@ const EventCreate = () => {
       ),
     },
     {
-      title: 'Budget',
+      title: 'Customization',
       content: (
-        <Form.Item
-          name="budget"
-          label="Total Budget"
-          rules={[{ required: true, message: 'Please input budget!' }]}
-        >
-          <InputNumber min={0} placeholder="Total budget in INR (₹)" size="large" style={{ width: '100%' }} prefix="₹" />
-        </Form.Item>
+        <>
+          <Form.Item
+            name="budget"
+            label="Total Budget"
+            rules={[{ required: true, message: 'Please input budget!' }]}
+          >
+            <InputNumber min={0} placeholder="Total budget in INR (₹)" size="large" style={{ width: '100%' }} prefix="₹" />
+          </Form.Item>
+
+          <div className="customization-headline">Customer Preferences</div>
+          <Form.Item name="eventVibe" label="Event vibe">
+            <Select
+              size="large"
+              options={[
+                { label: 'Elegant and timeless', value: 'elegant' },
+                { label: 'Luxury and grand', value: 'luxury' },
+                { label: 'Modern and minimal', value: 'modern' },
+                { label: 'Traditional and cultural', value: 'traditional' },
+                { label: 'Playful and vibrant', value: 'vibrant' },
+              ]}
+              placeholder="Choose the overall vibe"
+            />
+          </Form.Item>
+          <Form.Item name="colorPalette" label="Color palette">
+            <Input placeholder="E.g. emerald, ivory, and warm gold" size="large" />
+          </Form.Item>
+          <Form.Item name="mustHaveMoments" label="Must-have moments">
+            <Input.TextArea rows={3} placeholder="Special rituals, performances, or memory moments" />
+          </Form.Item>
+          <Form.Item name="dietaryNotes" label="Dietary preferences">
+            <Input.TextArea rows={2} placeholder="Vegan counters, Jain menu, kids menu, allergy notes" />
+          </Form.Item>
+          <Form.Item name="accessibilityNeeds" label="Accessibility needs">
+            <Input.TextArea rows={2} placeholder="Wheelchair access, elderly seating, sign language support" />
+          </Form.Item>
+
+          <div className="customization-headline">Sector-level Customization</div>
+          <div className="sector-grid">
+            {sectorOptions.map((sector) => (
+              <Card key={sector.key} size="small" className="sector-card" title={sector.label}>
+                <Form.Item name={`${sector.key}Priority`} label="Priority" initialValue="medium">
+                  <Select
+                    options={[
+                      { label: 'High', value: 'high' },
+                      { label: 'Medium', value: 'medium' },
+                      { label: 'Low', value: 'low' },
+                    ]}
+                  />
+                </Form.Item>
+                <Form.Item name={`${sector.key}Budget`} label="Budget (INR)">
+                  <InputNumber min={0} style={{ width: '100%' }} />
+                </Form.Item>
+                <Form.Item name={`${sector.key}Note`} label="Customization note">
+                  <Input.TextArea rows={2} placeholder="Special expectations for this sector" />
+                </Form.Item>
+              </Card>
+            ))}
+          </div>
+        </>
       ),
     },
   ];

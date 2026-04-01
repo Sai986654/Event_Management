@@ -12,17 +12,20 @@ const VendorMarketplace = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
+  const [cityFilter, setCityFilter] = useState('');
+  const [sortBy, setSortBy] = useState('top-rated');
 
   useEffect(() => {
     fetchVendors();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedCategory]);
+  }, [selectedCategory, cityFilter]);
 
   const fetchVendors = async () => {
     try {
       setLoading(true);
       const params = {};
       if (selectedCategory) params.category = selectedCategory;
+      if (cityFilter.trim()) params.city = cityFilter.trim();
       const data = await vendorService.searchVendors(params);
       setVendors(data.vendors || []);
     } catch (error) {
@@ -36,10 +39,17 @@ const VendorMarketplace = () => {
     setSearchTerm(value);
   };
 
-  const filteredVendors = vendors.filter((vendor) =>
-    vendor.businessName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    vendor.description?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredVendors = vendors
+    .filter((vendor) =>
+      vendor.businessName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      vendor.description?.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+    .sort((a, b) => {
+      if (sortBy === 'top-rated') return Number(b.averageRating || 0) - Number(a.averageRating || 0);
+      if (sortBy === 'price-low') return Number(a.basePrice || 0) - Number(b.basePrice || 0);
+      if (sortBy === 'price-high') return Number(b.basePrice || 0) - Number(a.basePrice || 0);
+      return 0;
+    });
 
   const categories = [
     { label: 'All Categories', value: '' },
@@ -70,7 +80,7 @@ const VendorMarketplace = () => {
 
       <Card className="filters-card">
         <Row gutter={[16, 16]}>
-          <Col xs={24} sm={12}>
+          <Col xs={24} md={8}>
             <Input
               placeholder="Search vendors by name or description..."
               prefix={<SearchOutlined />}
@@ -79,7 +89,7 @@ const VendorMarketplace = () => {
               allowClear
             />
           </Col>
-          <Col xs={24} sm={12}>
+          <Col xs={24} md={6}>
             <Select
               placeholder="Filter by category"
               size="large"
@@ -87,6 +97,28 @@ const VendorMarketplace = () => {
               onChange={setSelectedCategory}
               value={selectedCategory || ''}
               options={categories}
+            />
+          </Col>
+          <Col xs={24} md={5}>
+            <Input
+              placeholder="City or area"
+              size="large"
+              value={cityFilter}
+              onChange={(e) => setCityFilter(e.target.value)}
+              allowClear
+            />
+          </Col>
+          <Col xs={24} md={5}>
+            <Select
+              size="large"
+              style={{ width: '100%' }}
+              value={sortBy}
+              onChange={setSortBy}
+              options={[
+                { label: 'Top rated', value: 'top-rated' },
+                { label: 'Price: Low to High', value: 'price-low' },
+                { label: 'Price: High to Low', value: 'price-high' },
+              ]}
             />
           </Col>
         </Row>

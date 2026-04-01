@@ -2,11 +2,13 @@ const router = require('express').Router();
 const { body } = require('express-validator');
 const validate = require('../middleware/validate');
 const { protect, authorize } = require('../middleware/auth');
+const upload = require('../middleware/upload');
 const {
   createVendor,
   getVendors,
   getVendor,
   updateVendor,
+  uploadVendorMedia,
   deleteVendor,
   addReview,
   getReviews,
@@ -36,6 +38,7 @@ router.post(
 );
 
 router.put('/:id', authorize('admin', 'vendor'), updateVendor);
+router.post('/:id/media', authorize('admin', 'vendor'), upload.single('file'), uploadVendorMedia);
 router.delete('/:id', authorize('admin', 'vendor'), deleteVendor);
 
 router.post(

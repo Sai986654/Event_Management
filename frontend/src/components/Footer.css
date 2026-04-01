@@ -1,10 +1,11 @@
 .footer {
   background:
-    linear-gradient(180deg, rgba(30, 32, 47, 0.96), rgba(20, 22, 34, 0.98));
+    radial-gradient(120% 200% at 10% -20%, rgba(45, 145, 130, 0.28), transparent 46%),
+    linear-gradient(180deg, rgba(12, 40, 63, 0.98), rgba(9, 29, 46, 1));
   color: #f0f0f0;
   padding: 48px 24px 24px;
   margin-top: 48px;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 .footer-content {
@@ -17,7 +18,7 @@
 }
 
 .footer-section h3 {
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 800;
   margin-bottom: 12px;
   color: white;
@@ -53,7 +54,7 @@
 }
 
 .footer-section ul li a:hover {
-  color: #9bb4ff;
+  color: #ffd2ae;
 }
 
 .footer-bottom {

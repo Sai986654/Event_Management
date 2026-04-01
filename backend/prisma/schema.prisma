@@ -156,6 +156,8 @@ model Event {
   status      EventStatus @default(draft)
   coverImage  String?     @map("cover_image")
   isPublic    Boolean     @default(false) @map("is_public")
+  sectorCustomizations Json @default("{}") @map("sector_customizations")
+  customerPreferences Json  @default("{}") @map("customer_preferences")
   timeline    Json        @default("[]")
   tasks       Json        @default("[]")
   inviteDripEnabled      Boolean   @default(false) @map("invite_drip_enabled")

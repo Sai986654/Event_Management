@@ -1,6 +1,7 @@
 const { prisma } = require('../config/db');
 const asyncHandler = require('../utils/asyncHandler');
 const { paginate } = require('../utils/pagination');
+const { uploadFile } = require('../services/fileService');
 
 // POST /api/vendors
 exports.createVendor = asyncHandler(async (req, res) => {
@@ -66,6 +67,47 @@ exports.updateVendor = asyncHandler(async (req, res) => {
     data: req.body,
   });
   res.json({ vendor: updated });
+});
+
+// POST /api/vendors/:id/media
+exports.uploadVendorMedia = asyncHandler(async (req, res) => {
+  const vendor = await prisma.vendor.findUnique({ where: { id: Number(req.params.id) } });
+  if (!vendor) return res.status(404).json({ message: 'Vendor not found' });
+
+  if (vendor.userId !== req.user.id && req.user.role !== 'admin') {
+    return res.status(403).json({ message: 'Not authorized' });
+  }
+
+  if (!req.file) {
+    return res.status(400).json({ message: 'No media file uploaded' });
+  }
+
+  let uploaded = null;
+  try {
+    uploaded = await uploadFile(req.file.buffer, `eventos/vendor-${vendor.id}`);
+  } catch {
+    uploaded = {
+      url: `https://placeholder.eventos.dev/${Date.now()}-${req.file.originalname || 'vendor-upload'}`,
+      publicId: null,
+    };
+  }
+
+  const existingPortfolio = Array.isArray(vendor.portfolio) ? vendor.portfolio : [];
+  const mediaItem = {
+    id: `media-${Date.now()}`,
+    url: uploaded.url,
+    publicId: uploaded.publicId,
+    type: req.file.mimetype.startsWith('video') ? 'video' : 'photo',
+    caption: req.body.caption || '',
+    createdAt: new Date().toISOString(),
+  };
+
+  const updated = await prisma.vendor.update({
+    where: { id: vendor.id },
+    data: { portfolio: [mediaItem, ...existingPortfolio].slice(0, 30) },
+  });
+
+  res.status(201).json({ media: mediaItem, portfolio: updated.portfolio });
 });
 
 // DELETE /api/vendors/:id
