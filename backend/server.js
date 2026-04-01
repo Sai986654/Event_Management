@@ -23,6 +23,7 @@ const adminRoutes = require('./routes/adminRoutes');
 const orderRoutes = require('./routes/orderRoutes');
 const activityRoutes = require('./routes/activityRoutes');
 const appNotificationRoutes = require('./routes/appNotificationRoutes');
+const locationRoutes = require('./routes/locationRoutes');
 
 const app = express();
 const server = http.createServer(app);
@@ -70,6 +71,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/activities', activityRoutes);
 app.use('/api/app-notifications', appNotificationRoutes);
+app.use('/api/location', locationRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

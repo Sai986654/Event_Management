@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Input, Select, Card, Row, Col, Spin, message, Rate, Button, Empty, Tag } from 'antd';
-import { SearchOutlined, ShopOutlined, CheckCircleOutlined, EnvironmentOutlined } from '@ant-design/icons';
+import { SearchOutlined, ShopOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { vendorService } from '../services/vendorService';
+import LocationAutocomplete from '../components/LocationAutocomplete';
 import { formatCurrency, getErrorMessage } from '../utils/helpers';
 import './VendorMarketplace.css';
 
@@ -12,20 +13,22 @@ const VendorMarketplace = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
-  const [cityFilter, setCityFilter] = useState('');
+  const [locationFilter, setLocationFilter] = useState('');
+  const [stateFilter, setStateFilter] = useState('');
   const [sortBy, setSortBy] = useState('top-rated');
 
   useEffect(() => {
     fetchVendors();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedCategory, cityFilter]);
+  }, [selectedCategory, locationFilter, stateFilter]);
 
   const fetchVendors = async () => {
     try {
       setLoading(true);
       const params = {};
       if (selectedCategory) params.category = selectedCategory;
-      if (cityFilter.trim()) params.city = cityFilter.trim();
+      if (locationFilter.trim()) params.city = locationFilter.trim();
+      if (stateFilter) params.state = stateFilter;
       const data = await vendorService.searchVendors(params);
       setVendors(data.vendors || []);
     } catch (error) {
@@ -44,6 +47,16 @@ const VendorMarketplace = () => {
       vendor.businessName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       vendor.description?.toLowerCase().includes(searchTerm.toLowerCase())
     )
+    .filter((vendor) => {
+      if (!locationFilter.trim()) return true;
+      const needle = locationFilter.toLowerCase().trim();
+      const hay = `${vendor.city || ''} ${vendor.state || ''}`.toLowerCase();
+      return hay.includes(needle);
+    })
+    .filter((vendor) => {
+      if (!stateFilter) return true;
+      return String(vendor.state || '').toLowerCase().includes(stateFilter.toLowerCase());
+    })
     .sort((a, b) => {
       if (sortBy === 'top-rated') return Number(b.averageRating || 0) - Number(a.averageRating || 0);
       if (sortBy === 'price-low') return Number(a.basePrice || 0) - Number(b.basePrice || 0);
@@ -64,6 +77,20 @@ const VendorMarketplace = () => {
     { label: 'Other', value: 'other' },
   ];
 
+  const stateOptions = [
+    { label: 'All States', value: '' },
+    { label: 'Telangana', value: 'Telangana' },
+    { label: 'Andhra Pradesh', value: 'Andhra Pradesh' },
+    { label: 'Karnataka', value: 'Karnataka' },
+    { label: 'Tamil Nadu', value: 'Tamil Nadu' },
+    { label: 'Maharashtra', value: 'Maharashtra' },
+    { label: 'Delhi', value: 'Delhi' },
+    { label: 'Gujarat', value: 'Gujarat' },
+    { label: 'Rajasthan', value: 'Rajasthan' },
+    { label: 'Uttar Pradesh', value: 'Uttar Pradesh' },
+    { label: 'West Bengal', value: 'West Bengal' },
+  ];
+
   const getPackageRange = (vendor) => {
     const packages = Array.isArray(vendor.packages) ? vendor.packages : [];
     if (packages.length === 0) return null;
@@ -80,7 +107,7 @@ const VendorMarketplace = () => {
 
       <Card className="filters-card">
         <Row gutter={[16, 16]}>
-          <Col xs={24} md={8}>
+          <Col xs={24} sm={12} lg={8}>
             <Input
               placeholder="Search vendors by name or description..."
               prefix={<SearchOutlined />}
@@ -89,7 +116,7 @@ const VendorMarketplace = () => {
               allowClear
             />
           </Col>
-          <Col xs={24} md={6}>
+          <Col xs={24} sm={12} lg={4}>
             <Select
               placeholder="Filter by category"
               size="large"
@@ -99,16 +126,27 @@ const VendorMarketplace = () => {
               options={categories}
             />
           </Col>
-          <Col xs={24} md={5}>
-            <Input
-              placeholder="City or area"
-              size="large"
-              value={cityFilter}
-              onChange={(e) => setCityFilter(e.target.value)}
-              allowClear
+          <Col xs={24} sm={12} lg={4}>
+            <LocationAutocomplete
+              value={locationFilter}
+              onChange={(v) => setLocationFilter(v || '')}
+              onLocationPick={(place) => {
+                setLocationFilter(place?.city || place?.formattedAddress || '');
+                if (place?.state) setStateFilter(place.state);
+              }}
+              placeholder="Location (city/area/state)"
             />
           </Col>
-          <Col xs={24} md={5}>
+          <Col xs={24} sm={12} lg={4}>
+            <Select
+              size="large"
+              style={{ width: '100%' }}
+              value={stateFilter}
+              onChange={setStateFilter}
+              options={stateOptions}
+            />
+          </Col>
+          <Col xs={24} sm={12} lg={4}>
             <Select
               size="large"
               style={{ width: '100%' }}

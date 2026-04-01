@@ -43,7 +43,6 @@ const normalizeDeliverables = (value) => {
   return [];
 };
 
-const TELUGU_STATES = new Set(['telangana', 'andhra pradesh', 'ap', 'ts']);
 const normalizeName = (value) => String(value || '').trim().toLowerCase();
 
 const formatINR = (value) => {
@@ -102,6 +101,9 @@ const EventPlanner = () => {
   }, [packages]);
 
   const vendorsBySector = useMemo(() => {
+    const selectedCity = normalizeName(selectedEvent?.city || selectedEvent?.venue);
+    const selectedState = normalizeName(selectedEvent?.state);
+
     const groupedAll = vendors.reduce((acc, vendor) => {
       const sector = categoryToSector[String(vendor.category || '').toLowerCase()] || 'other';
       if (!acc[sector]) acc[sector] = [];
@@ -109,9 +111,12 @@ const EventPlanner = () => {
       return acc;
     }, {});
 
-    const groupedTelugu = vendors.reduce((acc, vendor) => {
-      const state = String(vendor.state || '').trim().toLowerCase();
-      if (!TELUGU_STATES.has(state)) return acc;
+    const groupedPreferred = vendors.reduce((acc, vendor) => {
+      const vendorCity = normalizeName(vendor.city);
+      const vendorState = normalizeName(vendor.state);
+      const cityMatch = selectedCity && vendorCity && vendorCity.includes(selectedCity);
+      const stateMatch = selectedState && vendorState && vendorState.includes(selectedState);
+      if (!cityMatch && !stateMatch) return acc;
       const sector = categoryToSector[String(vendor.category || '').toLowerCase()] || 'other';
       if (!acc[sector]) acc[sector] = [];
       acc[sector].push(vendor);
@@ -119,8 +124,8 @@ const EventPlanner = () => {
     }, {});
 
     return sectorOrder.reduce((acc, sector) => {
-      const source = (groupedTelugu[sector] && groupedTelugu[sector].length > 0)
-        ? groupedTelugu[sector]
+      const source = (groupedPreferred[sector] && groupedPreferred[sector].length > 0)
+        ? groupedPreferred[sector]
         : (groupedAll[sector] || []);
       const seen = new Set();
       acc[sector] = source.filter((vendor) => {
@@ -130,7 +135,7 @@ const EventPlanner = () => {
       });
       return acc;
     }, {});
-  }, [vendors]);
+  }, [vendors, selectedEvent]);
 
   const steps = useMemo(
     () => ['choose_event', ...sectorOrder, 'review_quote'],

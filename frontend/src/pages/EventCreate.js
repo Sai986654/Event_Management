@@ -3,6 +3,7 @@ import { Form, Input, InputNumber, DatePicker, Select, Button, Card, message, Sp
 import { useNavigate } from 'react-router-dom';
 import { eventService } from '../services/eventService';
 import { vendorService } from '../services/vendorService';
+import LocationAutocomplete from '../components/LocationAutocomplete';
 import { getErrorMessage } from '../utils/helpers';
 import './EventCreate.css';
 
@@ -75,6 +76,11 @@ const EventCreate = () => {
         type: payloadValues.type,
         date: isoDate,
         venue: payloadValues.location,
+        address: payloadValues.address,
+        city: payloadValues.city,
+        state: payloadValues.state,
+        lat: payloadValues.lat,
+        lng: payloadValues.lng,
         description: payloadValues.description,
         budget: payloadValues.budget,
         guestCount: payloadValues.guestCount,
@@ -166,7 +172,21 @@ const EventCreate = () => {
             label="Location"
             rules={[{ required: true, message: 'Please input location!' }]}
           >
-            <Input placeholder="e.g. Hyderabad, Telangana or venue area" size="large" />
+            <LocationAutocomplete
+              value={form.getFieldValue('location')}
+              onChange={(next) => form.setFieldValue('location', next)}
+              onLocationPick={(place) => {
+                form.setFieldsValue({
+                  location: place?.name || place?.formattedAddress || '',
+                  address: place?.formattedAddress || '',
+                  city: place?.city || '',
+                  state: place?.state || '',
+                  lat: place?.lat || undefined,
+                  lng: place?.lng || undefined,
+                });
+              }}
+              placeholder="Search venue/city/area"
+            />
           </Form.Item>
 
           <Form.Item

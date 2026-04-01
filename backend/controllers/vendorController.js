@@ -18,6 +18,7 @@ exports.getVendors = asyncHandler(async (req, res) => {
 
   if (req.query.category) where.category = req.query.category.toLowerCase();
   if (req.query.city) where.city = { contains: req.query.city, mode: 'insensitive' };
+  if (req.query.state) where.state = { contains: req.query.state, mode: 'insensitive' };
   if (req.query.minRating) where.averageRating = { gte: Number(req.query.minRating) };
 
   const [vendors, total] = await Promise.all([
