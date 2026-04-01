@@ -11,6 +11,23 @@ const { deployEventToNetlify } = require('../services/netlifySiteService');
 const generateSlug = (title) =>
   slugify(title, { lower: true, strict: true }) + '-' + Date.now().toString(36);
 
+const resolveShareDestination = (event, origin) => {
+  const internalPublicUrl = event?.isPublic && event?.slug ? `${origin}/public/${event.slug}` : '';
+  const netlifyUrl = event?.netlifySiteUrl || '';
+  const preference = String(event?.qrDestinationType || 'auto').toLowerCase();
+
+  if (preference === 'netlify') return netlifyUrl || internalPublicUrl || '';
+  if (preference === 'public') return internalPublicUrl || netlifyUrl || '';
+  return netlifyUrl || internalPublicUrl || '';
+};
+
+const buildSharePayload = async (event, origin) => {
+  const shareDestinationUrl = resolveShareDestination(event, origin);
+  const shareQrCodeDataUrl = shareDestinationUrl ? await QRCode.toDataURL(shareDestinationUrl) : null;
+
+  return { shareDestinationUrl, shareQrCodeDataUrl };
+};
+
 // POST /api/events
 exports.createEvent = asyncHandler(async (req, res) => {
   const { concernedVendorIds, ...raw } = req.body;
@@ -35,6 +52,7 @@ exports.createEvent = asyncHandler(async (req, res) => {
     isPublic: raw.isPublic,
     sectorCustomizations: raw.sectorCustomizations,
     customerPreferences: raw.customerPreferences,
+    qrDestinationType: raw.qrDestinationType,
     timeline: raw.timeline,
     tasks: raw.tasks,
     organizerId: req.user.id,
@@ -85,7 +103,11 @@ exports.getEvent = asyncHandler(async (req, res) => {
     include: { organizer: { select: { id: true, name: true, email: true } } },
   });
   if (!event) return res.status(404).json({ message: 'Event not found' });
-  res.json({ event, inviteCopy });
+
+  const origin = process.env.CLIENT_URL || req.get('origin') || 'http://localhost:3000';
+  const sharePayload = await buildSharePayload(event, origin);
+
+  res.json({ event, inviteCopy, ...sharePayload });
 });
 
 // GET /api/events/slug/:slug  (public)
@@ -182,6 +204,32 @@ exports.updateTimeline = asyncHandler(async (req, res) => {
   res.json({ timeline: updated.timeline });
 });
 
+// PUT /api/events/:id/share-settings
+exports.updateShareSettings = asyncHandler(async (req, res) => {
+  const eventId = Number(req.params.id);
+  const event = await prisma.event.findUnique({ where: { id: eventId } });
+  if (!event) return res.status(404).json({ message: 'Event not found' });
+
+  if (!['admin', 'organizer'].includes(req.user.role)) {
+    return res.status(403).json({ message: 'Only organizers/admin can update share settings' });
+  }
+
+  const qrDestinationType = String(req.body?.qrDestinationType || 'auto').toLowerCase();
+  if (!['auto', 'netlify', 'public'].includes(qrDestinationType)) {
+    return res.status(400).json({ message: 'Invalid qrDestinationType' });
+  }
+
+  const updated = await prisma.event.update({
+    where: { id: eventId },
+    data: { qrDestinationType },
+  });
+
+  const origin = process.env.CLIENT_URL || req.get('origin') || 'http://localhost:3000';
+  const sharePayload = await buildSharePayload(updated, origin);
+
+  res.json({ event: updated, ...sharePayload });
+});
+
 // POST /api/events/:id/invite-drip/trigger — test or force-send scheduled WhatsApp drip (organizer/admin)
 exports.triggerInviteDrip = asyncHandler(async (req, res) => {
   const eventId = Number(req.params.id);
@@ -223,8 +271,12 @@ exports.publishEventNetlify = asyncHandler(async (req, res) => {
       },
     });
 
+    const origin = process.env.CLIENT_URL || req.get('origin') || 'http://localhost:3000';
+    const sharePayload = await buildSharePayload(updated, origin);
+
     res.status(201).json({
       event: updated,
+      ...sharePayload,
       site: deployed,
       message: 'Event microsite published on Netlify',
     });

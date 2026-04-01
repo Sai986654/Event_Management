@@ -17,6 +17,27 @@ const {
   normalizeStyle,
 } = require('../services/collageJobService');
 
+const buildMockCollageDataUrl = ({ eventId, style, photoCount }) => {
+  const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0f4b7f" />
+      <stop offset="50%" stop-color="#1f7a8c" />
+      <stop offset="100%" stop-color="#49a078" />
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="675" fill="url(#bg)"/>
+  <rect x="60" y="60" width="1080" height="555" rx="22" fill="rgba(255,255,255,0.14)" stroke="rgba(255,255,255,0.34)"/>
+  <text x="90" y="180" font-family="Segoe UI, Arial" font-size="52" fill="#ffffff" font-weight="700">EventOS AI Collage Preview</text>
+  <text x="90" y="250" font-family="Segoe UI, Arial" font-size="32" fill="#d9f6ff">Event #${eventId}</text>
+  <text x="90" y="300" font-family="Segoe UI, Arial" font-size="32" fill="#d9f6ff">Style: ${style}</text>
+  <text x="90" y="350" font-family="Segoe UI, Arial" font-size="32" fill="#d9f6ff">Photos used: ${photoCount}</text>
+  <text x="90" y="445" font-family="Segoe UI, Arial" font-size="24" fill="#f3fbff">This is a mock preview. Configure a real AI collage provider for production renders.</text>
+</svg>`;
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+};
+
 // POST /api/ai/suggestions
 exports.getAISuggestions = asyncHandler(async (req, res) => {
   const { eventType, budget, guestCount } = req.body;
@@ -241,7 +262,7 @@ exports.createEventCollageJob = asyncHandler(async (req, res) => {
   const style = normalizeStyle(req.body.style);
   const job = createJob(eventId, style);
   try {
-    const resultUrl = `https://placeholder.eventos.dev/collage/event-${eventId}-${style}-${Date.now()}.jpg`;
+    const resultUrl = buildMockCollageDataUrl({ eventId, style, photoCount: blessingPhotos.length });
     const collageMedia = await prisma.media.create({
       data: {
         eventId,

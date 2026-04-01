@@ -16,8 +16,10 @@ import {
   Switch,
   InputNumber,
   Divider,
+  Select,
+  Image,
 } from 'antd';
-import { EditOutlined, DeleteOutlined, ControlOutlined, ShopOutlined } from '@ant-design/icons';
+import { EditOutlined, DeleteOutlined, ControlOutlined, ShopOutlined, CopyOutlined } from '@ant-design/icons';
 import { eventService } from '../services/eventService';
 import { guestService } from '../services/guestService';
 import { bookingService } from '../services/bookingService';
@@ -46,6 +48,10 @@ const EventDetails = () => {
   const [dripSaving, setDripSaving] = useState(false);
   const [dripTesting, setDripTesting] = useState(false);
   const [publishingMicrosite, setPublishingMicrosite] = useState(false);
+  const [shareDestinationUrl, setShareDestinationUrl] = useState('');
+  const [shareQrCodeDataUrl, setShareQrCodeDataUrl] = useState('');
+  const [qrDestinationType, setQrDestinationType] = useState('auto');
+  const [shareSaving, setShareSaving] = useState(false);
 
   // Real-time handlers
   const handleGuestRsvp = useCallback((data) => {
@@ -97,6 +103,9 @@ const EventDetails = () => {
       const eventData = await eventService.getEventById(eventId);
       setEvent(eventData.event);
       setInviteCopy(eventData.inviteCopy || null);
+      setShareDestinationUrl(eventData.shareDestinationUrl || '');
+      setShareQrCodeDataUrl(eventData.shareQrCodeDataUrl || '');
+      setQrDestinationType(eventData.event?.qrDestinationType || 'auto');
 
       const guestsData = await guestService.getEventGuests(eventId);
       setGuests(guestsData.guests || []);
@@ -215,11 +224,47 @@ const EventDetails = () => {
     try {
       const res = await eventService.publishNetlifyMicrosite(eventId);
       setEvent(res.event);
+      setShareDestinationUrl(res.shareDestinationUrl || '');
+      setShareQrCodeDataUrl(res.shareQrCodeDataUrl || '');
+      setQrDestinationType(res.event?.qrDestinationType || 'auto');
       message.success('Netlify event microsite published');
     } catch (err) {
       message.error(getErrorMessage(err));
     } finally {
       setPublishingMicrosite(false);
+    }
+  };
+
+  const saveShareSettings = async (nextQrDestinationType) => {
+    setShareSaving(true);
+    try {
+      const res = await eventService.updateShareSettings(eventId, {
+        qrDestinationType: nextQrDestinationType,
+      });
+      setEvent(res.event);
+      setShareDestinationUrl(res.shareDestinationUrl || '');
+      setShareQrCodeDataUrl(res.shareQrCodeDataUrl || '');
+      setQrDestinationType(res.event?.qrDestinationType || nextQrDestinationType);
+      message.success('Share destination updated');
+    } catch (err) {
+      message.error(getErrorMessage(err));
+      setQrDestinationType(event?.qrDestinationType || 'auto');
+    } finally {
+      setShareSaving(false);
+    }
+  };
+
+  const copyShareLink = async () => {
+    if (!shareDestinationUrl) {
+      message.warning('No share link available yet');
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(shareDestinationUrl);
+      message.success('Share link copied');
+    } catch (err) {
+      message.error('Copy failed. Please copy the link manually.');
     }
   };
 
@@ -346,22 +391,63 @@ const EventDetails = () => {
                       </>
                     ) : null}
                     <Paragraph>
-                      <Text strong>Public page (QR destination): </Text>
-                      {event.isPublic && event.slug ? (
-                        <a href={`${window.location.origin}/public/${event.slug}`} target="_blank" rel="noreferrer">
-                          {`${window.location.origin}/public/${event.slug}`}
+                      <Text strong>Guest share destination: </Text>
+                      {shareDestinationUrl ? (
+                        <a href={shareDestinationUrl} target="_blank" rel="noreferrer">
+                          {shareDestinationUrl}
                         </a>
                       ) : (
                         <Text type="warning">
-                          Turn on <Text code>isPublic</Text> for this event so the link works for guests. You can
-                          update the event via API or your admin tools.
+                          Publish the Netlify site or turn on <Text code>isPublic</Text> so the guest link works.
                         </Text>
                       )}
                     </Paragraph>
+                    {(user?.role === 'organizer' || user?.role === 'admin') ? (
+                      <div className="event-share-panel">
+                        <Space wrap align="start" className="event-share-panel__controls">
+                          <div>
+                            <Text strong>QR destination</Text>
+                            <Select
+                              value={qrDestinationType}
+                              onChange={(value) => {
+                                setQrDestinationType(value);
+                                saveShareSettings(value);
+                              }}
+                              loading={shareSaving}
+                              style={{ width: 220, display: 'block', marginTop: 8 }}
+                              options={[
+                                { value: 'auto', label: 'Auto: prefer Netlify' },
+                                { value: 'netlify', label: 'Netlify microsite' },
+                                { value: 'public', label: 'Internal public page' },
+                              ]}
+                            />
+                          </div>
+                          <div>
+                            <Text strong>Quick actions</Text>
+                            <Space wrap style={{ display: 'flex', marginTop: 8 }}>
+                              <Button icon={<CopyOutlined />} onClick={copyShareLink} disabled={!shareDestinationUrl}>
+                                Copy share link
+                              </Button>
+                              <Button href={shareDestinationUrl || undefined} target="_blank" disabled={!shareDestinationUrl}>
+                                Open destination
+                              </Button>
+                            </Space>
+                          </div>
+                        </Space>
+                        {shareQrCodeDataUrl ? (
+                          <div className="event-share-panel__qr">
+                            <Image width={172} src={shareQrCodeDataUrl} alt="Share QR code" preview={false} />
+                            <Text type="secondary">
+                              Print this QR on physical invites to send guests to the selected destination.
+                            </Text>
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
                     <Paragraph type="secondary">
-                      Guests can use that page to send UPI gifts, upload remote-blessing photos for your AI collage,
-                      and you receive in-app alerts when photos arrive. Physical invites can print a QR pointing to the
-                      same URL.
+                      Guests can use that destination to view event details, open location, send UPI gifts,
+                      upload remote-blessing photos for your AI collage, and you receive in-app alerts when photos arrive.
+                      Physical invites can print a QR pointing to the same URL.
                     </Paragraph>
 
                     <Divider />

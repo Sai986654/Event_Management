@@ -175,6 +175,7 @@ model Event {
   netlifySiteId String?   @map("netlify_site_id") @db.VarChar(120)
   netlifySiteUrl String?  @map("netlify_site_url") @db.VarChar(500)
   netlifyPublishedAt DateTime? @map("netlify_published_at")
+  qrDestinationType String @default("auto") @map("qr_destination_type") @db.VarChar(20)
   sectorCustomizations Json @default("{}") @map("sector_customizations")
   customerPreferences Json  @default("{}") @map("customer_preferences")
   timeline    Json        @default("[]")

@@ -17,7 +17,7 @@ exports.uploadMedia = asyncHandler(async (req, res) => {
     url = result.url;
     publicId = result.publicId;
   } catch {
-    url = `https://placeholder.eventos.dev/${Date.now()}-${req.file.originalname}`;
+    url = `https://placehold.co/1200x675/png?text=${encodeURIComponent('EventOS Media Preview')}`;
     publicId = null;
   }
 
