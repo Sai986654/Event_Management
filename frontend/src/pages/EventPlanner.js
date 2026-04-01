@@ -102,6 +102,11 @@ const EventPlanner = () => {
     }, {});
   }, [packages]);
 
+  const selectedEvent = useMemo(
+    () => events.find((e) => e.id === eventId),
+    [events, eventId]
+  );
+
   const vendorsBySector = useMemo(() => {
     const selectedCity = normalizeName(selectedEvent?.city || selectedEvent?.venue);
     const selectedState = normalizeName(selectedEvent?.state);
@@ -168,11 +173,6 @@ const EventPlanner = () => {
   const selectedPackageList = useMemo(() => {
     return Object.values(selectedPackageBySector).filter(Boolean);
   }, [selectedPackageBySector]);
-
-  const selectedEvent = useMemo(
-    () => events.find((e) => e.id === eventId),
-    [events, eventId]
-  );
 
   useEffect(() => {
     if (!selectedEvent) {
