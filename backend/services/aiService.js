@@ -346,4 +346,78 @@ const autoRebalanceSelection = ({ event, selectedPackages, allPackages, scenario
   };
 };
 
-module.exports = { getSuggestions, buildPlannerCopilotPlan, optimizeBudgetScenario, autoRebalanceSelection };
+const scoreVendorFit = ({ event, vendors }) => {
+  const eventBudget = Number(event?.budget || 0);
+  const eventCity = String(event?.city || event?.venue || '').trim().toLowerCase();
+  const eventState = String(event?.state || '').trim().toLowerCase();
+  const vibe = String(event?.customerPreferences?.vibe || '').toLowerCase();
+  const sectorCustomizations = event?.sectorCustomizations || {};
+
+  const vibeBiasByCategory = {
+    luxury: { venue: 6, decor: 5, photography: 4 },
+    elegant: { decor: 4, florists: 3, music: 2 },
+    vibrant: { music: 5, decor: 4, catering: 3 },
+    modern: { photography: 4, videography: 4, venue: 3 },
+    traditional: { catering: 4, music: 3, decor: 3 },
+  };
+
+  const fitRows = vendors.map((vendor) => {
+    const category = String(vendor.category || '').toLowerCase();
+    const rating = Number(vendor.averageRating || 0);
+    const basePrice = Number(vendor.basePrice || 0);
+
+    const cityMatch = eventCity && String(vendor.city || '').toLowerCase().includes(eventCity) ? 1 : 0;
+    const stateMatch = eventState && String(vendor.state || '').toLowerCase().includes(eventState) ? 1 : 0;
+
+    const priority = String(sectorCustomizations?.[category]?.priority || 'medium').toLowerCase();
+    const priorityWeight = priority === 'high' ? 1.15 : priority === 'low' ? 0.9 : 1;
+
+    const targetSectorBudget = Number(sectorCustomizations?.[category]?.budget || 0);
+    const budgetAnchor = targetSectorBudget || (eventBudget > 0 ? eventBudget * 0.12 : 0);
+    const budgetFit = budgetAnchor > 0
+      ? Math.max(0, 1 - Math.abs(basePrice - budgetAnchor) / Math.max(budgetAnchor, 1))
+      : 0.55;
+
+    const vibeBoost = Number(vibeBiasByCategory[vibe]?.[category] || 0);
+
+    const scoreRaw = (
+      rating * 16 +
+      (vendor.isVerified ? 10 : 0) +
+      cityMatch * 12 +
+      stateMatch * 8 +
+      budgetFit * 24 +
+      vibeBoost
+    ) * priorityWeight;
+
+    const fitScore = Math.max(1, Math.min(100, Math.round(scoreRaw / 1.2)));
+
+    const reasons = [
+      rating ? `Strong rating (${rating.toFixed(1)})` : 'New vendor profile',
+      vendor.isVerified ? 'Verified vendor' : 'Profile pending verification',
+      cityMatch ? 'Matches your event city' : stateMatch ? 'Matches your event state' : 'Can still serve your location',
+      budgetAnchor > 0
+        ? `Budget alignment is ${Math.round(budgetFit * 100)}% for this sector`
+        : 'No sector budget set, using balanced estimate',
+    ];
+
+    return {
+      vendorId: vendor.id,
+      businessName: vendor.businessName,
+      category,
+      fitScore,
+      confidence: fitScore >= 80 ? 'high' : fitScore >= 60 ? 'medium' : 'low',
+      reasons,
+    };
+  });
+
+  fitRows.sort((a, b) => b.fitScore - a.fitScore);
+  return fitRows;
+};
+
+module.exports = {
+  getSuggestions,
+  buildPlannerCopilotPlan,
+  optimizeBudgetScenario,
+  autoRebalanceSelection,
+  scoreVendorFit,
+};

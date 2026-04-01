@@ -136,6 +136,22 @@ model AppNotification {
   @@map("app_notifications")
 }
 
+model AiRecommendationSnapshot {
+  id         Int      @id @default(autoincrement())
+  eventId    Int      @map("event_id")
+  userId     Int?     @map("user_id")
+  category   String?  @db.VarChar(64)
+  vendorId   Int      @map("vendor_id")
+  fitScore   Int      @map("fit_score")
+  confidence String?  @db.VarChar(16)
+  reasons    Json     @default("[]")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([eventId, category, createdAt])
+  @@index([vendorId, createdAt])
+  @@map("ai_recommendation_snapshots")
+}
+
 model Event {
   id          Int         @id @default(autoincrement())
   title       String      @db.VarChar(200)
@@ -156,6 +172,9 @@ model Event {
   status      EventStatus @default(draft)
   coverImage  String?     @map("cover_image")
   isPublic    Boolean     @default(false) @map("is_public")
+  netlifySiteId String?   @map("netlify_site_id") @db.VarChar(120)
+  netlifySiteUrl String?  @map("netlify_site_url") @db.VarChar(500)
+  netlifyPublishedAt DateTime? @map("netlify_published_at")
   sectorCustomizations Json @default("{}") @map("sector_customizations")
   customerPreferences Json  @default("{}") @map("customer_preferences")
   timeline    Json        @default("[]")

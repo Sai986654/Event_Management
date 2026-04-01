@@ -38,6 +38,39 @@
   margin-bottom: 24px;
 }
 
+.marketplace-ai-picks {
+  margin: 4px 0 18px;
+}
+
+.marketplace-ai-pick-card {
+  border: 1px solid #d9e8f5 !important;
+  border-radius: 14px !important;
+  background: linear-gradient(180deg, #ffffff, #f3f9ff);
+}
+
+.marketplace-ai-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #0b7285;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.marketplace-ai-pick-card h3 {
+  margin: 0;
+  color: #133a5e;
+}
+
+.marketplace-ai-pick-card p {
+  margin: 8px 0 0;
+  color: #3f5f7d;
+}
+
+.vendor-marketplace-container .ant-modal-body p {
+  margin-bottom: 10px;
+}
+
 .vendors-grid .ant-card {
   border-radius: 16px;
   overflow: hidden;
@@ -47,6 +80,10 @@
 .vendors-grid .ant-card:hover {
   transform: translateY(-6px);
   box-shadow: 0 16px 32px rgba(7, 40, 67, 0.16);
+}
+
+.vendors-grid .ant-card p {
+  transition: color 180ms ease;
 }
 
 .vendors-grid > .ant-col {

@@ -5,6 +5,7 @@ const {
   buildPlannerCopilotPlan,
   optimizeBudgetScenario,
   autoRebalanceSelection,
+  scoreVendorFit,
 } = require('../services/aiService');
 const {
   createJob,
@@ -302,4 +303,64 @@ exports.getEventCollageJobStatus = asyncHandler(async (req, res) => {
       note: 'Latest previously generated collage',
     },
   });
+});
+
+// POST /api/ai/vendor-fit
+exports.getVendorFit = asyncHandler(async (req, res) => {
+  const eventId = Number(req.body.eventId);
+  if (!eventId) {
+    return res.status(400).json({ message: 'Valid eventId is required' });
+  }
+
+  const event = await prisma.event.findUnique({
+    where: { id: eventId },
+    select: {
+      id: true,
+      organizerId: true,
+      venue: true,
+      city: true,
+      state: true,
+      budget: true,
+      customerPreferences: true,
+      sectorCustomizations: true,
+    },
+  });
+  if (!event) return res.status(404).json({ message: 'Event not found' });
+
+  if (req.user.role === 'customer' && event.organizerId !== req.user.id) {
+    return res.status(403).json({ message: 'Not authorized to access this event' });
+  }
+
+  const category = String(req.body.category || '').trim().toLowerCase();
+  const vendors = await prisma.vendor.findMany({
+    where: category ? { category } : {},
+    select: {
+      id: true,
+      businessName: true,
+      category: true,
+      city: true,
+      state: true,
+      averageRating: true,
+      isVerified: true,
+      basePrice: true,
+    },
+    take: 300,
+  });
+
+  const fit = scoreVendorFit({ event, vendors });
+
+  const topRows = fit.slice(0, 25).map((row) => ({
+    eventId: event.id,
+    userId: req.user?.id || null,
+    category: category || null,
+    vendorId: row.vendorId,
+    fitScore: row.fitScore,
+    confidence: row.confidence,
+    reasons: row.reasons,
+  }));
+  if (topRows.length) {
+    await prisma.aiRecommendationSnapshot.createMany({ data: topRows });
+  }
+
+  res.json({ eventId, category: category || null, fit });
 });

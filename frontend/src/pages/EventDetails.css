@@ -48,6 +48,12 @@
   gap: 8px;
 }
 
+.event-netlify-card {
+  margin-bottom: 16px;
+  border: 1px solid #d7e6f4;
+  border-radius: 12px;
+}
+
 .details-table {
   width: 100%;
   border-collapse: collapse;

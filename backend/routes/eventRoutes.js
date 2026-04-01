@@ -12,6 +12,7 @@ const {
   updateTasks,
   updateTimeline,
   triggerInviteDrip,
+  publishEventNetlify,
 } = require('../controllers/eventController');
 
 // Public route — get event by slug
@@ -41,6 +42,7 @@ router.post(
   authorize('admin', 'organizer', 'customer'),
   triggerInviteDrip
 );
+router.post('/:id/publish-netlify', authorize('admin', 'organizer'), publishEventNetlify);
 router.get('/:id', getEvent);
 router.put('/:id', authorize('admin', 'organizer', 'customer'), updateEvent);
 router.delete('/:id', authorize('admin', 'organizer', 'customer'), deleteEvent);

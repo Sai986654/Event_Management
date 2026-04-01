@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useContext } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   Card,
@@ -24,6 +24,7 @@ import { bookingService } from '../services/bookingService';
 import { useEventSocket } from '../hooks/useEventSocket';
 import { formatDate, formatCurrency, getErrorMessage } from '../utils/helpers';
 import { notificationService } from '../services/notificationService';
+import { AuthContext } from '../context/AuthContext';
 import './EventDetails.css';
 
 const { TextArea } = Input;
@@ -31,6 +32,7 @@ const { Paragraph, Text } = Typography;
 
 const EventDetails = () => {
   const { eventId } = useParams();
+  const { user } = useContext(AuthContext);
   const [event, setEvent] = useState(null);
   const [inviteCopy, setInviteCopy] = useState(null);
   const [guests, setGuests] = useState([]);
@@ -43,6 +45,7 @@ const EventDetails = () => {
   const [dripVideoUrl, setDripVideoUrl] = useState('');
   const [dripSaving, setDripSaving] = useState(false);
   const [dripTesting, setDripTesting] = useState(false);
+  const [publishingMicrosite, setPublishingMicrosite] = useState(false);
 
   // Real-time handlers
   const handleGuestRsvp = useCallback((data) => {
@@ -207,6 +210,19 @@ const EventDetails = () => {
     }
   };
 
+  const publishNetlifyMicrosite = async () => {
+    setPublishingMicrosite(true);
+    try {
+      const res = await eventService.publishNetlifyMicrosite(eventId);
+      setEvent(res.event);
+      message.success('Netlify event microsite published');
+    } catch (err) {
+      message.error(getErrorMessage(err));
+    } finally {
+      setPublishingMicrosite(false);
+    }
+  };
+
   const bookingStatusColor = {
     pending: 'orange',
     confirmed: 'green',
@@ -293,11 +309,28 @@ const EventDetails = () => {
                 <Button icon={<ControlOutlined />} type="primary">Control Panel</Button>
               </Link>
               <Button icon={<EditOutlined />}>Edit</Button>
+              {(user?.role === 'organizer' || user?.role === 'admin') ? (
+                <Button onClick={publishNetlifyMicrosite} loading={publishingMicrosite}>
+                  Publish Netlify Site
+                </Button>
+              ) : null}
               <Button danger icon={<DeleteOutlined />} onClick={handleDeleteEvent}>
                 Delete
               </Button>
             </div>
           </Card>
+
+          {event.netlifySiteUrl ? (
+            <Card className="event-netlify-card">
+              <Text strong>Public Netlify Microsite: </Text>
+              <a href={event.netlifySiteUrl} target="_blank" rel="noreferrer">{event.netlifySiteUrl}</a>
+              {event.netlifyPublishedAt ? (
+                <Text type="secondary" style={{ display: 'block', marginTop: 6 }}>
+                  Published: {formatDate(event.netlifyPublishedAt)}
+                </Text>
+              ) : null}
+            </Card>
+          ) : null}
 
           <Tabs
             items={[
@@ -409,6 +442,14 @@ const EventDetails = () => {
                         <tr>
                           <td>Location:</td>
                           <td>{[event.venue, event.city, event.state].filter(Boolean).join(', ') || '—'}</td>
+                        </tr>
+                        <tr>
+                          <td>Microsite:</td>
+                          <td>
+                            {event.netlifySiteUrl ? (
+                              <a href={event.netlifySiteUrl} target="_blank" rel="noreferrer">Open Event Site</a>
+                            ) : 'Not published yet'}
+                          </td>
                         </tr>
                         <tr>
                           <td>Budget:</td>

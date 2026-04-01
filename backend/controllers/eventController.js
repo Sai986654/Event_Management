@@ -6,6 +6,7 @@ const QRCode = require('qrcode');
 const { gifting, inviteCopy } = require('../config/inviteConfig');
 const { dispatchEventCreated } = require('../services/inAppNotificationService');
 const { triggerInviteDripForEventId } = require('../services/inviteDripService');
+const { deployEventToNetlify } = require('../services/netlifySiteService');
 
 const generateSlug = (title) =>
   slugify(title, { lower: true, strict: true }) + '-' + Date.now().toString(36);
@@ -196,4 +197,41 @@ exports.triggerInviteDrip = asyncHandler(async (req, res) => {
     return res.status(status).json(result);
   }
   res.json(result);
+});
+
+// POST /api/events/:id/publish-netlify
+exports.publishEventNetlify = asyncHandler(async (req, res) => {
+  const eventId = Number(req.params.id);
+  const event = await prisma.event.findUnique({ where: { id: eventId } });
+  if (!event) return res.status(404).json({ message: 'Event not found' });
+
+  // Product requirement: organizers can publish event microsites even for customer-created events.
+  if (!['admin', 'organizer'].includes(req.user.role)) {
+    return res.status(403).json({ message: 'Only organizers/admin can publish microsites' });
+  }
+
+  try {
+    const deployed = await deployEventToNetlify(event);
+
+    const updated = await prisma.event.update({
+      where: { id: eventId },
+      data: {
+        isPublic: true,
+        netlifySiteId: deployed.siteId,
+        netlifySiteUrl: deployed.siteUrl,
+        netlifyPublishedAt: new Date(),
+      },
+    });
+
+    res.status(201).json({
+      event: updated,
+      site: deployed,
+      message: 'Event microsite published on Netlify',
+    });
+  } catch (err) {
+    res.status(502).json({
+      message: 'Failed to publish Netlify microsite',
+      detail: err.message,
+    });
+  }
 });

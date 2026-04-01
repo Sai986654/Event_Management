@@ -69,6 +69,8 @@ const EventPlanner = () => {
   const [scenarioGuests, setScenarioGuests] = useState();
   const [scenarioBudget, setScenarioBudget] = useState();
   const [budgetOptimization, setBudgetOptimization] = useState(null);
+  const [sectorFitMap, setSectorFitMap] = useState({});
+  const [applyingEventDna, setApplyingEventDna] = useState(false);
   const [checklistInput, setChecklistInput] = useState('');
   const [checklistItems, setChecklistItems] = useState([]);
   const [checklistSaving, setChecklistSaving] = useState(false);
@@ -146,6 +148,22 @@ const EventPlanner = () => {
   const activeSector = currentStep > 0 && currentStep < reviewStepIndex
     ? steps[currentStep]
     : null;
+
+  useEffect(() => {
+    if (!eventId || !activeSector) {
+      setSectorFitMap({});
+      return;
+    }
+    aiService.getVendorFitScores(eventId, activeSector)
+      .then((res) => {
+        const map = (res.fit || []).reduce((acc, row) => {
+          acc[row.vendorId] = row;
+          return acc;
+        }, {});
+        setSectorFitMap(map);
+      })
+      .catch(() => setSectorFitMap({}));
+  }, [eventId, activeSector]);
 
   const selectedPackageList = useMemo(() => {
     return Object.values(selectedPackageBySector).filter(Boolean);
@@ -262,6 +280,29 @@ const EventPlanner = () => {
     }));
   };
 
+  const estimatePackageAmount = (pkg) => {
+    const base = Number(pkg?.basePrice || 0);
+    const rules = pkg?.estimationRules || {};
+    const guests = Number(criteriaMap[pkg?.id]?.guests || selectedEvent?.guestCount || 0);
+    const hours = Number(criteriaMap[pkg?.id]?.hours || (Number(rules.perHour || 0) > 0 ? 4 : 0));
+    return base + Number(rules.perGuest || 0) * guests + Number(rules.perHour || 0) * hours;
+  };
+
+  const showSwitchImpact = (sector, candidate) => {
+    const current = selectedPackageBySector[sector];
+    if (!current) {
+      message.info(`Estimated cost for ${candidate.title}: ${formatINR(estimatePackageAmount(candidate))}`);
+      return;
+    }
+    const currentAmount = estimatePackageAmount(current);
+    const nextAmount = estimatePackageAmount(candidate);
+    const delta = Math.round((nextAmount - currentAmount) * 100) / 100;
+    const word = delta > 0 ? 'increase' : delta < 0 ? 'save' : 'no change';
+    message.info(
+      `${word === 'no change' ? 'No cost change' : `Switching will ${word}`} (${formatINR(Math.abs(delta))}) in ${sector}.`
+    );
+  };
+
   const canGoNext = () => {
     if (currentStep === 0) return Boolean(eventId);
     return currentStep < reviewStepIndex;
@@ -364,6 +405,58 @@ const EventPlanner = () => {
       message.error(getErrorMessage(err));
     } finally {
       setAiPlanning(false);
+    }
+  };
+
+  const applyEventDnaFitPlan = async () => {
+    if (!eventId) {
+      message.warning('Select an event first');
+      return;
+    }
+
+    setApplyingEventDna(true);
+    try {
+      const sectorFits = await Promise.all(
+        sectorOrder.map(async (sector) => {
+          try {
+            const res = await aiService.getVendorFitScores(eventId, sector);
+            return { sector, fit: res.fit || [] };
+          } catch {
+            return { sector, fit: [] };
+          }
+        })
+      );
+
+      const nextVendor = {};
+      const nextPackage = {};
+      const nextReasons = {};
+
+      sectorFits.forEach(({ sector, fit }) => {
+        const best = fit[0];
+        if (!best?.vendorId) return;
+
+        const sectorPackages = packagesBySector[sector] || [];
+        const byVendor = sectorPackages
+          .filter((pkg) => pkg.vendor?.id === best.vendorId)
+          .sort((a, b) => Number(a.basePrice || 0) - Number(b.basePrice || 0));
+
+        const chosenPackage = byVendor[0] || null;
+        if (!chosenPackage) return;
+
+        nextVendor[sector] = { id: best.vendorId, businessName: best.businessName };
+        nextPackage[sector] = chosenPackage;
+        nextReasons[sector] = `${best.reasons?.[0] || 'Strong event fit'} (Fit ${best.fitScore}/100)`;
+      });
+
+      setSelectedVendorBySector((prev) => ({ ...prev, ...nextVendor }));
+      setSelectedPackageBySector((prev) => ({ ...prev, ...nextPackage }));
+      setAiReasonBySector((prev) => ({ ...prev, ...nextReasons }));
+      if (currentStep === 0) setCurrentStep(1);
+      message.success(`Event DNA auto-applied for ${Object.keys(nextPackage).length} sectors.`);
+    } catch (err) {
+      message.error(getErrorMessage(err));
+    } finally {
+      setApplyingEventDna(false);
     }
   };
 
@@ -492,6 +585,9 @@ const EventPlanner = () => {
               <Button type="primary" ghost onClick={applyAiPlan} loading={aiPlanning} disabled={!eventId}>
                 Generate with AI Co-Pilot
               </Button>
+              <Button onClick={applyEventDnaFitPlan} loading={applyingEventDna} disabled={!eventId}>
+                Auto-Apply Event DNA Fit
+              </Button>
               <Text type="secondary">Auto-picks best-fit vendor/package per sector for you.</Text>
             </Space>
           </Card>
@@ -575,7 +671,9 @@ const EventPlanner = () => {
 
     if (activeSector) {
       const items = packagesBySector[activeSector] || [];
-      const sectorVendors = vendorsBySector[activeSector] || [];
+      const sectorVendors = [...(vendorsBySector[activeSector] || [])].sort((a, b) =>
+        Number(sectorFitMap[b.id]?.fitScore || 0) - Number(sectorFitMap[a.id]?.fitScore || 0)
+      );
       const selectedId = selectedPackageBySector[activeSector]?.id;
       const selectedVendor = selectedVendorBySector[activeSector];
       const selectedVendorId = selectedVendor?.id;
@@ -615,8 +713,16 @@ const EventPlanner = () => {
                           <Text strong>{vendor.businessName}</Text>
                           {vendor.isVerified ? <Tag color="green">Verified</Tag> : <Tag>Unverified</Tag>}
                           <Tag color="blue">{packageCount} packages</Tag>
+                          {sectorFitMap[vendor.id] ? (
+                            <Tag color={sectorFitMap[vendor.id].fitScore >= 80 ? 'green' : sectorFitMap[vendor.id].fitScore >= 60 ? 'gold' : 'default'}>
+                              Fit {sectorFitMap[vendor.id].fitScore}
+                            </Tag>
+                          ) : null}
                         </Space>
                         <Text type="secondary">Rating: {vendor.averageRating ?? '-'}</Text>
+                        {sectorFitMap[vendor.id]?.reasons?.[0] ? (
+                          <Text type="secondary">{sectorFitMap[vendor.id].reasons[0]}</Text>
+                        ) : null}
                         <Button type={selected ? 'primary' : 'default'} onClick={() => selectVendorForSector(activeSector, vendor)}>
                           {selected ? 'Selected Vendor' : 'Select Vendor'}
                         </Button>
@@ -680,6 +786,9 @@ const EventPlanner = () => {
                                 />
                               </Col>
                             </Row>
+                            <Button size="small" onClick={() => showSwitchImpact(activeSector, pkg)}>
+                              Budget impact if switch
+                            </Button>
                           </Space>
                         </Card>
                       );
