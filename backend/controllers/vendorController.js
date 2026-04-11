@@ -85,7 +85,7 @@ exports.uploadVendorMedia = asyncHandler(async (req, res) => {
 
   let uploaded = null;
   try {
-    uploaded = await uploadFile(req.file.buffer, `eventos/vendor-${vendor.id}`);
+    uploaded = await uploadFile(req.file.buffer, `eventos/vendor-${vendor.id}`, { contentType: req.file.mimetype });
   } catch {
     uploaded = {
       url: `https://placeholder.eventos.dev/${Date.now()}-${req.file.originalname || 'vendor-upload'}`,
