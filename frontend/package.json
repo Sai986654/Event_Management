@@ -40,5 +40,12 @@
   },
   "devDependencies": {
     "react-scripts": "5.0.1"
+  },
+  "overrides": {
+    "tailwindcss": {
+      "postcss-load-config": {
+        "yaml": "^2.8.0"
+      }
+    }
   }
 }
