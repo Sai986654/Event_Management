@@ -2,7 +2,7 @@
 
 FROM node:20-alpine
 
-RUN apk add --no-cache openssl libc6-compat ffmpeg
+RUN apk add --no-cache openssl libc6-compat ffmpeg fontconfig ttf-dejavu
 
 WORKDIR /app
 

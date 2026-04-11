@@ -177,8 +177,9 @@ async function generateInviteVideo({ imagePaths, voiceBuffer, musicBuffer, overl
     if (line) lines.push(line);
     fs.writeFileSync(textFilePath, lines.join('\n'));
 
+    const fontFile = '/usr/share/fonts/ttf-dejavu/DejaVuSans.ttf';
     drawtextFilter = `;[vout]drawtext=textfile='${textFilePath.replace(/\\/g, '/').replace(/:/g, '\\:')}'` +
-      `:fontsize=26:fontcolor=white:x=(w-text_w)/2:y=h-th-36` +
+      `:fontfile='${fontFile}':fontsize=26:fontcolor=white:x=(w-text_w)/2:y=h-th-36` +
       `:box=1:boxcolor=black@0.55:boxborderw=12:line_spacing=8[vtxt]`;
     videoMapLabel = '[vtxt]';
   }
