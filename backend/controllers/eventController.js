@@ -77,7 +77,7 @@ exports.getEvents = asyncHandler(async (req, res) => {
   const { page, limit, skip } = paginate(req.query.page, req.query.limit);
   const where = {};
 
-  if (req.user.role === 'organizer' || req.user.role === 'customer') {
+  if (req.user.role === 'customer') {
     where.organizerId = req.user.id;
   }
   if (req.query.status) where.status = req.query.status;
