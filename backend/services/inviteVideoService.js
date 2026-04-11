@@ -128,6 +128,7 @@ async function processInviteJob(jobId, io) {
         imagePaths: localImages,
         voiceBuffer,
         musicBuffer,
+        overlayText: voiceText,
       });
       tempFiles.push(videoPath);
 

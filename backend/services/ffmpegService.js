@@ -91,9 +91,10 @@ function getAudioDuration(audioPath) {
  * @param {string[]} opts.imagePaths  - Local paths to 3-5 images.
  * @param {Buffer}   opts.voiceBuffer - MP3 buffer of TTS voice.
  * @param {Buffer|null} opts.musicBuffer - MP3 buffer of background music (optional).
+ * @param {string}   [opts.overlayText] - Text to display as subtitle overlay.
  * @returns {Promise<{ videoPath: string }>} Path to the generated MP4.
  */
-async function generateInviteVideo({ imagePaths, voiceBuffer, musicBuffer }) {
+async function generateInviteVideo({ imagePaths, voiceBuffer, musicBuffer, overlayText }) {
   if (!imagePaths || imagePaths.length < 1) {
     throw new Error('At least 1 image is required');
   }
@@ -157,11 +158,38 @@ async function generateInviteVideo({ imagePaths, voiceBuffer, musicBuffer }) {
 
   const fullFilter = filterParts.join(';') + ';' + audioFilter;
 
+  // ── Text overlay (subtitle-style) ──────────────────────────
+  let videoMapLabel = '[vout]';
+  let textFilePath = null;
+  let drawtextFilter = '';
+
+  if (overlayText && overlayText.trim()) {
+    // Write text to a file to avoid FFmpeg escaping issues
+    textFilePath = tempPath('.txt');
+    // Word-wrap long lines (~40 chars per line for 854px)
+    const words = overlayText.trim().split(/\s+/);
+    const lines = [];
+    let line = '';
+    for (const w of words) {
+      if (line && (line + ' ' + w).length > 40) { lines.push(line); line = w; }
+      else { line = line ? line + ' ' + w : w; }
+    }
+    if (line) lines.push(line);
+    fs.writeFileSync(textFilePath, lines.join('\n'));
+
+    drawtextFilter = `;[vout]drawtext=textfile='${textFilePath.replace(/\\/g, '/').replace(/:/g, '\\:')}'` +
+      `:fontsize=26:fontcolor=white:x=(w-text_w)/2:y=h-th-36` +
+      `:box=1:boxcolor=black@0.55:boxborderw=12:line_spacing=8[vtxt]`;
+    videoMapLabel = '[vtxt]';
+  }
+
+  const finalFilter = fullFilter + drawtextFilter;
+
   const args = [
     '-y',
     ...inputs,
-    '-filter_complex', fullFilter,
-    '-map', '[vout]',
+    '-filter_complex', finalFilter,
+    '-map', videoMapLabel,
     '-map', '[aout]',
     '-c:v', 'libx264',
     '-preset', 'ultrafast',  // fastest encode, lowest memory
@@ -178,8 +206,9 @@ async function generateInviteVideo({ imagePaths, voiceBuffer, musicBuffer }) {
 
   await runFFmpeg(args);
 
-  // Clean up temp voice file (music cleaned by caller)
+  // Clean up temp voice file and text file
   safeUnlink(voicePath);
+  safeUnlink(textFilePath);
 
   return { videoPath: outputPath };
 }
