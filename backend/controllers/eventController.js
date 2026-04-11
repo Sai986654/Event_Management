@@ -258,8 +258,17 @@ exports.publishEventNetlify = asyncHandler(async (req, res) => {
     return res.status(403).json({ message: 'Only organizers/admin can publish microsites' });
   }
 
+  // Fetch approved event photos for the microsite gallery
+  const media = await prisma.media.findMany({
+    where: { eventId, type: 'photo', isApproved: true },
+    select: { url: true },
+    orderBy: { createdAt: 'desc' },
+    take: 12,
+  });
+  const mediaUrls = media.map((m) => m.url);
+
   try {
-    const deployed = await deployEventToNetlify(event);
+    const deployed = await deployEventToNetlify(event, mediaUrls);
 
     const updated = await prisma.event.update({
       where: { id: eventId },
