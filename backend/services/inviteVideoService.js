@@ -3,7 +3,7 @@ const { prisma } = require('../config/db');
 const { r2Client, R2_BUCKET, R2_PUBLIC_URL } = require('../config/r2');
 const { PutObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
 const { generateSpeech } = require('./ttsService');
-const { generateInviteVideo, writeTempFile, cleanupFiles, safeUnlink } = require('./ffmpegService');
+const { generateInviteVideo, writeTempFile, cleanupFiles, safeUnlink, preResizeImage } = require('./ffmpegService');
 const { messagingService } = require('./messagingService');
 const { inviteQueue } = require('./jobQueue');
 
@@ -71,19 +71,27 @@ async function processInviteJob(jobId, io) {
 
   emitProgress(io, job.eventId, jobId, { status: 'processing', processed: 0, total: job.totalGuests });
 
-  // Download template images from R2 to local temp files
+  // Download template images from R2 to local temp files, then pre-resize to 480p
   const imageKeys = Array.isArray(job.imageKeys) ? job.imageKeys : [];
-  const localImages = [];
+  const localImages = [];    // resized images (used for video gen)
+  const rawImages = [];      // originals (cleaned up after resize)
 
   try {
     for (const key of imageKeys) {
       const buf = await downloadFromR2(key);
       const ext = key.match(/\.\w+$/)?.[0] || '.jpg';
-      const localPath = writeTempFile(buf, ext);
-      localImages.push(localPath);
+      const rawPath = writeTempFile(buf, ext);
+      rawImages.push(rawPath);
+      // Pre-resize to 854x480 to keep FFmpeg memory low
+      const resized = await preResizeImage(rawPath);
+      localImages.push(resized);
     }
+    // Clean up raw originals immediately
+    cleanupFiles(rawImages);
   } catch (err) {
-    await failJob(jobId, `Failed to download template images: ${err.message}`);
+    cleanupFiles(rawImages);
+    cleanupFiles(localImages);
+    await failJob(jobId, `Failed to prepare template images: ${err.message}`);
     emitProgress(io, job.eventId, jobId, { status: 'failed', error: err.message });
     return;
   }

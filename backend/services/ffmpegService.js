@@ -48,6 +48,22 @@ function runFFmpeg(args) {
 }
 
 /**
+ * Pre-resize an image to 854x480 JPEG to limit memory during video generation.
+ * Returns new file path (caller must clean up).
+ */
+async function preResizeImage(inputPath) {
+  const outPath = tempPath('.jpg');
+  await runFFmpeg([
+    '-y', '-i', inputPath,
+    '-vf', 'scale=854:480:force_original_aspect_ratio=decrease,pad=854:480:(ow-iw)/2:(oh-ih)/2,format=yuvj420p',
+    '-q:v', '4',
+    '-frames:v', '1',
+    outPath,
+  ]);
+  return outPath;
+}
+
+/**
  * Get audio duration in seconds using ffprobe.
  */
 function getAudioDuration(audioPath) {
@@ -89,10 +105,14 @@ async function generateInviteVideo({ imagePaths, voiceBuffer, musicBuffer }) {
   const voiceDuration = await getAudioDuration(voicePath);
   const totalDuration = Math.max(voiceDuration + 1, 10); // at least 10s
   const imageCount = imagePaths.length;
-  const transitionDur = 1; // 1s xfade transition
+  const transitionDur = 0.5; // 0.5s xfade (lighter than 1s)
   const imageDur = Math.max(3, (totalDuration + (imageCount - 1) * transitionDur) / imageCount);
 
   // ── Build filter_complex ──────────────────────────────────
+  // Use 480p (854x480) to cut memory usage on free-tier hosts
+  const W = 854;
+  const H = 480;
+
   const inputs = [];
   const filterParts = [];
 
@@ -101,9 +121,9 @@ async function generateInviteVideo({ imagePaths, voiceBuffer, musicBuffer }) {
     inputs.push('-loop', '1', '-t', String(imageDur), '-i', imagePaths[i]);
   }
 
-  // Scale all images to 720p
+  // Scale all images to 480p
   for (let i = 0; i < imageCount; i++) {
-    filterParts.push(`[${i}]scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,setsar=1,format=yuv420p[img${i}]`);
+    filterParts.push(`[${i}]scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2,setsar=1,format=yuv420p[img${i}]`);
   }
 
   // Chain xfade transitions between images
@@ -128,7 +148,6 @@ async function generateInviteVideo({ imagePaths, voiceBuffer, musicBuffer }) {
     const musicPath = writeTempFile(musicBuffer, '.mp3');
     const musicInputIdx = imageCount + 1;
     inputs.push('-i', musicPath);
-    // Mix voice (full volume) + music (20% volume), trim to video duration
     audioFilter = `[${voiceInputIdx}]aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=mono[voice];` +
       `[${musicInputIdx}]aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=mono,volume=0.2[bgm];` +
       `[voice][bgm]amix=inputs=2:duration=first:dropout_transition=2[aout]`;
@@ -145,13 +164,15 @@ async function generateInviteVideo({ imagePaths, voiceBuffer, musicBuffer }) {
     '-map', '[vout]',
     '-map', '[aout]',
     '-c:v', 'libx264',
-    '-preset', 'fast',
-    '-crf', '23',
+    '-preset', 'ultrafast',  // fastest encode, lowest memory
+    '-crf', '28',            // lower quality = less CPU/RAM
+    '-tune', 'stillimage',   // optimized for slideshow content
     '-c:a', 'aac',
-    '-b:a', '128k',
+    '-b:a', '96k',
     '-movflags', '+faststart',
     '-t', String(totalDuration),
     '-shortest',
+    '-threads', '1',         // single-threaded to limit memory
     outputPath,
   ];
 
@@ -173,4 +194,4 @@ function cleanupFiles(paths) {
   for (const p of paths) safeUnlink(p);
 }
 
-module.exports = { generateInviteVideo, writeTempFile, cleanupFiles, safeUnlink, tempPath, ensureTempDir };
+module.exports = { generateInviteVideo, preResizeImage, writeTempFile, cleanupFiles, safeUnlink, tempPath, ensureTempDir };

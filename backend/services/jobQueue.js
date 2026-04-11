@@ -44,7 +44,7 @@ class JobQueue {
   }
 }
 
-/** Global invite-video queue (2 concurrent by default). */
-const inviteQueue = new JobQueue(Number(process.env.INVITE_CONCURRENCY) || 2);
+/** Global invite-video queue (1 concurrent to limit memory on free-tier hosts). */
+const inviteQueue = new JobQueue(Number(process.env.INVITE_CONCURRENCY) || 1);
 
 module.exports = { JobQueue, inviteQueue };
