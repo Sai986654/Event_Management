@@ -5,13 +5,23 @@
 }
 
 .event-header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
   color: white;
   margin-bottom: 24px;
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   padding: 24px;
+  border: none !important;
+}
+
+.event-header .ant-card-body {
+  background: transparent;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  width: 100%;
+  padding: 0;
 }
 
 .event-header-content h1 {
