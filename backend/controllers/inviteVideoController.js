@@ -24,8 +24,8 @@ exports.createInviteJob = asyncHandler(async (req, res) => {
     return res.status(404).json({ message: 'Event not found' });
   }
 
-  // Only organizer or admin
-  if (event.organizerId !== req.user.id && req.user.role !== 'admin') {
+  // Event creator, organizer role, or admin
+  if (event.organizerId !== req.user.id && req.user.role !== 'admin' && req.user.role !== 'organizer') {
     return res.status(403).json({ message: 'Not authorized' });
   }
 
@@ -133,9 +133,9 @@ exports.getInviteJob = asyncHandler(async (req, res) => {
     return res.status(404).json({ message: 'Job not found' });
   }
 
-  // Auth check — only organizer of the event or admin
+  // Auth check — event creator, organizer role, or admin
   const event = await prisma.event.findUnique({ where: { id: job.eventId } });
-  if (event.organizerId !== req.user.id && req.user.role !== 'admin') {
+  if (event.organizerId !== req.user.id && req.user.role !== 'admin' && req.user.role !== 'organizer') {
     return res.status(403).json({ message: 'Not authorized' });
   }
 
@@ -162,7 +162,7 @@ exports.getJobsByEvent = asyncHandler(async (req, res) => {
 
   const event = await prisma.event.findUnique({ where: { id: eventId } });
   if (!event) return res.status(404).json({ message: 'Event not found' });
-  if (event.organizerId !== req.user.id && req.user.role !== 'admin') {
+  if (event.organizerId !== req.user.id && req.user.role !== 'admin' && req.user.role !== 'organizer') {
     return res.status(403).json({ message: 'Not authorized' });
   }
 
@@ -190,7 +190,7 @@ exports.retryFailedGuests = asyncHandler(async (req, res) => {
     include: { event: { select: { organizerId: true } } },
   });
   if (!job) return res.status(404).json({ message: 'Job not found' });
-  if (job.event.organizerId !== req.user.id && req.user.role !== 'admin') {
+  if (job.event.organizerId !== req.user.id && req.user.role !== 'admin' && req.user.role !== 'organizer') {
     return res.status(403).json({ message: 'Not authorized' });
   }
 
