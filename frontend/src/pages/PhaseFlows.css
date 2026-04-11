@@ -1,7 +1,7 @@
 .phase-page {
   max-width: 1400px;
   margin: 0 auto;
-  padding: 28px 24px 32px;
+  padding: 28px 22px 32px;
 }
 
 .phase-stack {
@@ -9,11 +9,11 @@
 }
 
 .phase-hero {
-  border-radius: 16px !important;
+  border-radius: 22px !important;
   background:
-    radial-gradient(circle at 15% 10%, rgba(255, 255, 255, 0.22), transparent 35%),
-    linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-  box-shadow: 0 18px 40px rgba(102, 126, 234, 0.28) !important;
+    radial-gradient(circle at 18% 12%, rgba(255, 255, 255, 0.24), transparent 42%),
+    linear-gradient(135deg, #0f4b7f 0%, #1f7a8c 52%, #49a078 100%) !important;
+  box-shadow: 0 18px 42px rgba(17, 75, 104, 0.26) !important;
 }
 
 .phase-hero .ant-card-body {
@@ -21,8 +21,9 @@
 }
 
 .phase-card {
-  border-radius: 14px !important;
-  box-shadow: 0 10px 30px rgba(17, 24, 39, 0.06) !important;
+  border-radius: 18px !important;
+  border: 1px solid #dbe8f2 !important;
+  box-shadow: 0 12px 30px rgba(17, 41, 66, 0.08) !important;
   animation: phaseFadeUp 420ms ease both;
 }
 
@@ -178,6 +179,74 @@
 
 .planner-main-pane {
   min-width: 0;
+}
+
+.planner-checklist-list {
+  margin-top: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.planner-checklist-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid #dae6f3;
+  border-radius: 10px;
+  background: #fbfdff;
+}
+
+.planner-checklist-item.done {
+  background: #effaf5;
+  border-color: #bce8d1;
+}
+
+.planner-checklist-item.done span {
+  text-decoration: line-through;
+  color: #5f738c;
+}
+
+.planner-website-card,
+.planner-inspiration-card {
+  border: 1px solid #d7e4f2;
+  border-radius: 12px;
+  background: #f9fcff;
+  padding: 10px;
+}
+
+.planner-sector-tag-cloud {
+  margin-top: 10px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.vendor-portfolio-grid {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.vendor-portfolio-item {
+  border-radius: 12px !important;
+  border: 1px solid #d7e7f2 !important;
+}
+
+.vendor-portfolio-image,
+.vendor-portfolio-video {
+  width: 100%;
+  height: 180px;
+  object-fit: cover;
+  border-radius: 10px;
+}
+
+.vendor-portfolio-caption {
+  margin-top: 8px;
+  color: #475467;
+  font-size: 13px;
 }
 
 @media (max-width: 980px) {

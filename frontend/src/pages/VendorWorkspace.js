@@ -1,5 +1,6 @@
 import React, { useContext, useEffect, useMemo, useState } from 'react';
-import { Button, Card, Col, Form, Input, InputNumber, Row, Select, Space, Table, Tag, message } from 'antd';
+import { Button, Card, Col, Form, Image, Input, InputNumber, Row, Select, Space, Table, Tag, Upload, message } from 'antd';
+import { PlusOutlined } from '@ant-design/icons';
 import { AuthContext } from '../context/AuthContext';
 import { vendorService } from '../services/vendorService';
 import { packageService } from '../services/packageService';
@@ -17,6 +18,8 @@ const VendorWorkspace = () => {
   const [submittingProfile, setSubmittingProfile] = useState(false);
   const [submittingPackage, setSubmittingPackage] = useState(false);
   const [submittingTestimonial, setSubmittingTestimonial] = useState(false);
+  const [uploadingMedia, setUploadingMedia] = useState(false);
+  const [mediaCaption, setMediaCaption] = useState('');
   const [vendor, setVendor] = useState(null);
   const [packages, setPackages] = useState([]);
 
@@ -102,6 +105,28 @@ const VendorWorkspace = () => {
       setSubmittingTestimonial(false);
     }
   };
+
+  const handlePortfolioUpload = async ({ file, onSuccess, onError }) => {
+    if (!vendor?.id) {
+      message.warning('Create your profile first before uploading portfolio media.');
+      return;
+    }
+    setUploadingMedia(true);
+    try {
+      await vendorService.uploadVendorMedia(vendor.id, file, mediaCaption);
+      message.success('Portfolio media uploaded.');
+      setMediaCaption('');
+      await loadData();
+      if (typeof onSuccess === 'function') onSuccess('ok');
+    } catch (err) {
+      message.error(getErrorMessage(err));
+      if (typeof onError === 'function') onError(err);
+    } finally {
+      setUploadingMedia(false);
+    }
+  };
+
+  const portfolioItems = Array.isArray(vendor?.portfolio) ? vendor.portfolio : [];
 
   return (
     <div className="phase-page">
@@ -191,6 +216,50 @@ const VendorWorkspace = () => {
                 { title: 'Status', dataIndex: 'isActive', render: (v) => <Tag color={v ? 'green' : 'default'}>{v ? 'active' : 'inactive'}</Tag> },
               ]}
             />
+          </Card>
+        </Col>
+
+        <Col span={24}>
+          <Card className="phase-card" title="Portfolio Media">
+            <Row gutter={[16, 16]} align="middle">
+              <Col xs={24} md={16}>
+                <Input
+                  placeholder="Optional caption for this media"
+                  value={mediaCaption}
+                  onChange={(e) => setMediaCaption(e.target.value)}
+                  disabled={!vendor}
+                />
+              </Col>
+              <Col xs={24} md={8}>
+                <Upload
+                  accept="image/*,video/*"
+                  showUploadList={false}
+                  customRequest={handlePortfolioUpload}
+                  disabled={!vendor || uploadingMedia}
+                >
+                  <Button type="primary" icon={<PlusOutlined />} loading={uploadingMedia} block>
+                    Upload media
+                  </Button>
+                </Upload>
+              </Col>
+            </Row>
+
+            <div className="vendor-portfolio-grid">
+              {portfolioItems.length === 0 ? (
+                <div className="phase-empty">No portfolio media uploaded yet.</div>
+              ) : (
+                portfolioItems.map((item) => (
+                  <Card key={item.id || item.url} size="small" className="vendor-portfolio-item">
+                    {item.type === 'video' ? (
+                      <video src={item.url} controls className="vendor-portfolio-video" />
+                    ) : (
+                      <Image src={item.url} alt={item.caption || 'vendor media'} className="vendor-portfolio-image" />
+                    )}
+                    {item.caption ? <div className="vendor-portfolio-caption">{item.caption}</div> : null}
+                  </Card>
+                ))
+              )}
+            </div>
           </Card>
         </Col>
       </Row>

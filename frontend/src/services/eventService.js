@@ -26,9 +26,19 @@ export const eventService = {
     return response.data;
   },
 
+  updateShareSettings: async (eventId, shareData) => {
+    const response = await api.put(`/events/${eventId}/share-settings`, shareData);
+    return response.data;
+  },
+
   /** Run scheduled invite drip once (optional body: { force: true } to ignore interval). */
   triggerInviteDrip: async (eventId, body = {}) => {
     const response = await api.post(`/events/${eventId}/invite-drip/trigger`, body);
+    return response.data;
+  },
+
+  publishNetlifyMicrosite: async (eventId) => {
+    const response = await api.post(`/events/${eventId}/publish-netlify`);
     return response.data;
   },
 

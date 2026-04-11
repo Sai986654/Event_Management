@@ -9,9 +9,20 @@ const {
   postAutoRebalance,
   createEventCollageJob,
   getEventCollageJobStatus,
+  getVendorFit,
 } = require('../controllers/aiController');
 
 router.post('/suggestions', protect, getAISuggestions);
+router.post(
+  '/vendor-fit',
+  protect,
+  [
+    body('eventId').isInt({ min: 1 }).withMessage('Valid eventId is required'),
+    body('category').optional().isString().withMessage('category must be a string'),
+  ],
+  validate,
+  getVendorFit
+);
 router.post(
   '/planner-copilot',
   protect,

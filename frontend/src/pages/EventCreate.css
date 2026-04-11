@@ -1,18 +1,40 @@
 .event-create-container {
-  max-width: 800px;
+  max-width: 980px;
   margin: 0 auto;
-  padding: 24px;
+  padding: 28px 20px 34px;
 }
 
 .event-create-card {
-  border-radius: 8px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 22px 54px rgba(15, 33, 61, 0.15);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(250, 253, 255, 0.92));
 }
 
 .event-create-card h1 {
   text-align: center;
   margin-bottom: 24px;
-  color: #333;
+  color: #11203d;
+  letter-spacing: -0.02em;
+}
+
+.customization-headline {
+  font-weight: 800;
+  color: #183058;
+  margin: 14px 0 12px;
+  font-size: 16px;
+}
+
+.sector-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 12px;
+}
+
+.sector-card {
+  border-radius: 14px !important;
+  border: 1px solid #dce5f4 !important;
+  background: linear-gradient(180deg, #ffffff, #f8fbff);
 }
 
 .steps-action {
@@ -21,7 +43,7 @@
   gap: 8px;
   margin-top: 24px;
   padding-top: 24px;
-  border-top: 1px solid #f0f0f0;
+  border-top: 1px solid #e0e8f5;
 }
 
 @media (max-width: 768px) {

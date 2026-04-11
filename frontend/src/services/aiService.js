@@ -9,6 +9,14 @@ export const aiService = {
     return response.data;
   },
 
+  getVendorFitScores: async (eventId, category) => {
+    const response = await api.post('/ai/vendor-fit', {
+      eventId,
+      category,
+    });
+    return response.data;
+  },
+
   suggestVendors: async (eventId, category, budget) => {
     const response = await api.post('/ai/suggest-vendors', {
       eventId,

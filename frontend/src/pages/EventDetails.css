@@ -48,6 +48,34 @@
   gap: 8px;
 }
 
+.event-netlify-card {
+  margin-bottom: 16px;
+  border: 1px solid #d7e6f4;
+  border-radius: 12px;
+}
+
+.event-share-panel {
+  margin-bottom: 16px;
+  padding: 16px;
+  border: 1px solid #e5edf5;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #fbfdff 0%, #f4f8fc 100%);
+}
+
+.event-share-panel__controls {
+  justify-content: space-between;
+  width: 100%;
+  gap: 16px;
+}
+
+.event-share-panel__qr {
+  margin-top: 16px;
+  display: inline-flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+}
+
 .details-table {
   width: 100%;
   border-collapse: collapse;
@@ -90,5 +118,9 @@
 
   .event-actions button {
     width: 100%;
+  }
+
+  .event-share-panel__controls {
+    flex-direction: column;
   }
 }

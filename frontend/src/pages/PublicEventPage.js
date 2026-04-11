@@ -87,6 +87,18 @@ const PublicEventPage = () => {
     return <Empty description="Event not found" />;
   }
 
+  const effectiveInviteCopy = inviteCopy
+    ? {
+        ...inviteCopy,
+        tagline: gift?.enabled
+          ? inviteCopy.tagline
+          : "If you can't join us in person, you're still part of our day.",
+        details: gift?.enabled
+          ? inviteCopy.details
+          : 'Send your blessings and upload photos for the album and AI collage. The organizer will receive everything and include your presence in the celebration.',
+      }
+    : null;
+
   return (
     <div className="public-event-page">
       {/* Hero Section */}
@@ -98,10 +110,10 @@ const PublicEventPage = () => {
       </div>
 
       <div className="event-container">
-        {inviteCopy ? (
+        {effectiveInviteCopy ? (
           <Card style={{ marginBottom: 24, borderColor: '#667eea', background: '#f8f9ff' }}>
-            <h2 style={{ marginTop: 0 }}>{inviteCopy.tagline}</h2>
-            <p style={{ marginBottom: 0, fontSize: 16, lineHeight: 1.6 }}>{inviteCopy.details}</p>
+            <h2 style={{ marginTop: 0 }}>{effectiveInviteCopy.tagline}</h2>
+            <p style={{ marginBottom: 0, fontSize: 16, lineHeight: 1.6 }}>{effectiveInviteCopy.details}</p>
           </Card>
         ) : null}
         {/* Event Details */}
@@ -142,6 +154,13 @@ const PublicEventPage = () => {
                 </Row>
               </Card>
             )}
+
+            {!gift?.enabled ? (
+              <Card title="Blessings from Afar" style={{ marginTop: '24px' }}>
+                <p>The organizer has not enabled UPI gift QR for this event yet.</p>
+                <p>You can still share your blessings below and upload a photo for the AI collage.</p>
+              </Card>
+            ) : null}
 
             <Card title="Remote Blessing Photo (AI Collage)" style={{ marginTop: '24px' }}>
               <p>If you cannot attend, upload your photo and we will blend it into event memory collage.</p>
