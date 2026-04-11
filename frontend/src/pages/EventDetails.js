@@ -326,6 +326,11 @@ const EventDetails = () => {
     },
   ];
 
+  const isCustomer = user?.role === 'customer';
+  const isOrganizer = user?.role === 'organizer';
+  const isAdmin = user?.role === 'admin';
+  const isOrgOrAdmin = isOrganizer || isAdmin;
+
   if (loading) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 'calc(100vh - 64px)' }}>
@@ -351,18 +356,24 @@ const EventDetails = () => {
             </div>
             <div className="event-actions">
               <Badge status={connected ? 'success' : 'default'} text={connected ? 'Live' : 'Offline'} />
-              <Link to={`/events/${eventId}/control-panel`}>
-                <Button icon={<ControlOutlined />} type="primary">Control Panel</Button>
-              </Link>
-              <Button icon={<EditOutlined />}>Edit</Button>
-              {(user?.role === 'organizer' || user?.role === 'admin') ? (
+              {isOrgOrAdmin && (
+                <Link to={`/events/${eventId}/control-panel`}>
+                  <Button icon={<ControlOutlined />} type="primary">Control Panel</Button>
+                </Link>
+              )}
+              {(isCustomer || isAdmin) && (
+                <Button icon={<EditOutlined />}>Edit</Button>
+              )}
+              {isOrgOrAdmin ? (
                 <Button onClick={publishNetlifyMicrosite} loading={publishingMicrosite}>
-                  Publish Netlify Site
+                  {event.netlifySiteUrl ? 'Update Netlify Site' : 'Publish Netlify Site'}
                 </Button>
               ) : null}
-              <Button danger icon={<DeleteOutlined />} onClick={handleDeleteEvent}>
-                Delete
-              </Button>
+              {isOrgOrAdmin && (
+                <Button danger icon={<DeleteOutlined />} onClick={handleDeleteEvent}>
+                  Delete
+                </Button>
+              )}
             </div>
           </Card>
 
@@ -380,7 +391,8 @@ const EventDetails = () => {
 
           <Tabs
             items={[
-              {
+              // ── Organizer/Admin-only tabs ──
+              ...(isOrgOrAdmin ? [{
                 key: 'guest_comms',
                 label: 'Invite & guest updates',
                 children: (
@@ -403,48 +415,46 @@ const EventDetails = () => {
                         </Text>
                       )}
                     </Paragraph>
-                    {(user?.role === 'organizer' || user?.role === 'admin') ? (
-                      <div className="event-share-panel">
-                        <Space wrap align="start" className="event-share-panel__controls">
-                          <div>
-                            <Text strong>QR destination</Text>
-                            <Select
-                              value={qrDestinationType}
-                              onChange={(value) => {
-                                setQrDestinationType(value);
-                                saveShareSettings(value);
-                              }}
-                              loading={shareSaving}
-                              style={{ width: 220, display: 'block', marginTop: 8 }}
-                              options={[
-                                { value: 'auto', label: 'Auto: prefer Netlify' },
-                                { value: 'netlify', label: 'Netlify microsite' },
-                                { value: 'public', label: 'Internal public page' },
-                              ]}
-                            />
-                          </div>
-                          <div>
-                            <Text strong>Quick actions</Text>
-                            <Space wrap style={{ display: 'flex', marginTop: 8 }}>
-                              <Button icon={<CopyOutlined />} onClick={copyShareLink} disabled={!shareDestinationUrl}>
-                                Copy share link
-                              </Button>
-                              <Button href={shareDestinationUrl || undefined} target="_blank" disabled={!shareDestinationUrl}>
-                                Open destination
-                              </Button>
-                            </Space>
-                          </div>
-                        </Space>
-                        {shareQrCodeDataUrl ? (
-                          <div className="event-share-panel__qr">
-                            <Image width={172} src={shareQrCodeDataUrl} alt="Share QR code" preview={false} />
-                            <Text type="secondary">
-                              Print this QR on physical invites to send guests to the selected destination.
-                            </Text>
-                          </div>
-                        ) : null}
-                      </div>
-                    ) : null}
+                    <div className="event-share-panel">
+                      <Space wrap align="start" className="event-share-panel__controls">
+                        <div>
+                          <Text strong>QR destination</Text>
+                          <Select
+                            value={qrDestinationType}
+                            onChange={(value) => {
+                              setQrDestinationType(value);
+                              saveShareSettings(value);
+                            }}
+                            loading={shareSaving}
+                            style={{ width: 220, display: 'block', marginTop: 8 }}
+                            options={[
+                              { value: 'auto', label: 'Auto: prefer Netlify' },
+                              { value: 'netlify', label: 'Netlify microsite' },
+                              { value: 'public', label: 'Internal public page' },
+                            ]}
+                          />
+                        </div>
+                        <div>
+                          <Text strong>Quick actions</Text>
+                          <Space wrap style={{ display: 'flex', marginTop: 8 }}>
+                            <Button icon={<CopyOutlined />} onClick={copyShareLink} disabled={!shareDestinationUrl}>
+                              Copy share link
+                            </Button>
+                            <Button href={shareDestinationUrl || undefined} target="_blank" disabled={!shareDestinationUrl}>
+                              Open destination
+                            </Button>
+                          </Space>
+                        </div>
+                      </Space>
+                      {shareQrCodeDataUrl ? (
+                        <div className="event-share-panel__qr">
+                          <Image width={172} src={shareQrCodeDataUrl} alt="Share QR code" preview={false} />
+                          <Text type="secondary">
+                            Print this QR on physical invites to send guests to the selected destination.
+                          </Text>
+                        </div>
+                      ) : null}
+                    </div>
                     <Paragraph type="secondary">
                       Guests can use that destination to view event details, open location, send UPI gifts,
                       upload remote-blessing photos for your AI collage, and you receive in-app alerts when photos arrive.
@@ -507,7 +517,7 @@ const EventDetails = () => {
                     </Button>
                   </Card>
                 ),
-              },
+              }] : []),
               {
                 key: 'overview',
                 label: 'Overview',
@@ -551,7 +561,8 @@ const EventDetails = () => {
                   </Card>
                 ),
               },
-              {
+              // ── Organizer/Admin-only: Guests tab ──
+              ...(isOrgOrAdmin ? [{
                 key: 'guests',
                 label: `Guests (${guests.length})`,
                 children: (
@@ -559,30 +570,33 @@ const EventDetails = () => {
                     <Table dataSource={guests} columns={guestColumns} pagination={false} />
                   </Card>
                 ),
-              },
+              }] : []),
               {
                 key: 'vendors',
                 label: `Vendors (${bookings.length})`,
                 children: (
                   <Card
                     extra={
-                      <Link to="/vendors">
-                        <Button type="primary" icon={<ShopOutlined />}>
-                          Browse Vendors
-                        </Button>
-                      </Link>
+                      isOrgOrAdmin ? (
+                        <Link to="/vendors">
+                          <Button type="primary" icon={<ShopOutlined />}>
+                            Browse Vendors
+                          </Button>
+                        </Link>
+                      ) : null
                     }
                   >
                     <Table
                       dataSource={bookings}
-                      columns={bookingColumns}
+                      columns={isCustomer ? bookingColumns.filter(c => c.key !== 'actions') : bookingColumns}
                       rowKey="id"
                       pagination={false}
                     />
                   </Card>
                 ),
               },
-              {
+              // ── Organizer/Admin-only: Invite Videos tab ──
+              ...(isOrgOrAdmin ? [{
                 key: 'invite_videos',
                 label: (
                   <span>
@@ -592,8 +606,9 @@ const EventDetails = () => {
                 children: (
                   <InviteVideoManager eventId={Number(eventId)} guests={guests} />
                 ),
-              },
+              }] : []),
             ]}
+            defaultActiveKey={isCustomer ? 'overview' : 'guest_comms'}
             style={{ marginTop: '24px' }}
           />
         </>

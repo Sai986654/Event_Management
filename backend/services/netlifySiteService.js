@@ -17,7 +17,8 @@ const toIsoDateTime = (value) => {
   return date && !Number.isNaN(date.getTime()) ? date.toISOString() : '';
 };
 
-const htmlForEvent = (event, mediaUrls = []) => {
+const htmlForEvent = (event, mediaUrls = [], opts = {}) => {
+  const { giftQrDataUrl, giftUpiId, giftPayeeName, giftNote, apiBaseUrl, eventSlug } = opts;
   const title = event.title || 'Event Celebration';
   const venue = [event.venue, event.city, event.state].filter(Boolean).join(', ');
   const dateIso = toIsoDateTime(event.date);
@@ -151,6 +152,33 @@ const htmlForEvent = (event, mediaUrls = []) => {
     .gallery-item img { width: 100%; height: 100%; object-fit: cover; transition: transform .4s; cursor: pointer; }
     .gallery-item:hover img { transform: scale(1.05); }
 
+    /* ── Gifting ── */
+    .gift-section { background: linear-gradient(135deg, #fef9f0 0%, #fdf2f8 100%); border-radius: 14px; padding: 36px; text-align: center; box-shadow: 0 2px 12px rgba(0,0,0,.06); }
+    .gift-section h2 { font-family: 'Playfair Display', serif; font-size: 28px; margin-bottom: 8px; }
+    .gift-sub { color: #666; margin-bottom: 24px; font-size: 15px; }
+    .gift-qr { display: inline-block; background: #fff; padding: 16px; border-radius: 14px; box-shadow: 0 4px 20px rgba(0,0,0,.08); }
+    .gift-qr img { width: 200px; height: 200px; }
+    .gift-info { margin-top: 16px; color: #555; font-size: 14px; }
+    .gift-info strong { color: #1a1a2e; }
+
+    /* ── Photo Upload ── */
+    .upload-section { background: #fff; border-radius: 14px; padding: 36px; box-shadow: 0 2px 12px rgba(0,0,0,.06); }
+    .upload-form { max-width: 480px; margin: 24px auto 0; text-align: left; }
+    .upload-form label { display: block; font-size: 14px; font-weight: 600; color: #333; margin-bottom: 6px; }
+    .upload-form input, .upload-form textarea { width: 100%; padding: 10px 14px; border: 1px solid #ddd; border-radius: 10px; font-size: 14px; font-family: inherit; margin-bottom: 16px; }
+    .upload-form input:focus, .upload-form textarea:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,.15); }
+    .upload-form textarea { resize: vertical; min-height: 70px; }
+    .upload-btn {
+      display: inline-flex; align-items: center; gap: 8px; padding: 12px 28px; border: none; border-radius: 10px;
+      background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; font-size: 15px; font-weight: 600;
+      cursor: pointer; transition: transform .2s, box-shadow .2s; width: 100%;  justify-content: center;
+    }
+    .upload-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(102,126,234,.35); }
+    .upload-btn:disabled { opacity: .6; cursor: not-allowed; transform: none; }
+    .upload-msg { margin-top: 12px; padding: 12px; border-radius: 10px; font-size: 14px; text-align: center; }
+    .upload-msg.ok { background: #ecfdf5; color: #065f46; }
+    .upload-msg.err { background: #fef2f2; color: #991b1b; }
+
     /* ── Lightbox ── */
     .lightbox {
       display: none; position: fixed; inset: 0; z-index: 1000; background: rgba(0,0,0,.92);
@@ -266,6 +294,45 @@ const htmlForEvent = (event, mediaUrls = []) => {
         ${photoCards}
       </div>
     </section>` : ''}
+
+    ${giftQrDataUrl ? `
+    <!-- Gifting -->
+    <section class="section" style="padding-top:0">
+      <div class="gift-section">
+        <h2>Send Your Blessings &#127873;</h2>
+        <p class="gift-sub">Can't make it in person? You can still be part of the celebration — send a gift via UPI.</p>
+        <div class="gift-qr">
+          <img src="${giftQrDataUrl}" alt="Gift QR Code" />
+        </div>
+        <div class="gift-info">
+          <p><strong>${escHtml(giftPayeeName || 'Event Family')}</strong></p>
+          ${giftUpiId ? `<p>UPI: ${escHtml(giftUpiId)}</p>` : ''}
+          ${giftNote ? `<p style="color:#888;font-style:italic">${escHtml(giftNote)}</p>` : ''}
+        </div>
+      </div>
+    </section>` : ''}
+
+    ${apiBaseUrl && eventSlug ? `
+    <!-- Guest Photo Upload -->
+    <section class="section" style="padding-top:0">
+      <div class="upload-section" style="text-align:center">
+        <h2 class="section-title" style="display:inline-block">Share Your Photos &#128247;</h2>
+        <p style="color:#666;margin-bottom:8px">Upload your photos with a message. They'll appear in the event album after approval.</p>
+        <form id="photoForm" class="upload-form">
+          <label for="guestName">Your Name</label>
+          <input type="text" id="guestName" placeholder="Enter your name" required />
+          <label for="caption">Message / Caption</label>
+          <textarea id="caption" placeholder="Write a message or blessing..."></textarea>
+          <label for="photoFile">Choose Photo</label>
+          <input type="file" id="photoFile" accept="image/*" required />
+          <button type="submit" class="upload-btn" id="uploadBtn">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z"/></svg>
+            Upload Photo
+          </button>
+          <div id="uploadMsg" class="upload-msg" style="display:none"></div>
+        </form>
+      </div>
+    </section>` : ''}
   </div>
 
   <!-- Lightbox -->
@@ -306,36 +373,103 @@ const htmlForEvent = (event, mediaUrls = []) => {
       img.addEventListener('click', function() { lbImg.src = this.src; lb.classList.add('active'); });
     });
     lb.addEventListener('click', function() { lb.classList.remove('active'); });
+
+    /* ── Photo Upload ── */
+    var form = document.getElementById('photoForm');
+    if (form) {
+      form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        var btn = document.getElementById('uploadBtn');
+        var msgEl = document.getElementById('uploadMsg');
+        var name = document.getElementById('guestName').value.trim();
+        var caption = document.getElementById('caption').value.trim();
+        var file = document.getElementById('photoFile').files[0];
+        if (!name || !file) return;
+        btn.disabled = true;
+        btn.textContent = 'Uploading...';
+        msgEl.style.display = 'none';
+        var fd = new FormData();
+        fd.append('file', file);
+        fd.append('guestName', name);
+        fd.append('caption', caption || 'Photo from ' + name);
+        fd.append('eventSlug', '${eventSlug || ''}');
+        fetch('${apiBaseUrl || ''}/api/media/public-blessing', { method: 'POST', body: fd })
+          .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
+          .then(function(res) {
+            msgEl.style.display = 'block';
+            if (res.ok) {
+              msgEl.className = 'upload-msg ok';
+              msgEl.textContent = 'Thank you, ' + name + '! Your photo has been submitted.';
+              form.reset();
+            } else {
+              msgEl.className = 'upload-msg err';
+              msgEl.textContent = res.data.message || 'Upload failed. Please try again.';
+            }
+          })
+          .catch(function() {
+            msgEl.style.display = 'block';
+            msgEl.className = 'upload-msg err';
+            msgEl.textContent = 'Network error. Please try again.';
+          })
+          .finally(function() { btn.disabled = false; btn.textContent = 'Upload Photo'; });
+      });
+    }
   </script>
 </body>
 </html>`;
 };
 
-const deployEventToNetlify = async (event, mediaUrls = []) => {
+const deployEventToNetlify = async (event, mediaUrls = [], opts = {}) => {
   const { token, teamSlug } = ensureConfig();
-  const baseSlug = String(event.slug || event.title || 'event').toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').slice(0, 42);
-  const siteName = `eventos-${baseSlug}-${Date.now().toString(36)}`;
-  const html = htmlForEvent(event, mediaUrls);
+  const html = htmlForEvent(event, mediaUrls, opts);
   const hash = createHash('sha1').update(html).digest('hex');
 
-  const accountQuery = teamSlug ? `?account_slug=${encodeURIComponent(teamSlug)}` : '';
-  const createSiteRes = await fetch(`${NETLIFY_API_BASE}/sites${accountQuery}`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ name: siteName }),
-  });
+  let siteId = event.netlifySiteId || null;
+  let siteUrl = event.netlifySiteUrl || null;
+  let siteName = null;
 
-  if (!createSiteRes.ok) {
-    const errText = await createSiteRes.text();
-    throw new Error(`Failed to create Netlify site: ${errText}`);
+  // ── Reuse existing site or create a new one ──
+  if (siteId) {
+    // Verify the site still exists on Netlify
+    const checkRes = await fetch(`${NETLIFY_API_BASE}/sites/${siteId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (checkRes.ok) {
+      const existing = await checkRes.json();
+      siteName = existing.name;
+      siteUrl = existing.ssl_url || existing.url || siteUrl;
+    } else {
+      // Site was deleted externally — create a fresh one
+      siteId = null;
+    }
   }
 
-  const site = await createSiteRes.json();
+  if (!siteId) {
+    const baseSlug = String(event.slug || event.title || 'event').toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').slice(0, 42);
+    const newSiteName = `eventos-${baseSlug}-${Date.now().toString(36)}`;
+    const accountQuery = teamSlug ? `?account_slug=${encodeURIComponent(teamSlug)}` : '';
+    const createSiteRes = await fetch(`${NETLIFY_API_BASE}/sites${accountQuery}`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ name: newSiteName }),
+    });
 
-  const createDeployRes = await fetch(`${NETLIFY_API_BASE}/sites/${site.id}/deploys`, {
+    if (!createSiteRes.ok) {
+      const errText = await createSiteRes.text();
+      throw new Error(`Failed to create Netlify site: ${errText}`);
+    }
+
+    const site = await createSiteRes.json();
+    siteId = site.id;
+    siteName = site.name;
+    siteUrl = site.ssl_url || site.url;
+  }
+
+  // ── Deploy updated HTML to the site ──
+  const createDeployRes = await fetch(`${NETLIFY_API_BASE}/sites/${siteId}/deploys`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
@@ -366,9 +500,9 @@ const deployEventToNetlify = async (event, mediaUrls = []) => {
   }
 
   return {
-    siteId: site.id,
-    siteName: site.name,
-    siteUrl: site.ssl_url || site.url,
+    siteId,
+    siteName,
+    siteUrl,
     deployId: deploy.id,
   };
 };

@@ -48,6 +48,22 @@
   gap: 8px;
 }
 
+/* Override Ant Design button text color inside the gradient header */
+.event-actions .ant-btn-default {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: transparent;
+  color: #333;
+}
+
+.event-actions .ant-btn-default:hover {
+  background: #fff;
+  color: #1a1a2e;
+}
+
+.event-actions .ant-badge-status-text {
+  color: rgba(255, 255, 255, 0.95);
+}
+
 .event-netlify-card {
   margin-bottom: 16px;
   border: 1px solid #d7e6f4;

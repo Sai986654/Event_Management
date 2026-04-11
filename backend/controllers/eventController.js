@@ -267,8 +267,32 @@ exports.publishEventNetlify = asyncHandler(async (req, res) => {
   });
   const mediaUrls = media.map((m) => m.url);
 
+  // Build gifting QR code for the microsite
+  let giftQrDataUrl = '';
+  let giftUpiId = '';
+  let giftPayeeName = '';
+  let giftNote = '';
+  if (gifting.enabled && gifting.upiId) {
+    const upiLink = `upi://pay?pa=${encodeURIComponent(gifting.upiId)}&pn=${encodeURIComponent(gifting.payeeName)}&tn=${encodeURIComponent(gifting.defaultNote)}`;
+    giftQrDataUrl = await QRCode.toDataURL(upiLink, { width: 300, margin: 1 });
+    giftUpiId = gifting.upiId;
+    giftPayeeName = gifting.payeeName;
+    giftNote = gifting.defaultNote;
+  }
+
+  const apiBaseUrl = process.env.API_BASE_URL || process.env.SERVER_URL || '';
+
   try {
-    const deployed = await deployEventToNetlify(event, mediaUrls);
+    const deployed = await deployEventToNetlify(event, mediaUrls, {
+      giftQrDataUrl,
+      giftUpiId,
+      giftPayeeName,
+      giftNote,
+      apiBaseUrl,
+      eventSlug: event.slug,
+    });
+
+    const isUpdate = !!event.netlifySiteId;
 
     const updated = await prisma.event.update({
       where: { id: eventId },
@@ -283,11 +307,13 @@ exports.publishEventNetlify = asyncHandler(async (req, res) => {
     const origin = process.env.CLIENT_URL || req.get('origin') || 'http://localhost:3000';
     const sharePayload = await buildSharePayload(updated, origin);
 
-    res.status(201).json({
+    res.status(isUpdate ? 200 : 201).json({
       event: updated,
       ...sharePayload,
       site: deployed,
-      message: 'Event microsite published on Netlify',
+      message: isUpdate
+        ? 'Event microsite updated on Netlify'
+        : 'Event microsite published on Netlify',
     });
   } catch (err) {
     res.status(502).json({
