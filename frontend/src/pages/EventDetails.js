@@ -19,7 +19,7 @@ import {
   Select,
   Image,
 } from 'antd';
-import { EditOutlined, DeleteOutlined, ControlOutlined, ShopOutlined, CopyOutlined } from '@ant-design/icons';
+import { EditOutlined, DeleteOutlined, ControlOutlined, ShopOutlined, CopyOutlined, VideoCameraOutlined } from '@ant-design/icons';
 import { eventService } from '../services/eventService';
 import { guestService } from '../services/guestService';
 import { bookingService } from '../services/bookingService';
@@ -27,6 +27,7 @@ import { useEventSocket } from '../hooks/useEventSocket';
 import { formatDate, formatCurrency, getErrorMessage } from '../utils/helpers';
 import { notificationService } from '../services/notificationService';
 import { AuthContext } from '../context/AuthContext';
+import InviteVideoManager from '../components/InviteVideoManager';
 import './EventDetails.css';
 
 const { TextArea } = Input;
@@ -579,6 +580,17 @@ const EventDetails = () => {
                       pagination={false}
                     />
                   </Card>
+                ),
+              },
+              {
+                key: 'invite_videos',
+                label: (
+                  <span>
+                    <VideoCameraOutlined /> Invite Videos
+                  </span>
+                ),
+                children: (
+                  <InviteVideoManager eventId={Number(eventId)} guests={guests} />
                 ),
               },
             ]}

@@ -24,6 +24,7 @@ const orderRoutes = require('./routes/orderRoutes');
 const activityRoutes = require('./routes/activityRoutes');
 const appNotificationRoutes = require('./routes/appNotificationRoutes');
 const locationRoutes = require('./routes/locationRoutes');
+const inviteVideoRoutes = require('./routes/inviteVideoRoutes');
 
 const app = express();
 const server = http.createServer(app);
@@ -72,6 +73,7 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/activities', activityRoutes);
 app.use('/api/app-notifications', appNotificationRoutes);
 app.use('/api/location', locationRoutes);
+app.use('/api/invite-videos', inviteVideoRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

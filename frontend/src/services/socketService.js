@@ -114,4 +114,9 @@ export const socketService = {
     socket?.on('notification:new', callback);
     return () => socket?.off('notification:new', callback);
   },
+
+  onInviteJobProgress: (callback) => {
+    socket?.on('invite-job-progress', callback);
+    return () => socket?.off('invite-job-progress', callback);
+  },
 };

@@ -16,9 +16,9 @@ exports.uploadMedia = asyncHandler(async (req, res) => {
     const result = await uploadFile(req.file.buffer, `eventos/${req.body.event}`, { contentType: req.file.mimetype });
     url = result.url;
     publicId = result.publicId;
-  } catch {
-    url = `https://placehold.co/1200x675/png?text=${encodeURIComponent('EventOS Media Preview')}`;
-    publicId = null;
+  } catch (err) {
+    console.error('[MediaUpload] R2 upload failed:', err.message);
+    return res.status(502).json({ message: 'File storage upload failed. Check R2 configuration.' });
   }
 
   const media = await prisma.media.create({
@@ -118,9 +118,9 @@ exports.uploadPublicBlessing = asyncHandler(async (req, res) => {
     const result = await uploadFile(req.file.buffer, `eventos/public-blessings/${event.id}`, { contentType: req.file.mimetype });
     url = result.url;
     publicId = result.publicId;
-  } catch {
-    url = `https://placeholder.eventos.dev/${Date.now()}-${req.file.originalname}`;
-    publicId = null;
+  } catch (err) {
+    console.error('[PublicBlessing] R2 upload failed:', err.message);
+    return res.status(502).json({ message: 'File storage upload failed. Check R2 configuration.' });
   }
 
   const media = await prisma.media.create({

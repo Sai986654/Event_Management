@@ -37,6 +37,7 @@ export const useEventSocket = (eventId, handlers = {}) => {
     if (handlers.onGuestCheckin) cleanups.push(ctx.onGuestCheckin(handlers.onGuestCheckin));
     if (handlers.onBookingCreated) cleanups.push(ctx.onBookingCreated(handlers.onBookingCreated));
     if (handlers.onBookingUpdated) cleanups.push(ctx.onBookingUpdated(handlers.onBookingUpdated));
+    if (handlers.onInviteJobProgress) cleanups.push(ctx.onInviteJobProgress(handlers.onInviteJobProgress));
 
     return () => cleanups.forEach((unsub) => unsub());
   }, [ctx?.connected]); // eslint-disable-line react-hooks/exhaustive-deps

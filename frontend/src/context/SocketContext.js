@@ -62,6 +62,7 @@ export const SocketProvider = ({ children }) => {
     onBookingCreated: socketService.onBookingCreated,
     onBookingUpdated: socketService.onBookingUpdated,
     onNotificationNew: socketService.onNotificationNew,
+    onInviteJobProgress: socketService.onInviteJobProgress,
     joinUser: socketService.joinUser,
   };
 

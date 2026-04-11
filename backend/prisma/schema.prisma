@@ -195,6 +195,7 @@ model Event {
   budgetRec Budget?
   reviews   Review[]
   media     Media[]
+  inviteJobs InviteJob[]
 
   @@index([organizerId, date])
   @@index([status])
@@ -446,4 +447,54 @@ model Media {
 
   @@index([eventId])
   @@map("media")
+}
+
+// ── Invite Video System ──────────────────────────────────────────────
+
+enum InviteJobStatus {
+  pending
+  processing
+  completed
+  failed
+}
+
+model InviteJob {
+  id          Int             @id @default(autoincrement())
+  eventId     Int             @map("event_id")
+  status      InviteJobStatus @default(pending)
+  templateKey String?         @map("template_key") @db.VarChar(500)   // R2 folder e.g. templates/{id}
+  musicKey    String?         @map("music_key") @db.VarChar(500)
+  imageKeys   Json            @default("[]") @map("image_keys")       // array of R2 keys
+  totalGuests Int             @default(0) @map("total_guests")
+  processed   Int             @default(0)
+  failed      Int             @default(0)
+  error       String?         @db.Text
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+
+  event       Event           @relation(fields: [eventId], references: [id])
+  guestVideos InviteGuestVideo[]
+
+  @@index([eventId, status])
+  @@map("invite_jobs")
+}
+
+model InviteGuestVideo {
+  id          Int             @id @default(autoincrement())
+  jobId       Int             @map("job_id")
+  guestName   String          @map("guest_name") @db.VarChar(200)
+  phone       String          @db.VarChar(20)
+  status      InviteJobStatus @default(pending)
+  videoKey    String?         @map("video_key") @db.VarChar(500)
+  videoUrl    String?         @map("video_url") @db.VarChar(500)
+  messageSent Boolean         @default(false) @map("message_sent")
+  retries     Int             @default(0)
+  error       String?         @db.Text
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+
+  job         InviteJob       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId, status])
+  @@map("invite_guest_videos")
 }

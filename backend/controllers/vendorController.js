@@ -86,11 +86,9 @@ exports.uploadVendorMedia = asyncHandler(async (req, res) => {
   let uploaded = null;
   try {
     uploaded = await uploadFile(req.file.buffer, `eventos/vendor-${vendor.id}`, { contentType: req.file.mimetype });
-  } catch {
-    uploaded = {
-      url: `https://placeholder.eventos.dev/${Date.now()}-${req.file.originalname || 'vendor-upload'}`,
-      publicId: null,
-    };
+  } catch (err) {
+    console.error('[VendorMedia] R2 upload failed:', err.message);
+    return res.status(502).json({ message: 'File storage upload failed. Check R2 configuration.' });
   }
 
   const existingPortfolio = Array.isArray(vendor.portfolio) ? vendor.portfolio : [];

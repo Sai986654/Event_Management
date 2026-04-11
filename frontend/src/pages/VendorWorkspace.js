@@ -221,13 +221,16 @@ const VendorWorkspace = () => {
 
         <Col span={24}>
           <Card className="phase-card" title="Portfolio Media">
+            {!vendor ? (
+              <div className="phase-empty">Create your vendor profile first to upload portfolio media.</div>
+            ) : (
+            <>
             <Row gutter={[16, 16]} align="middle">
               <Col xs={24} md={16}>
                 <Input
                   placeholder="Optional caption for this media"
                   value={mediaCaption}
                   onChange={(e) => setMediaCaption(e.target.value)}
-                  disabled={!vendor}
                 />
               </Col>
               <Col xs={24} md={8}>
@@ -235,7 +238,7 @@ const VendorWorkspace = () => {
                   accept="image/*,video/*"
                   showUploadList={false}
                   customRequest={handlePortfolioUpload}
-                  disabled={!vendor || uploadingMedia}
+                  disabled={uploadingMedia}
                 >
                   <Button type="primary" icon={<PlusOutlined />} loading={uploadingMedia} block>
                     Upload media
@@ -260,6 +263,8 @@ const VendorWorkspace = () => {
                 ))
               )}
             </div>
+            </>
+            )}
           </Card>
         </Col>
       </Row>

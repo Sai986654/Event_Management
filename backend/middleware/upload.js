@@ -4,7 +4,7 @@ const path = require('path');
 const storage = multer.memoryStorage();
 
 const fileFilter = (req, file, cb) => {
-  const allowedTypes = /jpeg|jpg|png|gif|mp4|mov|webm/;
+  const allowedTypes = /jpeg|jpg|png|gif|mp4|mov|webm|mp3|mpeg|wav|ogg|audio/;
   const ext = file.originalname
     ? path.extname(file.originalname).toLowerCase()
     : '';
@@ -15,7 +15,7 @@ const fileFilter = (req, file, cb) => {
   if (extOk && mimeOk) {
     cb(null, true);
   } else {
-    cb(new Error('Only image and video files are allowed'), false);
+    cb(new Error('Only image, video, and audio files are allowed'), false);
   }
 };
 
