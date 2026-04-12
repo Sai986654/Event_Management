@@ -1,8 +1,8 @@
-# EventOS - Complete Setup Guide
+# Vedika 360 - Complete Setup Guide
 
 ## Project Overview
 
-EventOS is a production-ready MERN (MongoDB/PostgreSQL, Express.js, React, Node.js) application for technology-driven event management. The project is now complete with both backend and frontend implementations.
+Vedika 360 is a production-ready MERN (MongoDB/PostgreSQL, Express.js, React, Node.js) application for technology-driven event management. The project is now complete with both backend and frontend implementations.
 
 ## Frontend Implementation Complete ✅
 
@@ -350,7 +350,7 @@ npm test
 ```bash
 # Build and push images
 docker-compose build
-docker push yourusername/eventos-frontend:latest
+docker push yourusername/vedika360-frontend:latest
 
 # Deploy to server
 docker-compose -f docker-compose.prod.yml up -d

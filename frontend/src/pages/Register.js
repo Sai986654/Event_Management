@@ -21,7 +21,7 @@ const Register = () => {
         password: values.password,
         role: values.role,
       });
-      message.success('Registration successful! Welcome to EventOS');
+      message.success('Registration successful! Welcome to Vedika 360');
       navigate('/dashboard');
     } catch (error) {
       message.error(getErrorMessage(error));
@@ -34,7 +34,7 @@ const Register = () => {
     <div className="auth-container">
       <Card className="auth-card">
         <h1 className="auth-title">Create Your Account</h1>
-        <p className="auth-subtitle">Join EventOS and start planning amazing events</p>
+        <p className="auth-subtitle">Join Vedika 360 and start planning amazing events</p>
 
         <Form form={form} layout="vertical" onFinish={onFinish}>
           <Form.Item

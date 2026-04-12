@@ -93,7 +93,7 @@ exports.updateRSVP = asyncHandler(async (req, res) => {
   if (updated.email) {
     await sendEmail({
       to: updated.email,
-      subject: 'RSVP Confirmation - EventOS',
+      subject: 'RSVP Confirmation - Vedika 360',
       html: `<p>Hi ${updated.name}, your RSVP status is now: <strong>${updated.rsvpStatus}</strong>.</p>`,
     });
   }

@@ -24,7 +24,7 @@ exports.createBooking = asyncHandler(async (req, res) => {
 
   await sendEmail({
     to: req.user.email,
-    subject: 'Booking Confirmation - EventOS',
+    subject: 'Booking Confirmation - Vedika 360',
     html: `<p>Your booking with vendor has been created. Status: pending.</p>`,
   });
 

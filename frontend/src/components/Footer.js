@@ -9,7 +9,7 @@ const Footer = () => {
     <Layout.Footer className="footer">
       <div className="footer-content">
         <div className="footer-section">
-          <h3>EventOS</h3>
+          <h3>Vedika 360</h3>
           <p>Technology-driven event management platform</p>
         </div>
 
@@ -34,7 +34,7 @@ const Footer = () => {
       </div>
 
       <div className="footer-bottom">
-        <p>&copy; {currentYear} EventOS. All rights reserved.</p>
+        <p>&copy; {currentYear} Vedika 360. All rights reserved.</p>
       </div>
     </Layout.Footer>
   );

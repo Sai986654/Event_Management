@@ -99,7 +99,7 @@ const Header = () => {
     <Layout.Header className="header">
       <div className="header-container">
         <Link to="/" className="logo">
-          EventOS
+          Vedika 360
         </Link>
 
         {user ? (

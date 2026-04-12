@@ -521,7 +521,7 @@ const htmlForEvent = (event, mediaUrls = [], opts = {}) => {
   </div>
 
   <!-- Footer -->
-  <div class="footer">Made with &#10084;&#65039; &middot; Powered by Eventos</div>
+  <div class="footer">Made with &#10084;&#65039; &middot; Powered by Vedika 360</div>
 
   <script>
     /* ── Countdown ── */
@@ -712,7 +712,7 @@ const deployEventToNetlify = async (event, mediaUrls = [], opts = {}) => {
 
   if (!siteId) {
     const baseSlug = String(event.slug || event.title || 'event').toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').slice(0, 42);
-    const newSiteName = `eventos-${baseSlug}-${Date.now().toString(36)}`;
+    const newSiteName = `vedika360-${baseSlug}-${Date.now().toString(36)}`;
     const accountQuery = teamSlug ? `?account_slug=${encodeURIComponent(teamSlug)}` : '';
     const createSiteRes = await fetch(`${NETLIFY_API_BASE}/sites${accountQuery}`, {
       method: 'POST',

@@ -9,7 +9,7 @@ const { r2Client, R2_BUCKET, R2_PUBLIC_URL } = require('../config/r2');
  * @param {string} folder
  * @param {{ contentType?: string, originalname?: string }} opts
  */
-const uploadFile = async (fileBuffer, folder = 'eventos', opts = {}) => {
+const uploadFile = async (fileBuffer, folder = 'vedika360', opts = {}) => {
   const uniqueName = `${Date.now()}-${crypto.randomBytes(8).toString('hex')}`;
   const key = `${folder}/${uniqueName}`;
 

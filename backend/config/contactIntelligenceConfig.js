@@ -170,6 +170,6 @@ module.exports = {
     fromNumber: process.env.WHATSAPP_FROM_NUMBER || '',
     apiBaseUrl: process.env.WHATSAPP_API_BASE_URL || '',
     apiKey: process.env.WHATSAPP_API_KEY || '',
-    templatePrefix: process.env.WHATSAPP_TEMPLATE_PREFIX || 'eventos_',
+    templatePrefix: process.env.WHATSAPP_TEMPLATE_PREFIX || 'vedika360_',
   },
 };

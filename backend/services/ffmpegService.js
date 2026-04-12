@@ -4,7 +4,7 @@ const path = require('path');
 const os = require('os');
 const crypto = require('crypto');
 
-const TEMP_DIR = path.join(os.tmpdir(), 'eventos-invite');
+const TEMP_DIR = path.join(os.tmpdir(), 'vedika360-invite');
 
 /** Ensure temp directory exists. */
 function ensureTempDir() {

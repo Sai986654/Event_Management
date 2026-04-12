@@ -24,7 +24,7 @@ afterAll(async () => {
 describe('Auth API', () => {
   const testUser = {
     name: 'Test User',
-    email: `test${Date.now()}@eventos.com`,
+    email: `test${Date.now()}@vedika360.com`,
     password: 'password123',
     role: 'organizer',
   };
@@ -48,7 +48,7 @@ describe('Auth API', () => {
   it('POST /api/auth/register — should register admin/vendor/customer users for flow tests', async () => {
     const admin = await request(app).post('/api/auth/register').send({
       name: 'Admin Flow',
-      email: `adminflow${Date.now()}@eventos.com`,
+      email: `adminflow${Date.now()}@vedika360.com`,
       password: 'password123',
       role: 'admin',
     });
@@ -57,7 +57,7 @@ describe('Auth API', () => {
 
     const vendor = await request(app).post('/api/auth/register').send({
       name: 'Vendor Flow',
-      email: `vendorflow${Date.now()}@eventos.com`,
+      email: `vendorflow${Date.now()}@vedika360.com`,
       password: 'password123',
       role: 'vendor',
     });
@@ -66,7 +66,7 @@ describe('Auth API', () => {
 
     const customer = await request(app).post('/api/auth/register').send({
       name: 'Customer Flow',
-      email: `customerflow${Date.now()}@eventos.com`,
+      email: `customerflow${Date.now()}@vedika360.com`,
       password: 'password123',
       role: 'customer',
     });

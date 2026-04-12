@@ -1,4 +1,4 @@
-# EventOS — Event Management Platform
+# Vedika 360 — Event Management Platform
 
 Monorepo: **backend** (Node + Express + Prisma), **frontend** (React), **mobile** (Expo / React Native).
 

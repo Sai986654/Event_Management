@@ -1,4 +1,4 @@
-# EventOS Backend
+# Vedika 360 Backend
 
 FROM node:20-alpine
 

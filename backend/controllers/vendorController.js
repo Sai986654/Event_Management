@@ -85,7 +85,7 @@ exports.uploadVendorMedia = asyncHandler(async (req, res) => {
 
   let uploaded = null;
   try {
-    uploaded = await uploadFile(req.file.buffer, `eventos/vendor-${vendor.id}`, { contentType: req.file.mimetype });
+    uploaded = await uploadFile(req.file.buffer, `vedika360/vendor-${vendor.id}`, { contentType: req.file.mimetype });
   } catch (err) {
     console.error('[VendorMedia] R2 upload failed:', err.message);
     return res.status(502).json({ message: 'File storage upload failed. Check R2 configuration.' });

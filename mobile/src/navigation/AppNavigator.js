@@ -37,7 +37,7 @@ const VendorStack = () => (
 // Dashboard stack (dashboard → event create/detail)
 const DashboardStack = () => (
   <Stack.Navigator screenOptions={{ headerStyle: { backgroundColor: '#667eea' }, headerTintColor: '#fff' }}>
-    <Stack.Screen name="DashboardHome" component={DashboardScreen} options={{ title: 'EventOS' }} />
+    <Stack.Screen name="DashboardHome" component={DashboardScreen} options={{ title: 'Vedika 360' }} />
     <Stack.Screen name="EventCreate" component={EventCreateScreen} options={{ title: 'New Event' }} />
     <Stack.Screen name="EventDetail" component={EventDetailScreen} options={{ title: 'Event Details' }} />
     <Stack.Screen name="VendorWorkspace" component={VendorWorkspaceScreen} options={{ title: 'Vendor Workspace' }} />

@@ -1,4 +1,4 @@
-# Contributing to EventOS
+# Contributing to Vedika 360
 
 ## Repository structure
 

@@ -29,7 +29,7 @@ const Login = () => {
     <div className="auth-container">
       <Card className="auth-card">
         <h1 className="auth-title">Welcome Back</h1>
-        <p className="auth-subtitle">Sign in to your EventOS account</p>
+        <p className="auth-subtitle">Sign in to your Vedika 360 account</p>
 
         <Form form={form} layout="vertical" onFinish={onFinish}>
           <Form.Item

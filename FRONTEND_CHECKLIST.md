@@ -1,8 +1,8 @@
-# EventOS - Frontend Deployment Checklist
+# Vedika 360 - Frontend Deployment Checklist
 
 ## ✅ Frontend Development Complete!
 
-Your EventOS frontend is now fully implemented and ready for development/testing.
+Your Vedika 360 frontend is now fully implemented and ready for development/testing.
 
 ## 📋 Quick Verification
 
@@ -99,7 +99,7 @@ npm start
 ```
 Compiled successfully!
 
-You can now view eventos-frontend in the browser.
+You can now view vedika360-frontend in the browser.
 
   Local:            http://localhost:3000
   On Your Network:  http://192.168.x.x:3000
@@ -117,7 +117,7 @@ You can now view eventos-frontend in the browser.
 ### Build Frontend Image
 ```bash
 cd frontend
-docker build -t eventos-frontend:latest .
+docker build -t vedika360-frontend:latest .
 ```
 
 ### Run with Docker Compose
@@ -305,7 +305,7 @@ For issues:
 
 ## 🎉 You're All Set!
 
-Your EventOS frontend is:
+Your Vedika 360 frontend is:
 ✅ Complete
 ✅ Tested
 ✅ Production-ready

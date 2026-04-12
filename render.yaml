@@ -2,7 +2,7 @@
 # Do not run migrations only in CI; production applies them on each deploy/start.
 services:
   - type: web
-    name: eventos-backend
+    name: vedika360-backend
     runtime: docker
     # Monorepo: Dockerfile lives at repo root (see ./Dockerfile)
     dockerfilePath: ./Dockerfile
@@ -49,7 +49,7 @@ services:
 
   # Static React app (CRA). Set REACT_APP_* in Render dashboard to your API URL.
   - type: web
-    name: eventos-frontend
+    name: vedika360-frontend
     runtime: static
     rootDir: frontend
     buildCommand: npm ci && npm run build

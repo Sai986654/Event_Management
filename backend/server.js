@@ -89,7 +89,7 @@ const PORT = process.env.PORT || 5000;
 const start = async () => {
   await connectDB();
   server.listen(PORT, () => {
-    console.log(`EventOS server running on port ${PORT}`);
+    console.log(`Vedika 360 server running on port ${PORT}`);
   });
 
   if (String(process.env.INVITE_DRIP_ENABLED || 'true').toLowerCase() !== 'false') {

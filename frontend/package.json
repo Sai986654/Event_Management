@@ -1,7 +1,7 @@
 {
-  "name": "eventos-frontend",
+  "name": "vedika360-frontend",
   "version": "1.0.0",
-  "description": "EventOS - Technology-driven event management platform Frontend",
+  "description": "Vedika 360 - Technology-driven event management platform Frontend",
   "private": true,
   "dependencies": {
     "react": "^18.2.0",

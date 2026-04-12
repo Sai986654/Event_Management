@@ -31,7 +31,7 @@ const seed = async () => {
   const admin = await prisma.user.create({
     data: {
       name: 'Admin User',
-      email: 'admin@eventos.com',
+      email: 'admin@vedika360.com',
       password: hashedPassword,
       role: 'admin',
     },
@@ -40,7 +40,7 @@ const seed = async () => {
   const organizer = await prisma.user.create({
     data: {
       name: 'Jane Organizer',
-      email: 'jane@eventos.com',
+      email: 'jane@vedika360.com',
       password: hashedPassword,
       role: 'organizer',
       phone: '+919876543210',
@@ -50,7 +50,7 @@ const seed = async () => {
   await prisma.user.create({
     data: {
       name: 'Sam Customer',
-      email: 'sam@eventos.com',
+      email: 'sam@vedika360.com',
       password: hashedPassword,
       role: 'customer',
       phone: '+919812345678',
@@ -60,7 +60,7 @@ const seed = async () => {
   const vendorUser1 = await prisma.user.create({
     data: {
       name: 'Chef Gordon',
-      email: 'gordon@eventos.com',
+      email: 'gordon@vedika360.com',
       password: hashedPassword,
       role: 'vendor',
     },
@@ -69,7 +69,7 @@ const seed = async () => {
   const vendorUser2 = await prisma.user.create({
     data: {
       name: 'Photo Phil',
-      email: 'phil@eventos.com',
+      email: 'phil@vedika360.com',
       password: hashedPassword,
       role: 'vendor',
     },
@@ -78,7 +78,7 @@ const seed = async () => {
   const vendorUser3 = await prisma.user.create({
     data: {
       name: 'DJ Marcus',
-      email: 'marcus@eventos.com',
+      email: 'marcus@vedika360.com',
       password: hashedPassword,
       role: 'vendor',
     },
@@ -87,7 +87,7 @@ const seed = async () => {
   const vendorUser4 = await prisma.user.create({
     data: {
       name: 'Flora Design',
-      email: 'flora@eventos.com',
+      email: 'flora@vedika360.com',
       password: hashedPassword,
       role: 'vendor',
     },
@@ -134,7 +134,7 @@ const seed = async () => {
       city: 'Hyderabad',
       state: 'Telangana',
       contactPhone: '+1111111111',
-      contactEmail: 'gordon@eventos.com',
+      contactEmail: 'gordon@vedika360.com',
       website: 'https://gordonscatering.example.com',
       averageRating: 4.8,
       totalReviews: 12,
@@ -182,7 +182,7 @@ const seed = async () => {
       city: 'Bengaluru',
       state: 'Karnataka',
       contactPhone: '+2222222222',
-      contactEmail: 'phil@eventos.com',
+      contactEmail: 'phil@vedika360.com',
       website: 'https://philsphotography.example.com',
       averageRating: 4.5,
       totalReviews: 8,
@@ -230,7 +230,7 @@ const seed = async () => {
       city: 'Chennai',
       state: 'Tamil Nadu',
       contactPhone: '+3333333333',
-      contactEmail: 'marcus@eventos.com',
+      contactEmail: 'marcus@vedika360.com',
       averageRating: 4.6,
       totalReviews: 15,
       isVerified: true,
@@ -277,7 +277,7 @@ const seed = async () => {
       city: 'Visakhapatnam',
       state: 'Andhra Pradesh',
       contactPhone: '+4444444444',
-      contactEmail: 'flora@eventos.com',
+      contactEmail: 'flora@vedika360.com',
       averageRating: 4.9,
       totalReviews: 20,
       isVerified: true,
@@ -287,16 +287,16 @@ const seed = async () => {
   });
 
   const additionalVendorBlueprints = [
-    { ownerName: 'Spice Route Caterers', email: 'spiceroute@eventos.com', businessName: 'Spice Route Caterers', category: 'catering', basePrice: 1800, city: 'Hyderabad', state: 'Telangana', rating: 4.7 },
-    { ownerName: 'Aaradhya Decor Studio', email: 'aaradhyadecor@eventos.com', businessName: 'Aaradhya Decor Studio', category: 'decor', basePrice: 1400, city: 'Vijayawada', state: 'Andhra Pradesh', rating: 4.6 },
-    { ownerName: 'LensCraft Weddings', email: 'lenscraft@eventos.com', businessName: 'LensCraft Weddings', category: 'photography', basePrice: 1500, city: 'Hyderabad', state: 'Telangana', rating: 4.8 },
-    { ownerName: 'FrameStory Films', email: 'framestory@eventos.com', businessName: 'FrameStory Films', category: 'videography', basePrice: 1700, city: 'Visakhapatnam', state: 'Andhra Pradesh', rating: 4.7 },
-    { ownerName: 'Sangeet Pulse', email: 'sangeetpulse@eventos.com', businessName: 'Sangeet Pulse', category: 'music', basePrice: 950, city: 'Hyderabad', state: 'Telangana', rating: 4.5 },
-    { ownerName: 'Lotus Grand Venues', email: 'lotusvenues@eventos.com', businessName: 'Lotus Grand Venues', category: 'venue', basePrice: 4000, city: 'Guntur', state: 'Andhra Pradesh', rating: 4.4 },
-    { ownerName: 'Petal Pooja Florals', email: 'petalpooja@eventos.com', businessName: 'Petal Pooja Florals', category: 'florist', basePrice: 700, city: 'Warangal', state: 'Telangana', rating: 4.6 },
-    { ownerName: 'RideRaja Logistics', email: 'rideraja@eventos.com', businessName: 'RideRaja Logistics', category: 'transportation', basePrice: 600, city: 'Hyderabad', state: 'Telangana', rating: 4.5 },
-    { ownerName: 'Elite Invitation House', email: 'eliteinvites@eventos.com', businessName: 'Elite Invitation House', category: 'other', basePrice: 500, city: 'Hyderabad', state: 'Telangana', rating: 4.4 },
-    { ownerName: 'Bridal Glow Artists', email: 'bridalglow@eventos.com', businessName: 'Bridal Glow Artists', category: 'other', basePrice: 1100, city: 'Tirupati', state: 'Andhra Pradesh', rating: 4.7 },
+    { ownerName: 'Spice Route Caterers', email: 'spiceroute@vedika360.com', businessName: 'Spice Route Caterers', category: 'catering', basePrice: 1800, city: 'Hyderabad', state: 'Telangana', rating: 4.7 },
+    { ownerName: 'Aaradhya Decor Studio', email: 'aaradhyadecor@vedika360.com', businessName: 'Aaradhya Decor Studio', category: 'decor', basePrice: 1400, city: 'Vijayawada', state: 'Andhra Pradesh', rating: 4.6 },
+    { ownerName: 'LensCraft Weddings', email: 'lenscraft@vedika360.com', businessName: 'LensCraft Weddings', category: 'photography', basePrice: 1500, city: 'Hyderabad', state: 'Telangana', rating: 4.8 },
+    { ownerName: 'FrameStory Films', email: 'framestory@vedika360.com', businessName: 'FrameStory Films', category: 'videography', basePrice: 1700, city: 'Visakhapatnam', state: 'Andhra Pradesh', rating: 4.7 },
+    { ownerName: 'Sangeet Pulse', email: 'sangeetpulse@vedika360.com', businessName: 'Sangeet Pulse', category: 'music', basePrice: 950, city: 'Hyderabad', state: 'Telangana', rating: 4.5 },
+    { ownerName: 'Lotus Grand Venues', email: 'lotusvenues@vedika360.com', businessName: 'Lotus Grand Venues', category: 'venue', basePrice: 4000, city: 'Guntur', state: 'Andhra Pradesh', rating: 4.4 },
+    { ownerName: 'Petal Pooja Florals', email: 'petalpooja@vedika360.com', businessName: 'Petal Pooja Florals', category: 'florist', basePrice: 700, city: 'Warangal', state: 'Telangana', rating: 4.6 },
+    { ownerName: 'RideRaja Logistics', email: 'rideraja@vedika360.com', businessName: 'RideRaja Logistics', category: 'transportation', basePrice: 600, city: 'Hyderabad', state: 'Telangana', rating: 4.5 },
+    { ownerName: 'Elite Invitation House', email: 'eliteinvites@vedika360.com', businessName: 'Elite Invitation House', category: 'other', basePrice: 500, city: 'Hyderabad', state: 'Telangana', rating: 4.4 },
+    { ownerName: 'Bridal Glow Artists', email: 'bridalglow@vedika360.com', businessName: 'Bridal Glow Artists', category: 'other', basePrice: 1100, city: 'Tirupati', state: 'Andhra Pradesh', rating: 4.7 },
   ];
 
   const additionalVendors = [];
@@ -408,7 +408,7 @@ const seed = async () => {
       },
       ...additionalVendors.slice(0, 6).map((vendor) => ({
         vendorId: vendor.id,
-        clientName: 'EventOS Client',
+        clientName: 'Vedika 360 Client',
         content: `${vendor.businessName} delivered a smooth and dependable service for our event.`,
         rating: 5,
         source: 'Direct',

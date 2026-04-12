@@ -29,7 +29,7 @@ const buildMockCollageDataUrl = ({ eventId, style, photoCount }) => {
   </defs>
   <rect width="1200" height="675" fill="url(#bg)"/>
   <rect x="60" y="60" width="1080" height="555" rx="22" fill="rgba(255,255,255,0.14)" stroke="rgba(255,255,255,0.34)"/>
-  <text x="90" y="180" font-family="Segoe UI, Arial" font-size="52" fill="#ffffff" font-weight="700">EventOS AI Collage Preview</text>
+  <text x="90" y="180" font-family="Segoe UI, Arial" font-size="52" fill="#ffffff" font-weight="700">Vedika 360 AI Collage Preview</text>
   <text x="90" y="250" font-family="Segoe UI, Arial" font-size="32" fill="#d9f6ff">Event #${eventId}</text>
   <text x="90" y="300" font-family="Segoe UI, Arial" font-size="32" fill="#d9f6ff">Style: ${style}</text>
   <text x="90" y="350" font-family="Segoe UI, Arial" font-size="32" fill="#d9f6ff">Photos used: ${photoCount}</text>

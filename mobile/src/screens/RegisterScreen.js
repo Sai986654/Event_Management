@@ -47,7 +47,7 @@ const RegisterScreen = ({ navigation }) => {
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         <View style={styles.card}>
           <Text variant="headlineMedium" style={styles.title}>Create Account</Text>
-          <Text variant="bodyMedium" style={styles.subtitle}>Join EventOS today</Text>
+          <Text variant="bodyMedium" style={styles.subtitle}>Join Vedika 360 today</Text>
 
           {error ? <HelperText type="error" visible>{error}</HelperText> : null}
 

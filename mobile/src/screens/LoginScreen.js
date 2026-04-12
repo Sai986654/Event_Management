@@ -37,7 +37,7 @@ const LoginScreen = ({ navigation }) => {
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         <View style={styles.card}>
           <Text variant="headlineMedium" style={styles.title}>Welcome Back</Text>
-          <Text variant="bodyMedium" style={styles.subtitle}>Sign in to your EventOS account</Text>
+          <Text variant="bodyMedium" style={styles.subtitle}>Sign in to your Vedika 360 account</Text>
 
           {error ? <HelperText type="error" visible>{error}</HelperText> : null}
 

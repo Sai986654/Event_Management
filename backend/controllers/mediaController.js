@@ -13,7 +13,7 @@ exports.uploadMedia = asyncHandler(async (req, res) => {
 
   let url, publicId;
   try {
-    const result = await uploadFile(req.file.buffer, `eventos/${req.body.event}`, { contentType: req.file.mimetype });
+    const result = await uploadFile(req.file.buffer, `vedika360/${req.body.event}`, { contentType: req.file.mimetype });
     url = result.url;
     publicId = result.publicId;
   } catch (err) {
@@ -115,7 +115,7 @@ exports.uploadPublicBlessing = asyncHandler(async (req, res) => {
   let url;
   let publicId;
   try {
-    const result = await uploadFile(req.file.buffer, `eventos/public-blessings/${event.id}`, { contentType: req.file.mimetype });
+    const result = await uploadFile(req.file.buffer, `vedika360/public-blessings/${event.id}`, { contentType: req.file.mimetype });
     url = result.url;
     publicId = result.publicId;
   } catch (err) {

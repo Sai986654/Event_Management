@@ -3,32 +3,32 @@ version: '3.8'
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: eventos-postgres
+    container_name: vedika360-postgres
     ports:
       - '5432:5432'
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: eventos
+      POSTGRES_DB: vedika360
     volumes:
       - pg-data:/var/lib/postgresql/data
 
   backend:
     build: ./backend
-    container_name: eventos-backend
+    container_name: vedika360-backend
     ports:
       - '5000:5000'
     env_file:
       - ./backend/.env
     environment:
-      - DATABASE_URL=postgres://postgres:postgres@postgres:5432/eventos
+      - DATABASE_URL=postgres://postgres:postgres@postgres:5432/vedika360
     depends_on:
       - postgres
     restart: unless-stopped
 
   frontend:
     build: ./frontend
-    container_name: eventos-frontend
+    container_name: vedika360-frontend
     ports:
       - '3000:3000'
     environment:

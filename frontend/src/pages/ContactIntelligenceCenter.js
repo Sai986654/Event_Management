@@ -10,7 +10,7 @@ const { Text, Paragraph } = Typography;
 const { TextArea } = Input;
 
 /** Browser cache for last analyzed segmentation (not sent to server). */
-const CONTACT_INTEL_STORAGE_KEY = 'eventos_contact_intelligence_v1';
+const CONTACT_INTEL_STORAGE_KEY = 'vedika360_contact_intelligence_v1';
 
 const LIST_OWNER_OPTIONS = [
   { value: 'unspecified', label: 'Whose list? — Not specified' },
@@ -69,7 +69,7 @@ const ContactIntelligenceCenter = () => {
   const [sending, setSending] = useState(false);
   const [analyzed, setAnalyzed] = useState(null);
   const [targetGroup, setTargetGroup] = useState('all');
-  const [reminderMessage, setReminderMessage] = useState('Namaste! Invitation reminder from EventOS. Please check your invite and RSVP.');
+  const [reminderMessage, setReminderMessage] = useState('Namaste! Invitation reminder from Vedika 360. Please check your invite and RSVP.');
   const [collageStatus, setCollageStatus] = useState(null);
   const [runningCollage, setRunningCollage] = useState(false);
   const [fetchingCollage, setFetchingCollage] = useState(false);

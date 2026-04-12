@@ -1,7 +1,7 @@
 {
-  "name": "eventos-backend",
+  "name": "vedika360-backend",
   "version": "1.0.0",
-  "description": "EventOS - Technology-driven event management platform API",
+  "description": "Vedika 360 - Technology-driven event management platform API",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

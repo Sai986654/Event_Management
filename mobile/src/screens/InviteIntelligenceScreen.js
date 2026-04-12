@@ -17,7 +17,7 @@ import { aiService } from '../services/aiService';
 import { getErrorMessage } from '../utils/helpers';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const CONTACT_INTEL_STORAGE_KEY = 'eventos_contact_intelligence_v1';
+const CONTACT_INTEL_STORAGE_KEY = 'vedika360_contact_intelligence_v1';
 
 const LIST_OWNER_OPTIONS = [
   { value: 'unspecified', label: 'Unspecified' },
@@ -69,7 +69,7 @@ const InviteIntelligenceScreen = () => {
   const [analyzed, setAnalyzed] = useState(null);
   const [targetGroup, setTargetGroup] = useState('all');
   const [reminderMessage, setReminderMessage] = useState(
-    'Namaste! Invitation reminder from EventOS. Please check your invite and RSVP.'
+    'Namaste! Invitation reminder from Vedika 360. Please check your invite and RSVP.'
   );
   const [collageStyle, setCollageStyle] = useState('traditional');
   const [collageStatus, setCollageStatus] = useState(null);

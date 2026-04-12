@@ -4,12 +4,31 @@ const http = require('http');
 /**
  * Text-to-Speech service abstraction.
  *
- * Default: Google Translate TTS (free, no API key, limited to ~200 chars).
- * Switch to a paid provider (ElevenLabs, Google Cloud TTS, AWS Polly)
- * by implementing the same interface.
+ * Providers:
+ *   'azure'      — Microsoft Azure Cognitive Services (500K chars/month FREE, excellent Indian language voices)
+ *   'elevenlabs' — ElevenLabs (paid, English-focused)
+ *   'gtts'       — Google Translate TTS (free, low quality, fallback)
  */
 
-const TTS_PROVIDER = process.env.TTS_PROVIDER || 'gtts'; // 'gtts' | 'elevenlabs'
+const TTS_PROVIDER = process.env.TTS_PROVIDER || 'gtts'; // 'gtts' | 'azure' | 'elevenlabs'
+
+/* ── Azure voice mapping per language ────────────────────────── */
+const AZURE_VOICES = {
+  te: { female: 'te-IN-ShrutiNeural', male: 'te-IN-MohanNeural' },
+  hi: { female: 'hi-IN-SwaraNeural', male: 'hi-IN-MadhurNeural' },
+  ta: { female: 'ta-IN-PallaviNeural', male: 'ta-IN-ValluvarNeural' },
+  kn: { female: 'kn-IN-SapnaNeural', male: 'kn-IN-GaganNeural' },
+  ml: { female: 'ml-IN-SobhanaNeural', male: 'ml-IN-MidhunNeural' },
+  mr: { female: 'mr-IN-AarohiNeural', male: 'mr-IN-ManoharNeural' },
+  bn: { female: 'bn-IN-TanishaaNeural', male: 'bn-IN-BashkarNeural' },
+  gu: { female: 'gu-IN-DhwaniNeural', male: 'gu-IN-NiranjanNeural' },
+  pa: { female: 'pa-IN-GurpreetNeural', male: 'pa-IN-GurpreetNeural' },
+  ur: { female: 'ur-IN-GulNeural', male: 'ur-IN-SalmanNeural' },
+  en: { female: 'en-IN-NeerjaNeural', male: 'en-IN-PrabhatNeural' },
+  es: { female: 'es-ES-ElviraNeural', male: 'es-ES-AlvaroNeural' },
+  fr: { female: 'fr-FR-DeniseNeural', male: 'fr-FR-HenriNeural' },
+  ar: { female: 'ar-SA-ZariyahNeural', male: 'ar-SA-HamedNeural' },
+};
 
 /* ── Google Translate TTS (free, best-effort) ───────────────── */
 
@@ -28,6 +47,59 @@ function gttsGenerate(text, lang = 'en') {
       res.on('error', reject);
     }).on('error', reject);
   });
+}
+
+/* ── Azure Cognitive Services TTS (500K chars/month FREE) ───── */
+
+async function azureGenerate(text, lang = 'en') {
+  const key = process.env.AZURE_TTS_KEY;
+  const region = process.env.AZURE_TTS_REGION || 'eastus';
+  if (!key) throw new Error('AZURE_TTS_KEY is required for Azure TTS');
+
+  const gender = process.env.AZURE_TTS_GENDER || 'female'; // 'male' | 'female'
+  const voiceEntry = AZURE_VOICES[lang] || AZURE_VOICES.en;
+  const voiceName = gender === 'male' ? voiceEntry.male : voiceEntry.female;
+  const xmlLang = lang.length === 2 ? `${lang}-IN` : lang;
+
+  // SSML with slightly slower rate for clarity
+  const ssml = `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='${xmlLang}'>
+  <voice name='${voiceName}'>
+    <prosody rate='-5%' pitch='+0%'>${escapeXml(text)}</prosody>
+  </voice>
+</speak>`;
+
+  return new Promise((resolve, reject) => {
+    const req = https.request(
+      `https://${region}.tts.speech.microsoft.com/cognitiveservices/v1`,
+      {
+        method: 'POST',
+        headers: {
+          'Ocp-Apim-Subscription-Key': key,
+          'Content-Type': 'application/ssml+xml',
+          'X-Microsoft-OutputFormat': 'audio-16khz-128kbitrate-mono-mp3',
+          'User-Agent': 'Vedika 360-TTS',
+        },
+      },
+      (res) => {
+        if (res.statusCode !== 200) {
+          const chunks = [];
+          res.on('data', (c) => chunks.push(c));
+          res.on('end', () => reject(new Error(`Azure TTS ${res.statusCode}: ${Buffer.concat(chunks).toString()}`)));
+          return;
+        }
+        const chunks = [];
+        res.on('data', (c) => chunks.push(c));
+        res.on('end', () => resolve(Buffer.concat(chunks)));
+        res.on('error', reject);
+      }
+    );
+    req.on('error', reject);
+    req.end(ssml);
+  });
+}
+
+function escapeXml(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
 }
 
 /* ── ElevenLabs TTS (paid, high quality) ────────────────────── */
@@ -82,6 +154,8 @@ async function elevenLabsGenerate(text) {
  */
 async function generateSpeech(text, lang = 'en') {
   switch (TTS_PROVIDER) {
+    case 'azure':
+      return azureGenerate(text, lang);
     case 'elevenlabs':
       return elevenLabsGenerate(text);
     case 'gtts':

@@ -76,7 +76,7 @@ async function dispatchEventCreated(io, event, creator, concernedVendorIds = [])
     });
     await sendEmail({
       to: a.email,
-      subject: `[EventOS Admin] ${event.title}`,
+      subject: `[Vedika 360 Admin] ${event.title}`,
       html: `<p>A new event was created.</p><div style="font-family:sans-serif">${eventHtmlBlock(event, creator)}</div>`,
     }).catch(() => {});
   }
@@ -115,7 +115,7 @@ async function dispatchEventCreated(io, event, creator, concernedVendorIds = [])
     });
     await sendEmail({
       to: vendor.user.email,
-      subject: `[EventOS] Event ${event.title} — action may be needed`,
+      subject: `[Vedika 360] Event ${event.title} — action may be needed`,
       html: `<p>Hello ${vendor.businessName},</p><p>An event was created and you are listed as a concerned vendor.</p><div style="font-family:sans-serif">${eventHtmlBlock(event, creator)}</div>`,
     }).catch(() => {});
   }
@@ -280,7 +280,7 @@ async function dispatchRemoteBlessingUploaded(io, { event, media, guestName }) {
   });
   await sendEmail({
     to: organizer.email,
-    subject: `[EventOS] Remote blessing photo — ${event.title}`,
+    subject: `[Vedika 360] Remote blessing photo — ${event.title}`,
     html: `<p>${lines.replace(/\n/g, '<br/>')}</p>`,
   }).catch(() => {});
 

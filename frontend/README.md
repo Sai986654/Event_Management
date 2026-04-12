@@ -1,6 +1,6 @@
-# EventOS Frontend
+# Vedika 360 Frontend
 
-This is the React frontend application for EventOS - a technology-driven event management platform.
+This is the React frontend application for Vedika 360 - a technology-driven event management platform.
 
 ## Features
 

@@ -34,7 +34,7 @@ const Home = () => {
     <div className="home-container">
       <section className="hero">
         <div className="hero-content">
-          <h1>Welcome to EventOS</h1>
+          <h1>Welcome to Vedika 360</h1>
           <p>The complete platform for planning and managing extraordinary events</p>
           <div className="hero-buttons">
             <Button type="primary" size="large" onClick={() => navigate('/register')}>
@@ -69,7 +69,7 @@ const Home = () => {
       <section className="cta-section">
         <div className="cta-content">
           <h2>Ready to Create Your Next Event?</h2>
-          <p>Join thousands of event organizers using EventOS</p>
+          <p>Join thousands of event organizers using Vedika 360</p>
           <Button type="primary" size="large" onClick={() => navigate('/register')}>
             Start Planning Now
           </Button>
