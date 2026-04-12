@@ -106,8 +106,12 @@ async function generateInviteVideo({ imagePaths, voiceBuffer, musicBuffer, overl
   const voiceDuration = await getAudioDuration(voicePath);
   const totalDuration = Math.max(voiceDuration + 1, 10); // at least 10s
   const imageCount = imagePaths.length;
-  const transitionDur = 0.5; // 0.5s xfade (lighter than 1s)
+  const transitionDur = 1; // 1s smooth transition between photos
+  // Equal screen time: each image visible for the same duration
   const imageDur = Math.max(3, (totalDuration + (imageCount - 1) * transitionDur) / imageCount);
+
+  // Varied transitions for visual interest
+  const transitions = ['fadeblack', 'slideleft', 'slideright', 'circlecrop', 'smoothleft', 'smoothright', 'dissolve', 'radial', 'smoothup'];
 
   // ── Build filter_complex ──────────────────────────────────
   // Use 480p (854x480) to cut memory usage on free-tier hosts
@@ -122,12 +126,16 @@ async function generateInviteVideo({ imagePaths, voiceBuffer, musicBuffer, overl
     inputs.push('-loop', '1', '-t', String(imageDur), '-i', imagePaths[i]);
   }
 
-  // Scale all images to 480p
+  // Scale all images to 480p + gentle zoom (Ken Burns lite)
   for (let i = 0; i < imageCount; i++) {
-    filterParts.push(`[${i}]scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2,setsar=1,format=yuv420p[img${i}]`);
+    const zoomDir = i % 2 === 0 ? '1+0.0008*on' : '1.04-0.0008*on';
+    filterParts.push(
+      `[${i}]scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2,setsar=1,format=yuv420p,` +
+      `zoompan=z='${zoomDir}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${Math.ceil(imageDur * 25)}:s=${W}x${H}:fps=25[img${i}]`
+    );
   }
 
-  // Chain xfade transitions between images
+  // Chain xfade transitions between images — each gets a different style
   if (imageCount === 1) {
     filterParts.push(`[img0]trim=duration=${totalDuration},setpts=PTS-STARTPTS[vout]`);
   } else {
@@ -135,7 +143,8 @@ async function generateInviteVideo({ imagePaths, voiceBuffer, musicBuffer, overl
     for (let i = 1; i < imageCount; i++) {
       const offset = i * imageDur - i * transitionDur;
       const outLabel = i === imageCount - 1 ? 'vout' : `xf${i}`;
-      filterParts.push(`[${prevLabel}][img${i}]xfade=transition=fade:duration=${transitionDur}:offset=${offset.toFixed(2)}[${outLabel}]`);
+      const transition = transitions[(i - 1) % transitions.length];
+      filterParts.push(`[${prevLabel}][img${i}]xfade=transition=${transition}:duration=${transitionDur}:offset=${offset.toFixed(2)}[${outLabel}]`);
       prevLabel = outLabel;
     }
   }

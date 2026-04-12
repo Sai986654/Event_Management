@@ -250,7 +250,10 @@ exports.triggerInviteDrip = asyncHandler(async (req, res) => {
 // POST /api/events/:id/publish-netlify
 exports.publishEventNetlify = asyncHandler(async (req, res) => {
   const eventId = Number(req.params.id);
-  const event = await prisma.event.findUnique({ where: { id: eventId } });
+  const event = await prisma.event.findUnique({
+    where: { id: eventId },
+    include: { organizer: { select: { name: true, avatar: true } } },
+  });
   if (!event) return res.status(404).json({ message: 'Event not found' });
 
   // Product requirement: organizers can publish event microsites even for customer-created events.
@@ -282,6 +285,9 @@ exports.publishEventNetlify = asyncHandler(async (req, res) => {
 
   const apiBaseUrl = process.env.API_BASE_URL || process.env.SERVER_URL || '';
 
+  // Optional overrides from request body
+  const { hostName, hostSubtitle, bgMusicUrl } = req.body || {};
+
   try {
     const deployed = await deployEventToNetlify(event, mediaUrls, {
       giftQrDataUrl,
@@ -290,6 +296,10 @@ exports.publishEventNetlify = asyncHandler(async (req, res) => {
       giftNote,
       apiBaseUrl,
       eventSlug: event.slug,
+      hostName: hostName || event.organizer?.name || '',
+      hostSubtitle: hostSubtitle || 'Event Host',
+      hostImageUrl: event.organizer?.avatar || '',
+      bgMusicUrl: bgMusicUrl || '',
     });
 
     const isUpdate = !!event.netlifySiteId;
