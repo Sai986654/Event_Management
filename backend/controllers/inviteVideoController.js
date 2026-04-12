@@ -12,7 +12,7 @@ const { startInviteJobProcessing, uploadToR2 } = require('../services/inviteVide
  *   - eventId  (number)
  */
 exports.createInviteJob = asyncHandler(async (req, res) => {
-  const { eventId, guests: guestsRaw } = req.body;
+  const { eventId, guests: guestsRaw, voiceTemplate, voiceLang } = req.body;
 
   // ── Validate eventId ──────────────────────────────────────
   if (!eventId) {
@@ -80,6 +80,8 @@ exports.createInviteJob = asyncHandler(async (req, res) => {
       templateKey: templatePrefix,
       imageKeys,
       musicKey,
+      voiceTemplate: voiceTemplate || null,
+      voiceLang: voiceLang || 'en',
       totalGuests: guests.length,
       guestVideos: {
         create: guests.map((g) => ({

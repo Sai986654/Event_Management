@@ -120,8 +120,9 @@ async function processInviteJob(jobId, io) {
       });
 
       // 1. Generate TTS voice
-      const voiceText = `${guest.guestName}, you are invited to our wedding ceremony`;
-      const voiceBuffer = await generateSpeech(voiceText);
+      const template = job.voiceTemplate || 'Dear {name}, you are cordially invited';
+      const voiceText = template.replace(/\{name\}/gi, guest.guestName);
+      const voiceBuffer = await generateSpeech(voiceText, job.voiceLang || 'en');
 
       // 2. Generate video with FFmpeg
       const { videoPath } = await generateInviteVideo({

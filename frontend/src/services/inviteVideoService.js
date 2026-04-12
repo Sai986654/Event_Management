@@ -2,10 +2,12 @@ import api from './api';
 
 export const inviteVideoService = {
   /** Create a new invite video job (multipart). */
-  createJob: async (eventId, images, guests, music = null) => {
+  createJob: async (eventId, images, guests, music = null, voiceTemplate = '', voiceLang = 'en') => {
     const formData = new FormData();
     formData.append('eventId', eventId);
     formData.append('guests', JSON.stringify(guests));
+    if (voiceTemplate) formData.append('voiceTemplate', voiceTemplate);
+    formData.append('voiceLang', voiceLang);
     images.forEach((file) => formData.append('images', file));
     if (music) formData.append('music', music);
 

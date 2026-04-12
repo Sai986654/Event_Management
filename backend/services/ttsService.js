@@ -80,13 +80,13 @@ async function elevenLabsGenerate(text) {
  * @param {string} text - The text to convert.
  * @returns {Promise<Buffer>} MP3 audio buffer.
  */
-async function generateSpeech(text) {
+async function generateSpeech(text, lang = 'en') {
   switch (TTS_PROVIDER) {
     case 'elevenlabs':
       return elevenLabsGenerate(text);
     case 'gtts':
     default:
-      return gttsGenerate(text);
+      return gttsGenerate(text, lang);
   }
 }
 

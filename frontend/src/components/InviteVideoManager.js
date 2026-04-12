@@ -4,6 +4,7 @@ import {
   Card,
   Input,
   Progress,
+  Select,
   Space,
   Table,
   Tag,
@@ -19,6 +20,7 @@ import {
   VideoCameraOutlined,
   DeleteOutlined,
   SoundOutlined,
+  AudioOutlined,
 } from '@ant-design/icons';
 import { inviteVideoService } from '../services/inviteVideoService';
 import { socketService } from '../services/socketService';
@@ -28,6 +30,23 @@ const { Text, Paragraph } = Typography;
 const { TextArea } = Input;
 
 const statusColors = { pending: 'default', processing: 'blue', completed: 'green', failed: 'red' };
+
+const VOICE_LANGUAGES = [
+  { value: 'en', label: 'English' },
+  { value: 'te', label: 'Telugu (తెలుగు)' },
+  { value: 'hi', label: 'Hindi (हिन्दी)' },
+  { value: 'ta', label: 'Tamil (தமிழ்)' },
+  { value: 'kn', label: 'Kannada (ಕನ್ನಡ)' },
+  { value: 'ml', label: 'Malayalam (മലയാളം)' },
+  { value: 'mr', label: 'Marathi (मराठी)' },
+  { value: 'bn', label: 'Bengali (বাংলা)' },
+  { value: 'gu', label: 'Gujarati (ગુજરાતી)' },
+  { value: 'pa', label: 'Punjabi (ਪੰਜਾਬੀ)' },
+  { value: 'ur', label: 'Urdu (اردو)' },
+  { value: 'es', label: 'Spanish' },
+  { value: 'fr', label: 'French' },
+  { value: 'ar', label: 'Arabic' },
+];
 
 const InviteVideoManager = ({ eventId, guests: eventGuests = [] }) => {
   const [jobs, setJobs] = useState([]);
@@ -41,6 +60,8 @@ const InviteVideoManager = ({ eventId, guests: eventGuests = [] }) => {
   const [musicFile, setMusicFile] = useState(null);
   const [guestInput, setGuestInput] = useState('');
   const [useExistingGuests, setUseExistingGuests] = useState(true);
+  const [voiceTemplate, setVoiceTemplate] = useState('Dear {name}, you are cordially invited to our event');
+  const [voiceLang, setVoiceLang] = useState('en');
 
   // Real-time progress ref
   const progressRef = useRef(null);
@@ -128,7 +149,7 @@ const InviteVideoManager = ({ eventId, guests: eventGuests = [] }) => {
     try {
       const files = imageFiles.map((f) => f.originFileObj || f);
       const music = musicFile?.originFileObj || musicFile || null;
-      const data = await inviteVideoService.createJob(eventId, files, guests, music);
+      const data = await inviteVideoService.createJob(eventId, files, guests, music, voiceTemplate, voiceLang);
       message.success(`Job started! Generating videos for ${data.totalGuests} guest(s).`);
       await loadJobs();
       loadJobDetail(data.jobId);
@@ -243,9 +264,9 @@ const InviteVideoManager = ({ eventId, guests: eventGuests = [] }) => {
         }
       >
         <Paragraph type="secondary">
-          Upload 3–5 event images to create a personalized slideshow video for each guest. Each video includes
-          a voice greeting ("{'{guest name}'}, you are invited to our wedding ceremony"), image transitions, and
-          optional background music. Videos are uploaded to cloud storage and sent via WhatsApp.
+          Upload 3–5 event images to create a personalized slideshow video for each guest. Customize the
+          voice message and language — each video includes a voice greeting with the guest's name, image
+          transitions, and optional background music. Videos are uploaded to cloud storage and sent via WhatsApp.
         </Paragraph>
 
         <Divider orientation="left">1. Event Images (3–5)</Divider>
@@ -297,7 +318,37 @@ const InviteVideoManager = ({ eventId, guests: eventGuests = [] }) => {
           )}
         </Space>
 
-        <Divider orientation="left">3. Guest List</Divider>
+        <Divider orientation="left">3. Voice Message</Divider>
+        <Space direction="vertical" size={12} style={{ width: '100%' }}>
+          <div>
+            <Text strong>Language</Text>
+            <Select
+              value={voiceLang}
+              onChange={setVoiceLang}
+              options={VOICE_LANGUAGES}
+              style={{ width: 220, marginLeft: 12 }}
+            />
+          </div>
+          <div>
+            <Text strong>Voice Message Template</Text>
+            <Text type="secondary" style={{ marginLeft: 8 }}>
+              Use <Text code>{'{name}'}</Text> where the guest's name should appear
+            </Text>
+          </div>
+          <TextArea
+            rows={3}
+            value={voiceTemplate}
+            onChange={(e) => setVoiceTemplate(e.target.value)}
+            placeholder="Dear {name}, you are cordially invited to our event"
+            maxLength={200}
+            showCount
+          />
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            <AudioOutlined /> Preview: "{voiceTemplate.replace(/\{name\}/gi, 'Prakash')}"
+          </Text>
+        </Space>
+
+        <Divider orientation="left">4. Guest List</Divider>
         <Space direction="vertical" size={8} style={{ width: '100%' }}>
           <Space>
             <Button
