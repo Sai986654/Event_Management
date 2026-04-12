@@ -5,8 +5,54 @@ import { AuthContext } from '../context/AuthContext';
 import { eventService } from '../services/eventService';
 import { bookingService } from '../services/bookingService';
 import { formatDate, formatCurrency, getErrorMessage, getStatusColor } from '../utils/helpers';
+import { Colors, Spacing, Radius } from '../theme';
 
-/* ─── Organizer / Admin / Customer dashboard ─── */
+/* ── Stat Card Component ── */
+const StatCard = ({ label, value, color, accent }) => (
+  <View style={[statStyles.card, accent && statStyles.cardAccent]}>
+    <Text variant="bodySmall" style={statStyles.label}>{label}</Text>
+    <Text variant="headlineMedium" style={[statStyles.value, color && { color }]}>{value}</Text>
+  </View>
+);
+
+const statStyles = StyleSheet.create({
+  card: {
+    width: 140,
+    marginHorizontal: 5,
+    borderRadius: Radius.lg,
+    elevation: 2,
+    backgroundColor: Colors.surface,
+    padding: Spacing.md,
+  },
+  cardAccent: { borderWidth: 1.5, borderColor: Colors.surfaceVariant },
+  label: { color: Colors.textSecondary, fontWeight: '600', fontSize: 12 },
+  value: { fontWeight: '800', marginTop: 4, color: Colors.textPrimary, fontSize: 22 },
+});
+
+/* ── Quick Action Card ── */
+const ActionCard = ({ icon, title, subtitle, onPress }) => (
+  <Card style={qStyles.card} onPress={onPress}>
+    <Card.Content style={qStyles.row}>
+      <IconButton icon={icon} iconColor={Colors.primary} size={28} style={qStyles.icon} />
+      <View style={qStyles.textCol}>
+        <Text variant="titleSmall" style={qStyles.title}>{title}</Text>
+        <Text variant="bodySmall" style={qStyles.sub}>{subtitle}</Text>
+      </View>
+      <IconButton icon="chevron-right" iconColor={Colors.textMuted} size={20} />
+    </Card.Content>
+  </Card>
+);
+
+const qStyles = StyleSheet.create({
+  card: { marginHorizontal: Spacing.lg, marginBottom: Spacing.sm, borderRadius: Radius.lg, elevation: 2, backgroundColor: Colors.surface },
+  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 4 },
+  icon: { margin: 0, backgroundColor: Colors.surfaceVariant, borderRadius: Radius.sm },
+  textCol: { flex: 1, marginLeft: Spacing.sm },
+  title: { fontWeight: '700', color: Colors.textPrimary },
+  sub: { color: Colors.textSecondary, marginTop: 2, fontSize: 12 },
+});
+
+/* ── Organizer / Admin / Customer Dashboard ── */
 const EventsDashboard = ({ user, navigation }) => {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -29,13 +75,14 @@ const EventsDashboard = ({ user, navigation }) => {
   const upcoming = events.filter((e) => new Date(e.date) > new Date()).length;
   const totalBudget = events.reduce((s, e) => s + (e.budget || 0), 0);
 
-  if (loading) return <ActivityIndicator style={styles.loader} size="large" />;
+  if (loading) return <ActivityIndicator style={styles.loader} size="large" color={Colors.primary} />;
 
   return (
     <View style={styles.container}>
       <ScrollView
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchEvents(); }} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchEvents(); }} colors={[Colors.primary]} />}
       >
+        {/* Hero */}
         <Card style={styles.heroCard}>
           <Card.Content>
             <Text variant="headlineSmall" style={styles.greeting}>Welcome, {user?.name}! 👋</Text>
@@ -43,23 +90,14 @@ const EventsDashboard = ({ user, navigation }) => {
           </Card.Content>
         </Card>
 
-        {/* Stats row */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.statsRow}>
-          <Card style={[styles.statCard, styles.statCardPrimary]}><Card.Content>
-            <Text variant="bodySmall" style={styles.statLabel}>Events</Text>
-            <Text variant="headlineMedium" style={styles.statValue}>{events.length}</Text>
-          </Card.Content></Card>
-          <Card style={styles.statCard}><Card.Content>
-            <Text variant="bodySmall" style={styles.statLabel}>Upcoming</Text>
-            <Text variant="headlineMedium" style={[styles.statValue, { color: '#667eea' }]}>{upcoming}</Text>
-          </Card.Content></Card>
-          <Card style={styles.statCard}><Card.Content>
-            <Text variant="bodySmall" style={styles.statLabel}>Total Budget</Text>
-            <Text variant="headlineMedium" style={[styles.statValue, { color: '#52c41a' }]}>{formatCurrency(totalBudget)}</Text>
-          </Card.Content></Card>
+        {/* Stats */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.statsRow}>
+          <StatCard label="Events" value={events.length} accent />
+          <StatCard label="Upcoming" value={upcoming} color={Colors.primary} />
+          <StatCard label="Total Budget" value={formatCurrency(totalBudget)} color={Colors.success} />
         </ScrollView>
 
-        {/* Event list */}
+        {/* Event List */}
         <Text variant="titleMedium" style={styles.sectionTitle}>Your Events</Text>
         {events.length === 0 ? (
           <Card style={styles.emptyCard}>
@@ -77,7 +115,7 @@ const EventsDashboard = ({ user, navigation }) => {
               <Card.Content>
                 <View style={styles.eventRow}>
                   <Text variant="titleMedium" numberOfLines={1} style={styles.eventTitle}>{event.title}</Text>
-                  <Chip compact textStyle={{ fontSize: 11 }} style={{ backgroundColor: getStatusColor(event.status) + '22' }}>
+                  <Chip compact textStyle={styles.statusChipText} style={[styles.statusChip, { backgroundColor: getStatusColor(event.status) + '18' }]}>
                     {event.status}
                   </Chip>
                 </View>
@@ -91,45 +129,50 @@ const EventsDashboard = ({ user, navigation }) => {
             </Card>
           ))
         )}
+
+        {/* Quick Actions */}
+        <Text variant="titleMedium" style={styles.sectionTitle}>Quick Actions</Text>
+
         {(user?.role === 'customer' || user?.role === 'admin') && (
-          <Card style={styles.actionCard} onPress={() => navigation.navigate('Planner')}>
-            <Card.Content>
-              <Text variant="titleMedium">Plan Event End-to-End</Text>
-              <Text variant="bodySmall" style={styles.eventMeta}>Build quotation and place order</Text>
-            </Card.Content>
-          </Card>
+          <ActionCard
+            icon="clipboard-check-outline"
+            title="Plan Event End-to-End"
+            subtitle="Build quotation and place order"
+            onPress={() => navigation.navigate('Planner')}
+          />
         )}
         {(user?.role === 'organizer' || user?.role === 'admin') && (
-          <Card style={styles.actionCard} onPress={() => navigation.navigate('ActivityTracker')}>
-            <Card.Content>
-              <Text variant="titleMedium">Update Activity Progress</Text>
-              <Text variant="bodySmall" style={styles.eventMeta}>Track spend and progress transparently</Text>
-            </Card.Content>
-          </Card>
+          <ActionCard
+            icon="chart-timeline-variant"
+            title="Update Activity Progress"
+            subtitle="Track spend and progress transparently"
+            onPress={() => navigation.navigate('ActivityTracker')}
+          />
         )}
         {(user?.role === 'organizer' || user?.role === 'admin') && (
-          <Card style={styles.actionCard} onPress={() => navigation.navigate('InviteIntelligence')}>
-            <Card.Content>
-              <Text variant="titleMedium">Invite Intelligence</Text>
-              <Text variant="bodySmall" style={styles.eventMeta}>Contact segments, WhatsApp reminders, AI collage</Text>
-            </Card.Content>
-          </Card>
+          <ActionCard
+            icon="card-account-phone-outline"
+            title="Invite Intelligence"
+            subtitle="Contact segments, WhatsApp reminders"
+            onPress={() => navigation.navigate('InviteIntelligence')}
+          />
         )}
         {user?.role === 'admin' && (
-          <Card style={styles.actionCard} onPress={() => navigation.navigate('AdminControl')}>
-            <Card.Content>
-              <Text variant="titleMedium">Admin Control Center</Text>
-              <Text variant="bodySmall" style={styles.eventMeta}>Verify vendors and create users</Text>
-            </Card.Content>
-          </Card>
+          <ActionCard
+            icon="shield-check-outline"
+            title="Admin Control Center"
+            subtitle="Verify vendors and create users"
+            onPress={() => navigation.navigate('AdminControl')}
+          />
         )}
-        <View style={{ height: 80 }} />
+        <View style={{ height: 90 }} />
       </ScrollView>
 
       {(user?.role === 'organizer' || user?.role === 'customer' || user?.role === 'admin') && (
         <FAB
           icon="plus"
           style={styles.fab}
+          color={Colors.textOnPrimary}
           onPress={() => navigation.navigate('EventCreate')}
           label="New Event"
         />
@@ -138,7 +181,7 @@ const EventsDashboard = ({ user, navigation }) => {
   );
 };
 
-/* ─── Vendor dashboard ─── */
+/* ── Vendor Dashboard ── */
 const VendorDashboard = ({ user, navigation }) => {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -164,12 +207,12 @@ const VendorDashboard = ({ user, navigation }) => {
     .filter((b) => b.status === 'confirmed' || b.status === 'completed')
     .reduce((s, b) => s + (b.price || 0), 0);
 
-  if (loading) return <ActivityIndicator style={styles.loader} size="large" />;
+  if (loading) return <ActivityIndicator style={styles.loader} size="large" color={Colors.primary} />;
 
   return (
     <View style={styles.container}>
       <ScrollView
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchBookings(); }} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchBookings(); }} colors={[Colors.primary]} />}
       >
         <Card style={styles.heroCard}>
           <Card.Content>
@@ -178,23 +221,11 @@ const VendorDashboard = ({ user, navigation }) => {
           </Card.Content>
         </Card>
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.statsRow}>
-          <Card style={styles.statCard}><Card.Content>
-            <Text variant="bodySmall" style={styles.statLabel}>Total</Text>
-            <Text variant="headlineMedium" style={styles.statValue}>{bookings.length}</Text>
-          </Card.Content></Card>
-          <Card style={styles.statCard}><Card.Content>
-            <Text variant="bodySmall" style={styles.statLabel}>Pending</Text>
-            <Text variant="headlineMedium" style={[styles.statValue, { color: '#fa8c16' }]}>{pending}</Text>
-          </Card.Content></Card>
-          <Card style={styles.statCard}><Card.Content>
-            <Text variant="bodySmall" style={styles.statLabel}>Confirmed</Text>
-            <Text variant="headlineMedium" style={[styles.statValue, { color: '#52c41a' }]}>{confirmed}</Text>
-          </Card.Content></Card>
-          <Card style={styles.statCard}><Card.Content>
-            <Text variant="bodySmall" style={styles.statLabel}>Revenue</Text>
-            <Text variant="headlineMedium" style={[styles.statValue, { color: '#52c41a' }]}>{formatCurrency(revenue)}</Text>
-          </Card.Content></Card>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.statsRow}>
+          <StatCard label="Total" value={bookings.length} accent />
+          <StatCard label="Pending" value={pending} color={Colors.statusPending} />
+          <StatCard label="Confirmed" value={confirmed} color={Colors.statusConfirmed} />
+          <StatCard label="Revenue" value={formatCurrency(revenue)} color={Colors.success} />
         </ScrollView>
 
         <Text variant="titleMedium" style={styles.sectionTitle}>Recent Bookings</Text>
@@ -223,19 +254,21 @@ const VendorDashboard = ({ user, navigation }) => {
             </Card>
           ))
         )}
-        <Card style={styles.actionCard} onPress={() => navigation.navigate('VendorWorkspace')}>
-          <Card.Content>
-            <Text variant="titleMedium">Manage Services & Packages</Text>
-            <Text variant="bodySmall" style={styles.eventMeta}>Add service details, estimation rules, testimonials</Text>
-          </Card.Content>
-        </Card>
+
+        <Text variant="titleMedium" style={styles.sectionTitle}>Quick Actions</Text>
+        <ActionCard
+          icon="briefcase-outline"
+          title="Manage Services & Packages"
+          subtitle="Add service details, estimation rules, testimonials"
+          onPress={() => navigation.navigate('VendorWorkspace')}
+        />
         <View style={{ height: 20 }} />
       </ScrollView>
     </View>
   );
 };
 
-/* ─── Main Dashboard ─── */
+/* ── Main Dashboard ── */
 const DashboardScreen = ({ navigation }) => {
   const { user } = useContext(AuthContext);
   const role = user?.role;
@@ -257,33 +290,42 @@ const DashboardScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f6f8fc' },
+  container: { flex: 1, backgroundColor: Colors.background },
   loader: { flex: 1, justifyContent: 'center' },
   heroCard: {
-    marginHorizontal: 16,
-    marginTop: 16,
-    marginBottom: 10,
-    borderRadius: 16,
+    marginHorizontal: Spacing.lg,
+    marginTop: Spacing.lg,
+    marginBottom: Spacing.sm,
+    borderRadius: Radius.lg,
     elevation: 3,
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.surface,
   },
-  greeting: { fontWeight: '800', marginBottom: 4 },
-  heroSubtext: { color: '#667085' },
-  statsRow: { paddingHorizontal: 12, marginBottom: 8 },
-  statCard: { width: 136, marginHorizontal: 4, borderRadius: 14, elevation: 2, backgroundColor: '#fff' },
-  statCardPrimary: { borderWidth: 1, borderColor: '#e7ebff' },
-  statLabel: { color: '#667085', fontWeight: '600' },
-  statValue: { fontWeight: '800', marginTop: 4, color: '#1d2939' },
-  sectionTitle: { fontWeight: '800', marginHorizontal: 16, marginTop: 16, marginBottom: 8, color: '#1d2939' },
-  eventCard: { marginHorizontal: 16, marginBottom: 10, borderRadius: 14, elevation: 2, backgroundColor: '#fff' },
+  greeting: { fontWeight: '800', color: Colors.textPrimary, marginBottom: 4 },
+  heroSubtext: { color: Colors.textSecondary, lineHeight: 20 },
+  statsRow: { paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm },
+  sectionTitle: {
+    fontWeight: '800',
+    marginHorizontal: Spacing.lg,
+    marginTop: Spacing.lg,
+    marginBottom: Spacing.sm,
+    color: Colors.textPrimary,
+  },
+  eventCard: {
+    marginHorizontal: Spacing.lg,
+    marginBottom: Spacing.sm,
+    borderRadius: Radius.lg,
+    elevation: 2,
+    backgroundColor: Colors.surface,
+  },
   eventRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  eventTitle: { flex: 1, marginRight: 8 },
-  eventMeta: { color: '#667085', marginTop: 6 },
-  eventBudget: { color: '#52c41a', marginTop: 2 },
-  emptyCard: { marginHorizontal: 16, borderRadius: 14, backgroundColor: '#fff' },
-  actionCard: { marginHorizontal: 16, marginBottom: 10, borderRadius: 14, elevation: 2, backgroundColor: '#fff' },
-  emptyText: { textAlign: 'center', color: '#888', paddingVertical: 20 },
-  fab: { position: 'absolute', right: 16, bottom: 16, backgroundColor: '#667eea' },
+  eventTitle: { flex: 1, marginRight: Spacing.sm, fontWeight: '700' },
+  eventMeta: { color: Colors.textSecondary, marginTop: 6 },
+  eventBudget: { color: Colors.success, marginTop: 2, fontWeight: '600' },
+  statusChip: { borderRadius: Radius.sm },
+  statusChipText: { fontSize: 11, fontWeight: '600' },
+  emptyCard: { marginHorizontal: Spacing.lg, borderRadius: Radius.lg, backgroundColor: Colors.surface },
+  emptyText: { textAlign: 'center', color: Colors.textMuted, paddingVertical: 20 },
+  fab: { position: 'absolute', right: 16, bottom: 16, backgroundColor: Colors.primary, borderRadius: Radius.lg },
 });
 
 export default DashboardScreen;

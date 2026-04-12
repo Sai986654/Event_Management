@@ -4,6 +4,7 @@ import { TextInput, Button, Text, SegmentedButtons } from 'react-native-paper';
 import { AuthContext } from '../context/AuthContext';
 import { eventService } from '../services/eventService';
 import { getErrorMessage } from '../utils/helpers';
+import { Colors, Spacing, Radius } from '../theme';
 
 const EVENT_TYPES = [
   { value: 'wedding', label: 'Wedding' },
@@ -48,13 +49,9 @@ const EventCreateScreen = ({ navigation }) => {
         .split(/[\s,]+/)
         .map((s) => Number(String(s).trim()))
         .filter((n) => Number.isFinite(n) && n > 0);
-      if (vendorIds.length) {
-        eventData.concernedVendorIds = vendorIds;
-      }
+      if (vendorIds.length) eventData.concernedVendorIds = vendorIds;
       await eventService.createEvent(eventData);
-      Alert.alert('Success', 'Event created!', [
-        { text: 'OK', onPress: () => navigation.goBack() },
-      ]);
+      Alert.alert('Success', 'Event created!', [{ text: 'OK', onPress: () => navigation.goBack() }]);
     } catch (err) {
       Alert.alert('Error', getErrorMessage(err));
     } finally {
@@ -70,13 +67,7 @@ const EventCreateScreen = ({ navigation }) => {
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         <Text variant="headlineSmall" style={styles.title}>Create New Event</Text>
 
-        <TextInput
-          label="Event Title *"
-          value={title}
-          onChangeText={setTitle}
-          mode="outlined"
-          style={styles.input}
-        />
+        <TextInput label="Event Title *" value={title} onChangeText={setTitle} mode="outlined" style={styles.input} outlineStyle={styles.outline} left={<TextInput.Icon icon="calendar-star" />} />
 
         <Text variant="labelLarge" style={styles.fieldLabel}>Event Type</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.typeRow}>
@@ -87,76 +78,20 @@ const EventCreateScreen = ({ navigation }) => {
               compact
               onPress={() => setType(t.value)}
               style={styles.typeBtn}
-              buttonColor={type === t.value ? '#667eea' : undefined}
+              buttonColor={type === t.value ? Colors.primary : undefined}
             >
               {t.label}
             </Button>
           ))}
         </ScrollView>
 
-        <TextInput
-          label="Date (YYYY-MM-DD) *"
-          value={date}
-          onChangeText={setDate}
-          mode="outlined"
-          style={styles.input}
-        />
-
-        <TextInput
-          label="Venue *"
-          value={venue}
-          onChangeText={setVenue}
-          mode="outlined"
-          placeholder="e.g. Convention hall, lawn, resort name"
-          style={styles.input}
-        />
-
-        <TextInput
-          label="City"
-          value={city}
-          onChangeText={setCity}
-          mode="outlined"
-          placeholder="e.g. Hyderabad, Bengaluru"
-          style={styles.input}
-        />
-
-        <TextInput
-          label="Budget (INR ₹)"
-          value={budget}
-          onChangeText={setBudget}
-          mode="outlined"
-          keyboardType="numeric"
-          placeholder="Total in Indian Rupees"
-          style={styles.input}
-        />
-
-        <TextInput
-          label="Expected Guests"
-          value={guestCount}
-          onChangeText={setGuestCount}
-          mode="outlined"
-          keyboardType="numeric"
-          style={styles.input}
-        />
-
-        <TextInput
-          label="Description"
-          value={description}
-          onChangeText={setDescription}
-          mode="outlined"
-          multiline
-          numberOfLines={4}
-          style={styles.input}
-        />
-
-        <TextInput
-          label="Notify vendor IDs (optional)"
-          value={vendorIdsText}
-          onChangeText={setVendorIdsText}
-          mode="outlined"
-          placeholder="e.g. 1, 2, 3 — from marketplace"
-          style={styles.input}
-        />
+        <TextInput label="Date (YYYY-MM-DD) *" value={date} onChangeText={setDate} mode="outlined" style={styles.input} outlineStyle={styles.outline} left={<TextInput.Icon icon="calendar" />} />
+        <TextInput label="Venue *" value={venue} onChangeText={setVenue} mode="outlined" placeholder="e.g. Convention hall, lawn, resort" style={styles.input} outlineStyle={styles.outline} left={<TextInput.Icon icon="map-marker-outline" />} />
+        <TextInput label="City" value={city} onChangeText={setCity} mode="outlined" placeholder="e.g. Hyderabad, Bengaluru" style={styles.input} outlineStyle={styles.outline} left={<TextInput.Icon icon="city-variant-outline" />} />
+        <TextInput label="Budget (₹)" value={budget} onChangeText={setBudget} mode="outlined" keyboardType="numeric" placeholder="Total in Indian Rupees" style={styles.input} outlineStyle={styles.outline} left={<TextInput.Icon icon="currency-inr" />} />
+        <TextInput label="Expected Guests" value={guestCount} onChangeText={setGuestCount} mode="outlined" keyboardType="numeric" style={styles.input} outlineStyle={styles.outline} left={<TextInput.Icon icon="account-group-outline" />} />
+        <TextInput label="Description" value={description} onChangeText={setDescription} mode="outlined" multiline numberOfLines={4} style={styles.input} outlineStyle={styles.outline} />
+        <TextInput label="Notify vendor IDs (optional)" value={vendorIdsText} onChangeText={setVendorIdsText} mode="outlined" placeholder="e.g. 1, 2, 3 — from marketplace" style={styles.input} outlineStyle={styles.outline} left={<TextInput.Icon icon="store-outline" />} />
 
         <Button
           mode="contained"
@@ -165,6 +100,7 @@ const EventCreateScreen = ({ navigation }) => {
           disabled={loading}
           style={styles.button}
           contentStyle={styles.buttonContent}
+          labelStyle={{ fontWeight: '700', fontSize: 15 }}
         >
           Create Event
         </Button>
@@ -174,15 +110,16 @@ const EventCreateScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f5f5' },
-  scroll: { padding: 16, paddingBottom: 40 },
-  title: { fontWeight: 'bold', marginBottom: 20, color: '#667eea' },
-  input: { marginBottom: 14 },
-  fieldLabel: { marginBottom: 8, color: '#333' },
-  typeRow: { marginBottom: 14 },
-  typeBtn: { marginRight: 8, borderRadius: 20 },
-  button: { marginTop: 8, backgroundColor: '#667eea', borderRadius: 8 },
-  buttonContent: { paddingVertical: 6 },
+  container: { flex: 1, backgroundColor: Colors.background },
+  scroll: { padding: Spacing.lg, paddingBottom: 40 },
+  title: { fontWeight: '800', marginBottom: Spacing.xl, color: Colors.primary },
+  input: { marginBottom: Spacing.md },
+  outline: { borderRadius: Radius.sm },
+  fieldLabel: { marginBottom: Spacing.sm, color: Colors.textPrimary, fontWeight: '600' },
+  typeRow: { marginBottom: Spacing.md },
+  typeBtn: { marginRight: Spacing.sm, borderRadius: Radius.xl },
+  button: { marginTop: Spacing.sm, backgroundColor: Colors.primary, borderRadius: Radius.sm },
+  buttonContent: { paddingVertical: 8 },
 });
 
 export default EventCreateScreen;

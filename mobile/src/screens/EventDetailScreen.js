@@ -5,6 +5,7 @@ import { AuthContext } from '../context/AuthContext';
 import { eventService } from '../services/eventService';
 import { bookingService } from '../services/bookingService';
 import { formatDate, formatCurrency, getErrorMessage, getStatusColor } from '../utils/helpers';
+import { Colors, Spacing, Radius } from '../theme';
 
 const EventDetailScreen = ({ route, navigation }) => {
   const { eventId } = route.params;
@@ -35,7 +36,9 @@ const EventDetailScreen = ({ route, navigation }) => {
     Alert.alert('Delete Event', 'This action cannot be undone. Continue?', [
       { text: 'Cancel' },
       {
-        text: 'Delete', style: 'destructive', onPress: async () => {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
           try {
             await eventService.deleteEvent(eventId);
             navigation.goBack();
@@ -47,7 +50,7 @@ const EventDetailScreen = ({ route, navigation }) => {
     ]);
   };
 
-  if (loading) return <ActivityIndicator style={{ flex: 1 }} size="large" />;
+  if (loading) return <ActivityIndicator style={{ flex: 1 }} size="large" color={Colors.primary} />;
   if (!event) return <Text style={{ textAlign: 'center', marginTop: 40 }}>Event not found</Text>;
 
   const timeline = event.timeline || [];
@@ -60,12 +63,14 @@ const EventDetailScreen = ({ route, navigation }) => {
       <View style={styles.header}>
         <View style={styles.headerRow}>
           <Text variant="headlineSmall" style={styles.name}>{event.title}</Text>
-          <Chip compact style={{ backgroundColor: getStatusColor(event.status) + '22' }}>{event.status}</Chip>
+          <Chip compact textStyle={{ fontSize: 11, fontWeight: '600' }} style={{ backgroundColor: getStatusColor(event.status) + '22' }}>{event.status}</Chip>
         </View>
-        <Text variant="bodySmall" style={styles.meta}>📅 {formatDate(event.date)}</Text>
-        <Text variant="bodySmall" style={styles.meta}>📍 {event.venue}{event.city ? `, ${event.city}` : ''}</Text>
-        {event.budget > 0 && <Text variant="bodySmall" style={styles.meta}>💰 {formatCurrency(event.budget)}</Text>}
-        {event.guestCount > 0 && <Text variant="bodySmall" style={styles.meta}>👥 {event.guestCount} guests</Text>}
+        <View style={styles.metaGrid}>
+          <Text variant="bodySmall" style={styles.metaItem}>📅 {formatDate(event.date)}</Text>
+          <Text variant="bodySmall" style={styles.metaItem}>📍 {event.venue}{event.city ? `, ${event.city}` : ''}</Text>
+          {event.budget > 0 && <Text variant="bodySmall" style={styles.metaItem}>💰 {formatCurrency(event.budget)}</Text>}
+          {event.guestCount > 0 && <Text variant="bodySmall" style={styles.metaItem}>👥 {event.guestCount} guests</Text>}
+        </View>
         {event.description && <Text variant="bodyMedium" style={styles.description}>{event.description}</Text>}
       </View>
 
@@ -77,14 +82,17 @@ const EventDetailScreen = ({ route, navigation }) => {
           <Text variant="titleMedium" style={styles.sectionTitle}>Timeline</Text>
           {timeline.map((item, i) => (
             <View key={i} style={styles.timelineItem}>
-              <Text variant="titleSmall" style={styles.timelineTime}>{item.time}</Text>
-              <Text variant="bodyMedium">{item.activity}</Text>
+              <View style={styles.timelineDot} />
+              <View style={styles.timelineContent}>
+                <Text variant="labelMedium" style={styles.timelineTime}>{item.time}</Text>
+                <Text variant="bodyMedium" style={styles.timelineActivity}>{item.activity}</Text>
+              </View>
             </View>
           ))}
         </View>
       )}
 
-      {/* Tasks (organizer/admin only) */}
+      {/* Tasks */}
       {isOrganizer && tasks.length > 0 && (
         <View style={styles.section}>
           <Text variant="titleMedium" style={styles.sectionTitle}>Tasks</Text>
@@ -92,12 +100,10 @@ const EventDetailScreen = ({ route, navigation }) => {
             <Card key={i} style={styles.taskCard}>
               <Card.Content style={styles.taskRow}>
                 <View style={{ flex: 1 }}>
-                  <Text variant="bodyMedium">{task.title}</Text>
-                  {task.assignee && <Text variant="bodySmall" style={{ color: '#888' }}>Assigned to: {task.assignee}</Text>}
+                  <Text variant="bodyMedium" style={{ fontWeight: '600' }}>{task.title}</Text>
+                  {task.assignee && <Text variant="bodySmall" style={{ color: Colors.textSecondary }}>Assigned to: {task.assignee}</Text>}
                 </View>
-                <Chip compact style={{ backgroundColor: getStatusColor(task.status) + '22' }}>
-                  {task.status}
-                </Chip>
+                <Chip compact style={{ backgroundColor: getStatusColor(task.status) + '22' }}>{task.status}</Chip>
               </Card.Content>
             </Card>
           ))}
@@ -112,29 +118,20 @@ const EventDetailScreen = ({ route, navigation }) => {
             <Card key={bk.id} style={styles.taskCard}>
               <Card.Content style={styles.taskRow}>
                 <View style={{ flex: 1 }}>
-                  <Text variant="titleSmall">{bk.vendor?.businessName || 'Vendor'}</Text>
-                  <Text variant="bodySmall" style={{ color: '#666' }}>
-                    {formatDate(bk.serviceDate)} • {formatCurrency(bk.price)}
-                  </Text>
+                  <Text variant="titleSmall" style={{ fontWeight: '600' }}>{bk.vendor?.businessName || 'Vendor'}</Text>
+                  <Text variant="bodySmall" style={{ color: Colors.textSecondary }}>{formatDate(bk.serviceDate)} • {formatCurrency(bk.price)}</Text>
                 </View>
-                <Chip compact textStyle={{ color: '#fff', fontSize: 11 }} style={{ backgroundColor: getStatusColor(bk.status) }}>
-                  {bk.status}
-                </Chip>
+                <Chip compact textStyle={{ color: '#fff', fontSize: 11 }} style={{ backgroundColor: getStatusColor(bk.status) }}>{bk.status}</Chip>
               </Card.Content>
             </Card>
           ))}
         </View>
       )}
 
+      {/* Public Event Link */}
       {event.isPublic && event.slug ? (
         <View style={styles.section}>
-          <Button
-            mode="contained-tonal"
-            icon="link-variant"
-            onPress={() =>
-              navigation.navigate('PublicEvent', { slug: event.slug, eventTitle: event.title })
-            }
-          >
+          <Button mode="contained-tonal" icon="link-variant" onPress={() => navigation.navigate('PublicEvent', { slug: event.slug, eventTitle: event.title })}>
             Public invite (guest view)
           </Button>
         </View>
@@ -142,22 +139,9 @@ const EventDetailScreen = ({ route, navigation }) => {
 
       {/* Actions */}
       <View style={styles.section}>
-        <Button
-          mode="contained"
-          style={styles.vendorBtn}
-          onPress={() => navigation.navigate('VendorsTab')}
-        >
-          Browse Vendors
-        </Button>
+        <Button mode="contained" style={styles.vendorBtn} labelStyle={{ fontWeight: '600' }} onPress={() => navigation.navigate('VendorsTab')}>Browse Vendors</Button>
         {(user?.role === 'organizer' || user?.role === 'customer' || user?.role === 'admin') && (
-          <Button
-            mode="outlined"
-            textColor="#ff4d4f"
-            style={styles.deleteBtn}
-            onPress={handleDeleteEvent}
-          >
-            Delete Event
-          </Button>
+          <Button mode="outlined" textColor={Colors.danger} style={styles.deleteBtn} onPress={handleDeleteEvent}>Delete Event</Button>
         )}
       </View>
 
@@ -167,20 +151,24 @@ const EventDetailScreen = ({ route, navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f5f5' },
-  header: { padding: 16, backgroundColor: '#fff' },
+  container: { flex: 1, backgroundColor: Colors.background },
+  header: { padding: Spacing.lg, backgroundColor: Colors.surface },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  name: { fontWeight: 'bold', flex: 1, marginRight: 8 },
-  meta: { color: '#666', marginTop: 4 },
-  description: { marginTop: 12, lineHeight: 22 },
-  section: { padding: 16 },
-  sectionTitle: { fontWeight: 'bold', marginBottom: 12 },
-  timelineItem: { flexDirection: 'row', marginBottom: 10, alignItems: 'center' },
-  timelineTime: { width: 60, color: '#667eea', fontWeight: 'bold' },
-  taskCard: { marginBottom: 8, borderRadius: 8, elevation: 1 },
+  name: { fontWeight: '800', flex: 1, marginRight: Spacing.sm, color: Colors.textPrimary },
+  metaGrid: { marginTop: Spacing.sm },
+  metaItem: { color: Colors.textSecondary, marginTop: 4 },
+  description: { marginTop: Spacing.md, lineHeight: 22, color: Colors.textPrimary },
+  section: { padding: Spacing.lg },
+  sectionTitle: { fontWeight: '700', marginBottom: Spacing.md, color: Colors.textPrimary },
+  timelineItem: { flexDirection: 'row', marginBottom: Spacing.md, alignItems: 'flex-start' },
+  timelineDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: Colors.primary, marginTop: 5, marginRight: Spacing.md },
+  timelineContent: { flex: 1 },
+  timelineTime: { color: Colors.primary, fontWeight: '700' },
+  timelineActivity: { color: Colors.textPrimary, marginTop: 2 },
+  taskCard: { marginBottom: Spacing.sm, borderRadius: Radius.sm, elevation: 1, backgroundColor: Colors.surface },
   taskRow: { flexDirection: 'row', alignItems: 'center' },
-  vendorBtn: { backgroundColor: '#667eea', borderRadius: 8, marginBottom: 12 },
-  deleteBtn: { borderColor: '#ff4d4f', borderRadius: 8 },
+  vendorBtn: { backgroundColor: Colors.primary, borderRadius: Radius.sm, marginBottom: Spacing.md },
+  deleteBtn: { borderColor: Colors.danger, borderRadius: Radius.sm },
 });
 
 export default EventDetailScreen;

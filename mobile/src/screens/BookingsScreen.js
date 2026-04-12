@@ -4,6 +4,7 @@ import { Text, Card, Chip, Button, ActivityIndicator } from 'react-native-paper'
 import { AuthContext } from '../context/AuthContext';
 import { bookingService } from '../services/bookingService';
 import { formatDate, formatCurrency, getErrorMessage, getStatusColor } from '../utils/helpers';
+import { Colors, Spacing, Radius } from '../theme';
 
 const BookingsScreen = () => {
   const { user } = useContext(AuthContext);
@@ -50,48 +51,25 @@ const BookingsScreen = () => {
             <Text variant="titleMedium" style={styles.title} numberOfLines={1}>
               {isVendor ? (item.event?.title || 'Event') : (item.vendor?.businessName || 'Vendor')}
             </Text>
-            <Chip
-              compact
-              textStyle={{ fontSize: 11, color: '#fff' }}
-              style={{ backgroundColor: getStatusColor(item.status) }}
-            >
+            <Chip compact textStyle={{ fontSize: 11, color: '#fff', fontWeight: '600' }} style={{ backgroundColor: getStatusColor(item.status), borderRadius: Radius.sm }}>
               {item.status}
             </Chip>
           </View>
-
-          <Text variant="bodySmall" style={styles.meta}>
-            📅 {formatDate(item.serviceDate)}  •  💰 {formatCurrency(item.price)}
-          </Text>
-
-          {item.event?.title && !isVendor && (
-            <Text variant="bodySmall" style={styles.meta}>🎉 {item.event.title}</Text>
-          )}
-
-          {item.vendor?.category && isVendor && (
-            <Text variant="bodySmall" style={styles.meta}>📂 {item.vendor.category}</Text>
-          )}
-
-          {/* Actions */}
+          <Text variant="bodySmall" style={styles.meta}>📅 {formatDate(item.serviceDate)}  •  💰 {formatCurrency(item.price)}</Text>
+          {item.event?.title && !isVendor && <Text variant="bodySmall" style={styles.meta}>🎉 {item.event.title}</Text>}
+          {item.vendor?.category && isVendor && <Text variant="bodySmall" style={styles.meta}>📂 {item.vendor.category}</Text>}
           <View style={styles.actions}>
             {isVendor && item.status === 'pending' && (
               <>
-                <Button compact mode="contained" style={styles.confirmBtn} onPress={() => handleUpdateStatus(item.id, 'confirmed')}>
-                  Confirm
-                </Button>
-                <Button compact mode="outlined" style={styles.cancelBtn} textColor="#ff4d4f" onPress={() => handleCancel(item.id)}>
-                  Decline
-                </Button>
+                <Button compact mode="contained" style={styles.confirmBtn} labelStyle={styles.actionLabel} onPress={() => handleUpdateStatus(item.id, 'confirmed')}>Confirm</Button>
+                <Button compact mode="outlined" style={styles.cancelBtn} textColor={Colors.danger} labelStyle={styles.actionLabel} onPress={() => handleCancel(item.id)}>Decline</Button>
               </>
             )}
             {isVendor && item.status === 'confirmed' && (
-              <Button compact mode="contained" style={styles.completeBtn} onPress={() => handleUpdateStatus(item.id, 'completed')}>
-                Mark Complete
-              </Button>
+              <Button compact mode="contained" style={styles.completeBtn} labelStyle={styles.actionLabel} onPress={() => handleUpdateStatus(item.id, 'completed')}>Mark Complete</Button>
             )}
             {!isVendor && (item.status === 'pending' || item.status === 'confirmed') && (
-              <Button compact mode="outlined" textColor="#ff4d4f" onPress={() => handleCancel(item.id)}>
-                Cancel
-              </Button>
+              <Button compact mode="outlined" textColor={Colors.danger} onPress={() => handleCancel(item.id)}>Cancel</Button>
             )}
           </View>
         </Card.Content>
@@ -99,7 +77,7 @@ const BookingsScreen = () => {
     );
   };
 
-  if (loading) return <ActivityIndicator style={{ flex: 1 }} size="large" />;
+  if (loading) return <ActivityIndicator style={{ flex: 1 }} size="large" color={Colors.primary} />;
 
   return (
     <View style={styles.container}>
@@ -107,28 +85,27 @@ const BookingsScreen = () => {
         data={bookings}
         keyExtractor={(item) => String(item.id)}
         renderItem={renderBooking}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchBookings(); }} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchBookings(); }} colors={[Colors.primary]} />}
         contentContainerStyle={styles.listContent}
-        ListEmptyComponent={
-          <Text style={styles.emptyText}>No bookings yet.</Text>
-        }
+        ListEmptyComponent={<Text style={styles.emptyText}>No bookings yet.</Text>}
       />
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f5f5' },
-  listContent: { padding: 12 },
-  card: { marginBottom: 12, borderRadius: 12, elevation: 2 },
+  container: { flex: 1, backgroundColor: Colors.background },
+  listContent: { padding: Spacing.md },
+  card: { marginBottom: Spacing.md, borderRadius: Radius.lg, elevation: 2, backgroundColor: Colors.surface },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  title: { fontWeight: 'bold', flex: 1, marginRight: 8 },
-  meta: { color: '#666', marginTop: 4 },
-  actions: { flexDirection: 'row', marginTop: 12, gap: 8 },
-  confirmBtn: { backgroundColor: '#52c41a', borderRadius: 8 },
-  cancelBtn: { borderColor: '#ff4d4f', borderRadius: 8 },
-  completeBtn: { backgroundColor: '#1890ff', borderRadius: 8 },
-  emptyText: { textAlign: 'center', color: '#888', marginTop: 40 },
+  title: { fontWeight: '700', flex: 1, marginRight: Spacing.sm, color: Colors.textPrimary },
+  meta: { color: Colors.textSecondary, marginTop: 4 },
+  actions: { flexDirection: 'row', marginTop: Spacing.md, gap: Spacing.sm },
+  actionLabel: { fontWeight: '600' },
+  confirmBtn: { backgroundColor: Colors.success, borderRadius: Radius.sm },
+  cancelBtn: { borderColor: Colors.danger, borderRadius: Radius.sm },
+  completeBtn: { backgroundColor: Colors.info, borderRadius: Radius.sm },
+  emptyText: { textAlign: 'center', color: Colors.textMuted, marginTop: 40 },
 });
 
 export default BookingsScreen;

@@ -4,6 +4,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { IconButton } from 'react-native-paper';
 import { AuthContext } from '../context/AuthContext';
+import { Colors, headerScreenOptions } from '../theme';
 
 // Screens
 import LoginScreen from '../screens/LoginScreen';
@@ -28,7 +29,7 @@ const Tab = createBottomTabNavigator();
 
 // Vendor stack (list → detail)
 const VendorStack = () => (
-  <Stack.Navigator screenOptions={{ headerStyle: { backgroundColor: '#667eea' }, headerTintColor: '#fff' }}>
+  <Stack.Navigator screenOptions={headerScreenOptions}>
     <Stack.Screen name="VendorList" component={VendorListScreen} options={{ title: 'Vendors' }} />
     <Stack.Screen name="VendorDetail" component={VendorDetailScreen} options={{ title: 'Vendor' }} />
   </Stack.Navigator>
@@ -36,7 +37,7 @@ const VendorStack = () => (
 
 // Dashboard stack (dashboard → event create/detail)
 const DashboardStack = () => (
-  <Stack.Navigator screenOptions={{ headerStyle: { backgroundColor: '#667eea' }, headerTintColor: '#fff' }}>
+  <Stack.Navigator screenOptions={headerScreenOptions}>
     <Stack.Screen name="DashboardHome" component={DashboardScreen} options={{ title: 'Vedika 360' }} />
     <Stack.Screen name="EventCreate" component={EventCreateScreen} options={{ title: 'New Event' }} />
     <Stack.Screen name="EventDetail" component={EventDetailScreen} options={{ title: 'Event Details' }} />
@@ -68,10 +69,17 @@ const MainTabs = () => {
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: '#667eea',
-        tabBarInactiveTintColor: '#8c8c8c',
-        tabBarStyle: { paddingBottom: 4, height: 60 },
-        tabBarLabelStyle: { fontSize: 12 },
+        tabBarActiveTintColor: Colors.primary,
+        tabBarInactiveTintColor: Colors.textMuted,
+        tabBarStyle: {
+          paddingBottom: 6,
+          paddingTop: 4,
+          height: 64,
+          backgroundColor: Colors.surface,
+          borderTopColor: Colors.border,
+          elevation: 8,
+        },
+        tabBarLabelStyle: { fontSize: 12, fontWeight: '600' },
       }}
     >
       <Tab.Screen
@@ -98,8 +106,7 @@ const MainTabs = () => {
           tabBarIcon: tabIcon('calendar-check'),
           headerShown: true,
           headerTitle: 'My Bookings',
-          headerStyle: { backgroundColor: '#667eea' },
-          headerTintColor: '#fff',
+          ...headerScreenOptions,
         }}
       />
 
@@ -111,8 +118,7 @@ const MainTabs = () => {
           tabBarIcon: tabIcon('account-circle'),
           headerShown: true,
           headerTitle: 'Profile',
-          headerStyle: { backgroundColor: '#667eea' },
-          headerTintColor: '#fff',
+          ...headerScreenOptions,
         }}
       />
     </Tab.Navigator>
@@ -130,8 +136,7 @@ const AuthStack = () => (
       options={({ route }) => ({
         headerShown: true,
         title: route.params?.eventTitle || 'Event invite',
-        headerStyle: { backgroundColor: '#667eea' },
-        headerTintColor: '#fff',
+        ...headerScreenOptions,
       })}
     />
   </Stack.Navigator>

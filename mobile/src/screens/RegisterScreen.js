@@ -3,6 +3,7 @@ import { View, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 're
 import { TextInput, Button, Text, HelperText, SegmentedButtons } from 'react-native-paper';
 import { AuthContext } from '../context/AuthContext';
 import { getErrorMessage } from '../utils/helpers';
+import { Colors, Spacing, Radius } from '../theme';
 
 const RegisterScreen = ({ navigation }) => {
   const { register } = useContext(AuthContext);
@@ -45,9 +46,14 @@ const RegisterScreen = ({ navigation }) => {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+        <View style={styles.brandHeader}>
+          <Text variant="displaySmall" style={styles.brandName}>Vedika 360</Text>
+          <Text variant="bodyMedium" style={styles.brandTagline}>Create your account</Text>
+        </View>
+
         <View style={styles.card}>
-          <Text variant="headlineMedium" style={styles.title}>Create Account</Text>
-          <Text variant="bodyMedium" style={styles.subtitle}>Join Vedika 360 today</Text>
+          <Text variant="headlineMedium" style={styles.title}>Get Started</Text>
+          <Text variant="bodyMedium" style={styles.subtitle}>Join our event management platform</Text>
 
           {error ? <HelperText type="error" visible>{error}</HelperText> : null}
 
@@ -56,8 +62,9 @@ const RegisterScreen = ({ navigation }) => {
             value={name}
             onChangeText={setName}
             mode="outlined"
-            left={<TextInput.Icon icon="account" />}
+            left={<TextInput.Icon icon="account-outline" />}
             style={styles.input}
+            outlineStyle={styles.inputOutline}
           />
 
           <TextInput
@@ -67,8 +74,9 @@ const RegisterScreen = ({ navigation }) => {
             mode="outlined"
             keyboardType="email-address"
             autoCapitalize="none"
-            left={<TextInput.Icon icon="email" />}
+            left={<TextInput.Icon icon="email-outline" />}
             style={styles.input}
+            outlineStyle={styles.inputOutline}
           />
 
           <Text variant="labelLarge" style={styles.roleLabel}>I am a...</Text>
@@ -89,9 +97,15 @@ const RegisterScreen = ({ navigation }) => {
             onChangeText={setPassword}
             mode="outlined"
             secureTextEntry={secureEntry}
-            left={<TextInput.Icon icon="lock" />}
-            right={<TextInput.Icon icon={secureEntry ? 'eye-off' : 'eye'} onPress={() => setSecureEntry(!secureEntry)} />}
+            left={<TextInput.Icon icon="lock-outline" />}
+            right={
+              <TextInput.Icon
+                icon={secureEntry ? 'eye-off-outline' : 'eye-outline'}
+                onPress={() => setSecureEntry(!secureEntry)}
+              />
+            }
             style={styles.input}
+            outlineStyle={styles.inputOutline}
           />
 
           <TextInput
@@ -100,8 +114,9 @@ const RegisterScreen = ({ navigation }) => {
             onChangeText={setConfirmPassword}
             mode="outlined"
             secureTextEntry={secureEntry}
-            left={<TextInput.Icon icon="lock-check" />}
+            left={<TextInput.Icon icon="lock-check-outline" />}
             style={styles.input}
+            outlineStyle={styles.inputOutline}
           />
 
           <Button
@@ -111,6 +126,7 @@ const RegisterScreen = ({ navigation }) => {
             disabled={loading}
             style={styles.button}
             contentStyle={styles.buttonContent}
+            labelStyle={styles.buttonLabel}
           >
             Create Account
           </Button>
@@ -119,6 +135,7 @@ const RegisterScreen = ({ navigation }) => {
             mode="text"
             onPress={() => navigation.navigate('Login')}
             style={styles.linkButton}
+            labelStyle={styles.linkLabel}
           >
             Already have an account? Sign In
           </Button>
@@ -129,17 +146,32 @@ const RegisterScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f5f5' },
-  scroll: { flexGrow: 1, justifyContent: 'center', padding: 20 },
-  card: { backgroundColor: '#fff', borderRadius: 12, padding: 24, elevation: 4 },
-  title: { textAlign: 'center', fontWeight: 'bold', color: '#667eea' },
-  subtitle: { textAlign: 'center', color: '#666', marginBottom: 24, marginTop: 4 },
-  input: { marginBottom: 16 },
-  roleLabel: { marginBottom: 8, color: '#333' },
-  segmented: { marginBottom: 16 },
-  button: { marginTop: 8, backgroundColor: '#667eea', borderRadius: 8 },
-  buttonContent: { paddingVertical: 6 },
-  linkButton: { marginTop: 12 },
+  container: { flex: 1, backgroundColor: Colors.background },
+  scroll: { flexGrow: 1, justifyContent: 'center', padding: Spacing.xl },
+  brandHeader: { alignItems: 'center', marginBottom: Spacing.xxl },
+  brandName: { color: Colors.primary, fontWeight: '900', letterSpacing: 0.5 },
+  brandTagline: { color: Colors.textSecondary, marginTop: Spacing.xs },
+  card: {
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.lg,
+    padding: Spacing.xxl,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+  },
+  title: { textAlign: 'center', fontWeight: '800', color: Colors.textPrimary },
+  subtitle: { textAlign: 'center', color: Colors.textSecondary, marginBottom: Spacing.xxl, marginTop: Spacing.xs },
+  input: { marginBottom: Spacing.md },
+  inputOutline: { borderRadius: Radius.sm },
+  roleLabel: { marginBottom: Spacing.sm, color: Colors.textPrimary, fontWeight: '600' },
+  segmented: { marginBottom: Spacing.lg },
+  button: { marginTop: Spacing.sm, backgroundColor: Colors.primary, borderRadius: Radius.sm },
+  buttonContent: { paddingVertical: 8 },
+  buttonLabel: { fontSize: 16, fontWeight: '700', letterSpacing: 0.5 },
+  linkButton: { marginTop: Spacing.md },
+  linkLabel: { fontSize: 14 },
 });
 
 export default RegisterScreen;
