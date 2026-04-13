@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import {
+  Button,
   Card,
   Row,
   Col,
@@ -16,6 +17,7 @@ import {
   Empty,
 } from 'antd';
 import {
+  CameraOutlined,
   WifiOutlined,
   DisconnectOutlined,
   CheckCircleOutlined,
@@ -208,6 +210,11 @@ const EventControlPanel = () => {
             </span>
           }
         />
+        <Link to={`/events/${eventId}/photo-booth`}>
+          <Button type="primary" icon={<CameraOutlined />} style={{ borderRadius: 8 }}>
+            Photo Booth
+          </Button>
+        </Link>
       </div>
 
       {/* Live stats row */}

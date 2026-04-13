@@ -117,6 +117,7 @@ model User {
   reviews       Review[]
   media         Media[]
   appNotifications AppNotification[]
+  instantPhotos InstantPhoto[]
 
   @@map("users")
 }
@@ -197,6 +198,7 @@ model Event {
   reviews   Review[]
   media     Media[]
   inviteJobs InviteJob[]
+  instantPhotos InstantPhoto[]
 
   @@index([organizerId, date])
   @@index([status])
@@ -501,4 +503,22 @@ model InviteGuestVideo {
 
   @@index([jobId, status])
   @@map("invite_guest_videos")
+}
+
+// ── Instant Photo Download (Live Photo Wall) ────────────────────────
+
+model InstantPhoto {
+  id          Int      @id @default(autoincrement())
+  eventId     Int      @map("event_id")
+  url         String
+  publicId    String?  @map("public_id")
+  caption     String?  @db.VarChar(500)
+  uploadedBy  Int?     @map("uploaded_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  event    Event @relation(fields: [eventId], references: [id])
+  uploader User? @relation(fields: [uploadedBy], references: [id])
+
+  @@index([eventId, createdAt(sort: Desc)])
+  @@map("instant_photos")
 }

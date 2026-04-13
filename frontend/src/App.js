@@ -28,6 +28,8 @@ import ActivityTracker from './pages/ActivityTracker';
 import ContactIntelligenceCenter from './pages/ContactIntelligenceCenter';
 import NotificationsPage from './pages/NotificationsPage';
 import Profile from './pages/Profile';
+import PhotoBooth from './pages/PhotoBooth';
+import LivePhotoWall from './pages/GuestPhotoDownload';
 
 import './App.css';
 
@@ -90,6 +92,9 @@ const AppInner = () => {
             </AppLayout>
           }
         />
+
+        {/* Public live photo wall (no auth required) */}
+        <Route path="/live-photos/:eventId" element={<LivePhotoWall />} />
 
         {/* Protected Routes */}
         <Route
@@ -244,6 +249,16 @@ const AppInner = () => {
             <ProtectedRoute allowedRoles={['organizer', 'admin']}>
               <AppLayout>
                 <ContactIntelligenceCenter />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/events/:eventId/photo-booth"
+          element={
+            <ProtectedRoute allowedRoles={['organizer', 'admin', 'vendor']}>
+              <AppLayout>
+                <PhotoBooth />
               </AppLayout>
             </ProtectedRoute>
           }

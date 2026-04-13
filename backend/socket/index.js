@@ -38,6 +38,17 @@ const initSocket = (io) => {
       io.to(`event-${data.eventId}`).emit('task:update', data);
     });
 
+    // Live photo wall rooms (guests scan QR at event)
+    socket.on('join-live-photos', (eventId) => {
+      if (!eventId) return;
+      socket.join(`live-photos-${eventId}`);
+    });
+
+    socket.on('leave-live-photos', (eventId) => {
+      if (!eventId) return;
+      socket.leave(`live-photos-${eventId}`);
+    });
+
     socket.on('disconnect', () => {
       console.log(`Socket disconnected: ${socket.id}`);
     });
