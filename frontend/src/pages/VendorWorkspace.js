@@ -49,7 +49,8 @@ const VendorWorkspace = () => {
     }
   };
 
-  useEffect(() => { loadData(); /* eslint-disable-next-line */ }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { loadData(); }, []);
 
   // ---- Group packages by category (= "service") ----
   const serviceGroups = useMemo(() => {
