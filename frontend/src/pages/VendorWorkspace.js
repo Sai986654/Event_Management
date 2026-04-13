@@ -1,35 +1,44 @@
 import React, { useContext, useEffect, useMemo, useState } from 'react';
-import { Button, Card, Col, Collapse, Empty, Form, Image, Input, InputNumber, Row, Select, Space, Table, Tag, Tooltip, Upload, message } from 'antd';
-import { DeleteOutlined, EditOutlined, PlusOutlined, AppstoreOutlined } from '@ant-design/icons';
+import { Button, Card, Col, Empty, Form, Image, Input, InputNumber, Modal, Row, Select, Space, Tag, Tooltip, Upload, message } from 'antd';
+import { DeleteOutlined, EditOutlined, PlusOutlined, ShopOutlined } from '@ant-design/icons';
 import { AuthContext } from '../context/AuthContext';
 import { vendorService } from '../services/vendorService';
 import { packageService } from '../services/packageService';
 import { getErrorMessage } from '../utils/helpers';
 import './PhaseFlows.css';
 
-const categories = ['catering', 'decor', 'photography', 'videography', 'music', 'venue', 'florist', 'transportation', 'other'];
-const categoryLabel = (c) => c ? c.charAt(0).toUpperCase() + c.slice(1) : c;
-const categoryColor = { catering: 'orange', decor: 'purple', photography: 'blue', videography: 'cyan', music: 'magenta', venue: 'green', florist: 'pink', transportation: 'gold', other: 'default' };
+const ALL_CATEGORIES = ['catering', 'decor', 'photography', 'videography', 'music', 'venue', 'florist', 'transportation', 'other'];
+const catLabel = (c) => c ? c.charAt(0).toUpperCase() + c.slice(1) : c;
+const catColor = { catering: 'orange', decor: 'purple', photography: 'blue', videography: 'cyan', music: 'magenta', venue: 'green', florist: 'pink', transportation: 'gold', other: 'default' };
 
 const VendorWorkspace = () => {
   const { user } = useContext(AuthContext);
-  const [packageForm] = Form.useForm();
-  const [testimonialForm] = Form.useForm();
   const [loading, setLoading] = useState(false);
-  const [submittingPackage, setSubmittingPackage] = useState(false);
-  const [submittingTestimonial, setSubmittingTestimonial] = useState(false);
-  const [uploadingMedia, setUploadingMedia] = useState(false);
-  const [mediaCaption, setMediaCaption] = useState('');
   const [vendor, setVendor] = useState(null);
   const [packages, setPackages] = useState([]);
+
+  // Service modal
+  const [serviceModalOpen, setServiceModalOpen] = useState(false);
+  const [serviceForm] = Form.useForm();
+  const [savingService, setSavingService] = useState(false);
+  const [editingService, setEditingService] = useState(null);
+
+  // Package modal
+  const [packageModalOpen, setPackageModalOpen] = useState(false);
+  const [packageForm] = Form.useForm();
+  const [savingPackage, setSavingPackage] = useState(false);
   const [editingPackage, setEditingPackage] = useState(null);
-  const [activeServiceTab, setActiveServiceTab] = useState(null);
+  const [packageTargetCategory, setPackageTargetCategory] = useState(null);
 
-  const statusColor = useMemo(
-    () => ({ approved: 'green', pending: 'orange', rejected: 'red' }[vendor?.verificationStatus] || 'default'),
-    [vendor?.verificationStatus]
-  );
+  // Testimonial
+  const [testimonialForm] = Form.useForm();
+  const [savingTestimonial, setSavingTestimonial] = useState(false);
 
+  // Portfolio
+  const [uploadingMedia, setUploadingMedia] = useState(false);
+  const [mediaCaption, setMediaCaption] = useState('');
+
+  // ---- Data loading ----
   const loadData = async () => {
     setLoading(true);
     try {
@@ -37,8 +46,8 @@ const VendorWorkspace = () => {
       const mine = (vendorsRes.vendors || []).find((v) => v.user?.id === user?.id);
       setVendor(mine || null);
       if (mine) {
-        const packageRes = await packageService.getMyPackages();
-        setPackages(packageRes.packages || []);
+        const pkgRes = await packageService.getMyPackages();
+        setPackages(pkgRes.packages || []);
       } else {
         setPackages([]);
       }
@@ -52,22 +61,131 @@ const VendorWorkspace = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { loadData(); }, []);
 
-  // ---- Group packages by category (= "service") ----
-  const serviceGroups = useMemo(() => {
-    const groups = {};
+  // ---- Services stored in vendor.packages JSON ----
+  const services = useMemo(() => {
+    const raw = vendor?.packages;
+    return Array.isArray(raw) ? raw : [];
+  }, [vendor]);
+
+  const usedCategories = useMemo(() => services.map((s) => s.category), [services]);
+
+  const availableCategories = useMemo(
+    () => ALL_CATEGORIES.filter((c) => !usedCategories.includes(c)),
+    [usedCategories]
+  );
+
+  // Group VendorPackage records by category
+  const packagesByCategory = useMemo(() => {
+    const map = {};
     packages.forEach((pkg) => {
       const cat = pkg.category || 'other';
-      if (!groups[cat]) groups[cat] = [];
-      groups[cat].push(pkg);
+      if (!map[cat]) map[cat] = [];
+      map[cat].push(pkg);
     });
-    return groups;
+    return map;
   }, [packages]);
 
-  const serviceCategories = Object.keys(serviceGroups);
+  const statusColor = { approved: 'green', pending: 'orange', rejected: 'red' }[vendor?.verificationStatus] || 'default';
+
+  // ---- Service CRUD ----
+  const openAddService = () => {
+    setEditingService(null);
+    serviceForm.resetFields();
+    setServiceModalOpen(true);
+  };
+
+  const openEditService = (svc) => {
+    setEditingService(svc);
+    serviceForm.setFieldsValue({ category: svc.category, serviceDescription: svc.serviceDescription || '' });
+    setServiceModalOpen(true);
+  };
+
+  const saveService = async (values) => {
+    setSavingService(true);
+    try {
+      let updated;
+      if (editingService) {
+        updated = services.map((s) =>
+          s.category === editingService.category
+            ? { ...s, category: values.category, serviceDescription: values.serviceDescription }
+            : s
+        );
+        // If category changed, update all packages under old category
+        if (values.category !== editingService.category) {
+          const toUpdate = packagesByCategory[editingService.category] || [];
+          await Promise.all(
+            toUpdate.map((pkg) => packageService.updatePackage(pkg.id, { category: values.category }))
+          );
+        }
+      } else {
+        updated = [...services, { category: values.category, serviceDescription: values.serviceDescription, createdAt: new Date().toISOString() }];
+      }
+      await vendorService.updateVendorProfile(vendor.id, { packages: updated });
+      message.success(editingService ? 'Service updated' : 'Service added');
+      setServiceModalOpen(false);
+      serviceForm.resetFields();
+      setEditingService(null);
+      await loadData();
+    } catch (err) {
+      message.error(getErrorMessage(err));
+    } finally {
+      setSavingService(false);
+    }
+  };
+
+  const deleteService = async (category) => {
+    const catPackages = packagesByCategory[category] || [];
+    Modal.confirm({
+      title: `Delete "${catLabel(category)}" service?`,
+      content: catPackages.length > 0
+        ? `This will also delete ${catPackages.length} package(s) under this service.`
+        : 'This service has no packages.',
+      okText: 'Delete',
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        try {
+          // Delete all packages under this service
+          await Promise.all(catPackages.map((pkg) => packageService.deletePackage(pkg.id)));
+          // Remove service from vendor.packages JSON
+          const updated = services.filter((s) => s.category !== category);
+          await vendorService.updateVendorProfile(vendor.id, { packages: updated });
+          message.success('Service deleted');
+          await loadData();
+        } catch (err) {
+          message.error(getErrorMessage(err));
+        }
+      },
+    });
+  };
 
   // ---- Package CRUD ----
+  const openAddPackage = (category) => {
+    setEditingPackage(null);
+    setPackageTargetCategory(category);
+    packageForm.resetFields();
+    packageForm.setFieldsValue({ category });
+    setPackageModalOpen(true);
+  };
+
+  const openEditPackage = (pkg) => {
+    setEditingPackage(pkg);
+    setPackageTargetCategory(pkg.category);
+    packageForm.setFieldsValue({
+      title: pkg.title,
+      description: pkg.description,
+      category: pkg.category,
+      tier: pkg.tier || 'standard',
+      basePrice: pkg.basePrice,
+      perGuest: pkg.estimationRules?.perGuest || 0,
+      perHour: pkg.estimationRules?.perHour || 0,
+      fixed: pkg.estimationRules?.fixed || 0,
+      deliverables: Array.isArray(pkg.deliverables) ? pkg.deliverables.join(', ') : '',
+    });
+    setPackageModalOpen(true);
+  };
+
   const savePackage = async (values) => {
-    setSubmittingPackage(true);
+    setSavingPackage(true);
     try {
       const payload = {
         ...values,
@@ -86,57 +204,45 @@ const VendorWorkspace = () => {
         await packageService.createPackage(payload);
         message.success('Package added');
       }
+      setPackageModalOpen(false);
       packageForm.resetFields();
       setEditingPackage(null);
       await loadData();
     } catch (err) {
       message.error(getErrorMessage(err));
     } finally {
-      setSubmittingPackage(false);
+      setSavingPackage(false);
     }
   };
 
-  const startEditPackage = (pkg) => {
-    setEditingPackage(pkg);
-    packageForm.setFieldsValue({
-      title: pkg.title,
-      description: pkg.description,
-      category: pkg.category,
-      tier: pkg.tier || 'standard',
-      basePrice: pkg.basePrice,
-      perGuest: pkg.estimationRules?.perGuest || 0,
-      perHour: pkg.estimationRules?.perHour || 0,
-      fixed: pkg.estimationRules?.fixed || 0,
-      deliverables: Array.isArray(pkg.deliverables) ? pkg.deliverables.join(', ') : '',
-    });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const cancelEditPackage = () => { setEditingPackage(null); packageForm.resetFields(); };
-
-  const handleDeletePackage = async (id) => {
+  const deletePackage = async (id) => {
     try {
       await packageService.deletePackage(id);
       message.success('Package deleted');
       await loadData();
-    } catch (err) { message.error(getErrorMessage(err)); }
+    } catch (err) {
+      message.error(getErrorMessage(err));
+    }
   };
 
   // ---- Testimonials ----
   const addTestimonial = async (values) => {
-    setSubmittingTestimonial(true);
+    setSavingTestimonial(true);
     try {
       await packageService.addTestimonial(values);
       testimonialForm.resetFields();
       message.success('Testimonial added');
       await loadData();
-    } catch (err) { message.error(getErrorMessage(err)); }
-    finally { setSubmittingTestimonial(false); }
+    } catch (err) {
+      message.error(getErrorMessage(err));
+    } finally {
+      setSavingTestimonial(false);
+    }
   };
 
   // ---- Portfolio media ----
   const handlePortfolioUpload = async ({ file, onSuccess, onError }) => {
-    if (!vendor?.id) { message.warning('Create your business profile first (from the profile icon).'); return; }
+    if (!vendor?.id) { message.warning('Create your business profile first.'); return; }
     setUploadingMedia(true);
     try {
       await vendorService.uploadVendorMedia(vendor.id, file, mediaCaption);
@@ -144,26 +250,32 @@ const VendorWorkspace = () => {
       setMediaCaption('');
       await loadData();
       if (typeof onSuccess === 'function') onSuccess('ok');
-    } catch (err) { message.error(getErrorMessage(err)); if (typeof onError === 'function') onError(err); }
-    finally { setUploadingMedia(false); }
+    } catch (err) {
+      message.error(getErrorMessage(err));
+      if (typeof onError === 'function') onError(err);
+    } finally {
+      setUploadingMedia(false);
+    }
   };
 
   const portfolioItems = Array.isArray(vendor?.portfolio) ? vendor.portfolio : [];
 
-  if (!vendor) {
+  // ---- No vendor profile yet ----
+  if (!vendor && !loading) {
     return (
       <div className="phase-page">
-        <Card loading={loading} className="phase-hero" style={{ textAlign: 'center' }}>
+        <Card className="phase-hero" style={{ textAlign: 'center' }}>
           <h1 className="phase-title">Vendor Workspace</h1>
           <p className="phase-subtitle" style={{ marginBottom: 16 }}>
-            You need a business profile to manage services. Click the profile icon (top right) → <strong>My Profile</strong> to create one.
+            You need a business profile first. Click the profile icon (top right) â†’ <strong>My Profile</strong> to create one.
           </p>
-          <Button type="primary" onClick={() => window.location.href = '/profile'}>Go to My Profile</Button>
+          <Button type="primary" onClick={() => (window.location.href = '/profile')}>Go to My Profile</Button>
         </Card>
       </div>
     );
   }
 
+  // ---- Main render ----
   return (
     <div className="phase-page">
       <Row gutter={[20, 20]} className="phase-stack">
@@ -186,135 +298,118 @@ const VendorWorkspace = () => {
           </Card>
         </Col>
 
-        {/* Add / Edit Service Package Form */}
+        {/* Add New Service button */}
         <Col span={24}>
-          <Card
-            className="phase-card"
-            title={
-              editingPackage
-                ? <span><EditOutlined /> Edit Package: {editingPackage.title}</span>
-                : <span><PlusOutlined /> Add a New Service Package</span>
-            }
-            extra={editingPackage ? <Button size="small" onClick={cancelEditPackage}>Cancel</Button> : null}
+          <Button
+            type="primary"
+            size="large"
+            icon={<PlusOutlined />}
+            onClick={openAddService}
+            disabled={availableCategories.length === 0}
+            block
+            style={{ borderRadius: 8, fontWeight: 600, height: 48, fontSize: 16 }}
           >
-            <p style={{ color: '#666', marginBottom: 16, fontSize: 13 }}>
-              {editingPackage
-                ? 'Update the details of this package below.'
-                : 'Describe the service you offer (e.g. Photography, Catering). Each package belongs to a service category. You can add multiple packages across different categories — all managed from this workspace.'}
-            </p>
-            <Form form={packageForm} layout="vertical" onFinish={savePackage}>
-              <Row gutter={16}>
-                <Col xs={24} md={8}>
-                  <Form.Item name="category" label="Service Category" rules={[{ required: true, message: 'Pick the service type' }]}>
-                    <Select placeholder="e.g. Photography" options={categories.map((c) => ({ value: c, label: categoryLabel(c) }))} />
-                  </Form.Item>
-                </Col>
-                <Col xs={24} md={8}>
-                  <Form.Item name="title" label="Package Title" rules={[{ required: true }]}>
-                    <Input placeholder="e.g. Wedding Premium Package" />
-                  </Form.Item>
-                </Col>
-                <Col xs={24} md={8}>
-                  <Form.Item name="tier" label="Tier" initialValue="standard">
-                    <Select options={[
-                      { value: 'basic', label: 'Basic' },
-                      { value: 'standard', label: 'Standard' },
-                      { value: 'premium', label: 'Premium' },
-                      { value: 'luxury', label: 'Luxury' },
-                    ]} />
-                  </Form.Item>
-                </Col>
-              </Row>
-
-              <Form.Item name="description" label="Detailed Service Description" rules={[{ required: true }]}>
-                <Input.TextArea rows={4} placeholder="Explain what this package includes, duration, coverage, special features..." />
-              </Form.Item>
-
-              <Row gutter={16}>
-                <Col xs={12} md={6}><Form.Item name="basePrice" label="Base Price (₹)" rules={[{ required: true }]}><InputNumber min={0} style={{ width: '100%' }} placeholder="50000" /></Form.Item></Col>
-                <Col xs={12} md={6}><Form.Item name="perGuest" label="Per Guest (₹)"><InputNumber min={0} style={{ width: '100%' }} placeholder="0" /></Form.Item></Col>
-                <Col xs={12} md={6}><Form.Item name="perHour" label="Per Hour (₹)"><InputNumber min={0} style={{ width: '100%' }} placeholder="0" /></Form.Item></Col>
-                <Col xs={12} md={6}><Form.Item name="fixed" label="Fixed Add-on (₹)"><InputNumber min={0} style={{ width: '100%' }} placeholder="0" /></Form.Item></Col>
-              </Row>
-
-              <Form.Item name="deliverables" label="Deliverables (comma-separated)">
-                <Input placeholder="e.g. 500 edited photos, 1 highlight reel, 2 photographers, drone coverage" />
-              </Form.Item>
-
-              <Space>
-                <Button type="primary" htmlType="submit" loading={submittingPackage} icon={editingPackage ? <EditOutlined /> : <PlusOutlined />}>
-                  {editingPackage ? 'Update Package' : 'Add Package'}
-                </Button>
-                {editingPackage && <Button onClick={cancelEditPackage}>Cancel</Button>}
-              </Space>
-            </Form>
-          </Card>
+            + Add a New Service
+          </Button>
+          {availableCategories.length === 0 && (
+            <p style={{ textAlign: 'center', color: '#999', marginTop: 8, fontSize: 13 }}>You've added services in all available categories.</p>
+          )}
         </Col>
 
-        {/* My Services — grouped by category */}
-        <Col span={24}>
-          <Card className="phase-card" title={<span><AppstoreOutlined /> My Services ({serviceCategories.length} {serviceCategories.length === 1 ? 'service' : 'services'}, {packages.length} {packages.length === 1 ? 'package' : 'packages'})</span>}>
-            {serviceCategories.length === 0 ? (
-              <Empty description="No services yet. Add your first package above to get started." />
-            ) : (
-              <Collapse
-                accordion
-                activeKey={activeServiceTab}
-                onChange={(key) => setActiveServiceTab(key)}
-                items={serviceCategories.map((cat) => ({
-                  key: cat,
-                  label: (
+        {/* Service cards */}
+        {services.length === 0 ? (
+          <Col span={24}>
+            <Card className="phase-card">
+              <Empty description="No services yet. Click the button above to add your first service." />
+            </Card>
+          </Col>
+        ) : (
+          services.map((svc) => {
+            const cat = svc.category;
+            const catPkgs = packagesByCategory[cat] || [];
+            return (
+              <Col span={24} key={cat}>
+                <Card
+                  className="phase-card"
+                  title={
                     <Space>
-                      <Tag color={categoryColor[cat] || 'default'}>{categoryLabel(cat)}</Tag>
-                      <span style={{ fontWeight: 600 }}>{serviceGroups[cat].length} {serviceGroups[cat].length === 1 ? 'package' : 'packages'}</span>
+                      <ShopOutlined />
+                      <Tag color={catColor[cat] || 'default'} style={{ fontSize: 14, padding: '2px 12px' }}>{catLabel(cat)}</Tag>
+                      <span style={{ fontWeight: 400, color: '#666' }}>â€” {catPkgs.length} {catPkgs.length === 1 ? 'package' : 'packages'}</span>
                     </Space>
-                  ),
-                  children: (
-                    <Table
-                      rowKey="id"
-                      dataSource={serviceGroups[cat]}
-                      pagination={false}
-                      size="small"
-                      columns={[
-                        { title: 'Title', dataIndex: 'title', render: (t) => <strong>{t}</strong> },
-                        { title: 'Tier', dataIndex: 'tier', render: (t) => <Tag>{t}</Tag> },
-                        { title: 'Base Price', dataIndex: 'basePrice', render: (v) => v != null ? `₹${Number(v).toLocaleString('en-IN')}` : '—' },
-                        {
-                          title: 'Deliverables',
-                          dataIndex: 'deliverables',
-                          render: (d) => Array.isArray(d) ? d.slice(0, 3).map((item, i) => <Tag key={i} style={{ marginBottom: 2 }}>{item}</Tag>) : '—',
-                          responsive: ['md'],
-                        },
-                        { title: 'Status', dataIndex: 'isActive', width: 80, render: (v) => <Tag color={v ? 'green' : 'default'}>{v ? 'Active' : 'Off'}</Tag> },
-                        {
-                          title: 'Actions', key: 'actions', width: 100,
-                          render: (_, record) => (
-                            <Space size="small">
-                              <Tooltip title="Edit"><Button size="small" icon={<EditOutlined />} onClick={() => startEditPackage(record)} /></Tooltip>
-                              <Tooltip title="Delete"><Button size="small" danger icon={<DeleteOutlined />} onClick={() => handleDeletePackage(record.id)} /></Tooltip>
-                            </Space>
-                          ),
-                        },
-                      ]}
-                      expandable={{
-                        expandedRowRender: (record) => (
-                          <div style={{ padding: '8px 0' }}>
-                            <p style={{ margin: 0 }}>{record.description}</p>
-                            {record.estimationRules?.perGuest > 0 && <Tag style={{ marginTop: 4 }}>+₹{record.estimationRules.perGuest}/guest</Tag>}
-                            {record.estimationRules?.perHour > 0 && <Tag style={{ marginTop: 4 }}>+₹{record.estimationRules.perHour}/hr</Tag>}
-                            {record.estimationRules?.fixed > 0 && <Tag style={{ marginTop: 4 }}>+₹{record.estimationRules.fixed} fixed</Tag>}
-                          </div>
-                        ),
-                      }}
-                    />
-                  ),
-                }))}
-              />
-            )}
-          </Card>
-        </Col>
+                  }
+                  extra={
+                    <Space>
+                      <Tooltip title="Edit service details"><Button size="small" icon={<EditOutlined />} onClick={() => openEditService(svc)} /></Tooltip>
+                      <Tooltip title="Delete service"><Button size="small" danger icon={<DeleteOutlined />} onClick={() => deleteService(cat)} /></Tooltip>
+                    </Space>
+                  }
+                >
+                  {/* Service description */}
+                  {svc.serviceDescription && (
+                    <div style={{ padding: '12px 16px', background: '#f8f9fb', borderRadius: 8, marginBottom: 16, lineHeight: 1.6, color: '#444' }}>
+                      {svc.serviceDescription}
+                    </div>
+                  )}
 
-        {/* Testimonial + Portfolio side by side */}
+                  {/* Packages under this service */}
+                  {catPkgs.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '16px 0', color: '#999' }}>
+                      No packages yet for this service.
+                    </div>
+                  ) : (
+                    <Row gutter={[16, 16]}>
+                      {catPkgs.map((pkg) => (
+                        <Col xs={24} md={12} lg={8} key={pkg.id}>
+                          <Card
+                            size="small"
+                            style={{ borderRadius: 8, height: '100%' }}
+                            title={<span style={{ fontWeight: 600 }}>{pkg.title}</span>}
+                            extra={<Tag>{pkg.tier || 'standard'}</Tag>}
+                            actions={[
+                              <Tooltip title="Edit" key="edit"><EditOutlined onClick={() => openEditPackage(pkg)} /></Tooltip>,
+                              <Tooltip title="Delete" key="del"><DeleteOutlined style={{ color: '#ff4d4f' }} onClick={() => deletePackage(pkg.id)} /></Tooltip>,
+                            ]}
+                          >
+                            <p style={{ fontSize: 13, color: '#555', minHeight: 40, marginBottom: 8 }}>
+                              {pkg.description?.length > 120 ? pkg.description.slice(0, 120) + '...' : pkg.description}
+                            </p>
+                            <div style={{ fontSize: 20, fontWeight: 700, color: '#333', marginBottom: 4 }}>
+                              â‚¹{Number(pkg.basePrice || 0).toLocaleString('en-IN')}
+                            </div>
+                            {pkg.estimationRules?.perGuest > 0 && <Tag>+â‚¹{pkg.estimationRules.perGuest}/guest</Tag>}
+                            {pkg.estimationRules?.perHour > 0 && <Tag>+â‚¹{pkg.estimationRules.perHour}/hr</Tag>}
+                            {pkg.estimationRules?.fixed > 0 && <Tag>+â‚¹{pkg.estimationRules.fixed} fixed</Tag>}
+                            {Array.isArray(pkg.deliverables) && pkg.deliverables.length > 0 && (
+                              <div style={{ marginTop: 8 }}>
+                                {pkg.deliverables.slice(0, 3).map((d, i) => (
+                                  <Tag key={i} style={{ marginBottom: 4, fontSize: 11 }}>{d}</Tag>
+                                ))}
+                                {pkg.deliverables.length > 3 && <Tag>+{pkg.deliverables.length - 3} more</Tag>}
+                              </div>
+                            )}
+                            <div style={{ marginTop: 8 }}>
+                              <Tag color={pkg.isActive ? 'green' : 'default'}>{pkg.isActive ? 'Active' : 'Inactive'}</Tag>
+                            </div>
+                          </Card>
+                        </Col>
+                      ))}
+                    </Row>
+                  )}
+
+                  {/* Add package button for this service */}
+                  <div style={{ marginTop: 16, textAlign: 'center' }}>
+                    <Button type="dashed" icon={<PlusOutlined />} onClick={() => openAddPackage(cat)} style={{ borderRadius: 8 }}>
+                      Add Package to {catLabel(cat)}
+                    </Button>
+                  </div>
+                </Card>
+              </Col>
+            );
+          })
+        )}
+
+        {/* Testimonial + Portfolio */}
         <Col xs={24} lg={12}>
           <Card className="phase-card" title="Add Testimonial">
             <Form form={testimonialForm} layout="vertical" onFinish={addTestimonial}>
@@ -324,7 +419,7 @@ const VendorWorkspace = () => {
                 <Col span={12}><Form.Item name="rating" label="Rating"><InputNumber min={1} max={5} style={{ width: '100%' }} /></Form.Item></Col>
                 <Col span={12}><Form.Item name="source" label="Source"><Input placeholder="e.g. Google, WhatsApp" /></Form.Item></Col>
               </Row>
-              <Button type="primary" htmlType="submit" loading={submittingTestimonial}>Add Testimonial</Button>
+              <Button type="primary" htmlType="submit" loading={savingTestimonial}>Add Testimonial</Button>
             </Form>
           </Card>
         </Col>
@@ -360,6 +455,88 @@ const VendorWorkspace = () => {
           </Card>
         </Col>
       </Row>
+
+      {/* ===== Add/Edit Service Modal ===== */}
+      <Modal
+        title={editingService ? `Edit Service: ${catLabel(editingService.category)}` : 'Add a New Service'}
+        open={serviceModalOpen}
+        onCancel={() => { setServiceModalOpen(false); setEditingService(null); serviceForm.resetFields(); }}
+        footer={null}
+        destroyOnClose
+      >
+        <p style={{ color: '#666', marginBottom: 16 }}>
+          {editingService
+            ? 'Update your service details below.'
+            : 'Choose a service category and describe what you offer. You can add packages under it afterwards.'}
+        </p>
+        <Form form={serviceForm} layout="vertical" onFinish={saveService}>
+          <Form.Item name="category" label="Service Category" rules={[{ required: true, message: 'Select a category' }]}>
+            <Select
+              placeholder="e.g. Photography"
+              disabled={!!editingService}
+              options={(editingService ? ALL_CATEGORIES : availableCategories).map((c) => ({ value: c, label: catLabel(c) }))}
+            />
+          </Form.Item>
+          <Form.Item name="serviceDescription" label="Describe This Service" rules={[{ required: true, message: 'Describe your service' }]}>
+            <Input.TextArea rows={5} placeholder="What does your service include? What makes it special? Experience, equipment, team size, coverage areas..." />
+          </Form.Item>
+          <Space>
+            <Button type="primary" htmlType="submit" loading={savingService}>
+              {editingService ? 'Update Service' : 'Add Service'}
+            </Button>
+            <Button onClick={() => { setServiceModalOpen(false); setEditingService(null); }}>Cancel</Button>
+          </Space>
+        </Form>
+      </Modal>
+
+      {/* ===== Add/Edit Package Modal ===== */}
+      <Modal
+        title={editingPackage ? `Edit Package: ${editingPackage.title}` : `Add Package to ${catLabel(packageTargetCategory)}`}
+        open={packageModalOpen}
+        onCancel={() => { setPackageModalOpen(false); setEditingPackage(null); packageForm.resetFields(); }}
+        footer={null}
+        width={640}
+        destroyOnClose
+      >
+        <Form form={packageForm} layout="vertical" onFinish={savePackage}>
+          <Form.Item name="category" hidden><Input /></Form.Item>
+          <Row gutter={16}>
+            <Col span={16}>
+              <Form.Item name="title" label="Package Title" rules={[{ required: true }]}>
+                <Input placeholder="e.g. Wedding Premium Package" />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item name="tier" label="Tier" initialValue="standard">
+                <Select options={[
+                  { value: 'basic', label: 'Basic' },
+                  { value: 'standard', label: 'Standard' },
+                  { value: 'premium', label: 'Premium' },
+                  { value: 'luxury', label: 'Luxury' },
+                ]} />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Form.Item name="description" label="Package Description" rules={[{ required: true }]}>
+            <Input.TextArea rows={3} placeholder="What's included in this package..." />
+          </Form.Item>
+          <Row gutter={12}>
+            <Col span={6}><Form.Item name="basePrice" label="Base Price (â‚¹)" rules={[{ required: true }]}><InputNumber min={0} style={{ width: '100%' }} /></Form.Item></Col>
+            <Col span={6}><Form.Item name="perGuest" label="Per Guest (â‚¹)"><InputNumber min={0} style={{ width: '100%' }} /></Form.Item></Col>
+            <Col span={6}><Form.Item name="perHour" label="Per Hour (â‚¹)"><InputNumber min={0} style={{ width: '100%' }} /></Form.Item></Col>
+            <Col span={6}><Form.Item name="fixed" label="Fixed Add-on (â‚¹)"><InputNumber min={0} style={{ width: '100%' }} /></Form.Item></Col>
+          </Row>
+          <Form.Item name="deliverables" label="Deliverables (comma-separated)">
+            <Input placeholder="e.g. 500 photos, 1 highlight reel, drone coverage" />
+          </Form.Item>
+          <Space>
+            <Button type="primary" htmlType="submit" loading={savingPackage}>
+              {editingPackage ? 'Update Package' : 'Add Package'}
+            </Button>
+            <Button onClick={() => { setPackageModalOpen(false); setEditingPackage(null); }}>Cancel</Button>
+          </Space>
+        </Form>
+      </Modal>
     </div>
   );
 };
