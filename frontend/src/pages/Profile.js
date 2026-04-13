@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useRef, useState } from 'react';
-import { Button, Card, Col, Divider, Form, Input, Row, Select, Space, Tag, message } from 'antd';
+import { Button, Card, Col, Divider, Form, Input, Row, Select, Tag, message } from 'antd';
 import { FacebookOutlined, InstagramOutlined, MailOutlined, PhoneOutlined, TwitterOutlined, UserOutlined, YoutubeOutlined } from '@ant-design/icons';
 import { AuthContext } from '../context/AuthContext';
 import { authService } from '../services/authService';
@@ -49,7 +49,8 @@ const Profile = () => {
     }
   };
 
-  useEffect(() => { loadData(); /* eslint-disable-next-line */ }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { loadData(); }, []);
 
   // Populate vendor form when vendor data loads
   useEffect(() => {
