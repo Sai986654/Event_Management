@@ -219,6 +219,7 @@ model Vendor {
   contactPhone  String?        @map("contact_phone")
   contactEmail  String?        @map("contact_email")
   website       String?
+  socialLinks   Json           @default("{}") @map("social_links")
   averageRating Decimal        @default(0) @db.Decimal(2, 1) @map("average_rating")
   totalReviews  Int            @default(0) @map("total_reviews")
   isVerified    Boolean        @default(false) @map("is_verified")
