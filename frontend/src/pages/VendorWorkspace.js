@@ -11,6 +11,107 @@ const ALL_CATEGORIES = ['catering', 'decor', 'photography', 'videography', 'musi
 const catLabel = (c) => c ? c.charAt(0).toUpperCase() + c.slice(1) : c;
 const catColor = { catering: 'orange', decor: 'purple', photography: 'blue', videography: 'cyan', music: 'magenta', venue: 'green', florist: 'pink', transportation: 'gold', other: 'default' };
 
+// Category-specific pricing fields stored in estimationRules JSON
+const CATEGORY_FIELDS = {
+  catering: [
+    { name: 'perPlate', label: 'Per Plate Cost', prefix: '\u20B9', placeholder: '350' },
+    { name: 'extraSweetCost', label: 'Extra Sweet (per item)', prefix: '\u20B9', placeholder: '10' },
+    { name: 'extraStarterCost', label: 'Extra Starter (per item)', prefix: '\u20B9', placeholder: '15' },
+    { name: 'extraMainCourseCost', label: 'Extra Main Course (per item)', prefix: '\u20B9', placeholder: '20' },
+    { name: 'minPlates', label: 'Minimum Plates', placeholder: '100' },
+    { name: 'liveCounterCost', label: 'Live Counter Charge', prefix: '\u20B9', placeholder: '5000' },
+  ],
+  photography: [
+    { name: 'perHour', label: 'Per Hour', prefix: '\u20B9', placeholder: '2000' },
+    { name: 'extraCameraCost', label: 'Extra Camera/Photographer', prefix: '\u20B9', placeholder: '3000' },
+    { name: 'editedPhotos', label: 'Edited Photos Included', placeholder: '500' },
+    { name: 'albumCost', label: 'Album Cost', prefix: '\u20B9', placeholder: '5000' },
+    { name: 'droneCost', label: 'Drone Coverage', prefix: '\u20B9', placeholder: '8000' },
+  ],
+  videography: [
+    { name: 'perHour', label: 'Per Hour', prefix: '\u20B9', placeholder: '3000' },
+    { name: 'extraCameraCost', label: 'Extra Cameraman', prefix: '\u20B9', placeholder: '4000' },
+    { name: 'droneCost', label: 'Drone Coverage', prefix: '\u20B9', placeholder: '8000' },
+    { name: 'highlightReelCost', label: 'Highlight Reel', prefix: '\u20B9', placeholder: '10000' },
+    { name: 'trailerCost', label: 'Wedding Trailer', prefix: '\u20B9', placeholder: '15000' },
+  ],
+  decor: [
+    { name: 'perTable', label: 'Per Table Setup', prefix: '\u20B9', placeholder: '1500' },
+    { name: 'stageCost', label: 'Stage Decoration', prefix: '\u20B9', placeholder: '25000' },
+    { name: 'entranceCost', label: 'Entrance Decoration', prefix: '\u20B9', placeholder: '10000' },
+    { name: 'extraItemCost', label: 'Extra Item / Add-on', prefix: '\u20B9', placeholder: '500' },
+    { name: 'lightingCost', label: 'Lighting Package', prefix: '\u20B9', placeholder: '15000' },
+  ],
+  music: [
+    { name: 'perHour', label: 'Per Hour', prefix: '\u20B9', placeholder: '5000' },
+    { name: 'soundSystemCost', label: 'Sound System Charge', prefix: '\u20B9', placeholder: '10000' },
+    { name: 'extraArtistCost', label: 'Extra Artist / Singer', prefix: '\u20B9', placeholder: '8000' },
+    { name: 'djCost', label: 'DJ Setup', prefix: '\u20B9', placeholder: '15000' },
+  ],
+  venue: [
+    { name: 'perDay', label: 'Per Day Rental', prefix: '\u20B9', placeholder: '50000' },
+    { name: 'perHour', label: 'Per Hour (if applicable)', prefix: '\u20B9', placeholder: '5000' },
+    { name: 'cleaningCharge', label: 'Cleaning Charge', prefix: '\u20B9', placeholder: '3000' },
+    { name: 'securityDeposit', label: 'Security Deposit', prefix: '\u20B9', placeholder: '10000' },
+    { name: 'acCharge', label: 'AC / Generator Charge', prefix: '\u20B9', placeholder: '8000' },
+  ],
+  florist: [
+    { name: 'perArrangement', label: 'Per Arrangement', prefix: '\u20B9', placeholder: '2000' },
+    { name: 'bouquetCost', label: 'Bouquet Cost', prefix: '\u20B9', placeholder: '1500' },
+    { name: 'perTableCenterpiece', label: 'Table Centerpiece', prefix: '\u20B9', placeholder: '800' },
+    { name: 'carDecorationCost', label: 'Car Decoration', prefix: '\u20B9', placeholder: '3000' },
+  ],
+  transportation: [
+    { name: 'perTrip', label: 'Per Trip', prefix: '\u20B9', placeholder: '2000' },
+    { name: 'perKm', label: 'Per Km', prefix: '\u20B9', placeholder: '15' },
+    { name: 'waitingChargePerHour', label: 'Waiting Charge / Hr', prefix: '\u20B9', placeholder: '200' },
+    { name: 'driverAllowance', label: 'Driver Allowance', prefix: '\u20B9', placeholder: '500' },
+  ],
+  other: [
+    { name: 'perUnit', label: 'Per Unit Cost', prefix: '\u20B9', placeholder: '0' },
+    { name: 'perHour', label: 'Per Hour', prefix: '\u20B9', placeholder: '0' },
+  ],
+};
+
+// Renders category-specific pricing fields
+const CategoryPricingFields = ({ category }) => {
+  const fields = CATEGORY_FIELDS[category];
+  if (!fields || fields.length === 0) return null;
+  return (
+    <>
+      <div style={{ background: '#f0f5ff', padding: '8px 12px', borderRadius: 8, marginBottom: 12, fontSize: 13, color: '#444' }}>
+        <strong>{catLabel(category)}</strong> specific pricing (all optional \u2014 fill what applies)
+      </div>
+      <Row gutter={12}>
+        {fields.map((f) => (
+          <Col xs={12} md={8} key={f.name}>
+            <Form.Item name={['customPricing', f.name]} label={f.label}>
+              <InputNumber min={0} style={{ width: '100%' }} placeholder={f.placeholder} prefix={f.prefix} />
+            </Form.Item>
+          </Col>
+        ))}
+      </Row>
+    </>
+  );
+};
+
+// Format custom pricing tags for package card display
+const renderCustomPricingTags = (rules, category) => {
+  const fields = CATEGORY_FIELDS[category] || [];
+  const tags = [];
+  fields.forEach((f) => {
+    const val = rules?.[f.name];
+    if (val > 0) {
+      tags.push(
+        <Tag key={f.name} style={{ marginBottom: 4 }}>
+          {f.prefix ? `${f.prefix}${Number(val).toLocaleString('en-IN')}` : val} {f.label.toLowerCase()}
+        </Tag>
+      );
+    }
+  });
+  return tags.length > 0 ? <div style={{ marginTop: 4 }}>{tags}</div> : null;
+};
+
 const VendorWorkspace = () => {
   const { user } = useContext(AuthContext);
   const [loading, setLoading] = useState(false);
@@ -170,16 +271,18 @@ const VendorWorkspace = () => {
   const openEditPackage = (pkg) => {
     setEditingPackage(pkg);
     setPackageTargetCategory(pkg.category);
+    const rules = pkg.estimationRules || {};
+    const catFields = CATEGORY_FIELDS[pkg.category] || [];
+    const customPricing = {};
+    catFields.forEach((f) => { if (rules[f.name] != null) customPricing[f.name] = rules[f.name]; });
     packageForm.setFieldsValue({
       title: pkg.title,
       description: pkg.description,
       category: pkg.category,
       tier: pkg.tier || 'standard',
       basePrice: pkg.basePrice,
-      perGuest: pkg.estimationRules?.perGuest || 0,
-      perHour: pkg.estimationRules?.perHour || 0,
-      fixed: pkg.estimationRules?.fixed || 0,
       deliverables: Array.isArray(pkg.deliverables) ? pkg.deliverables.join(', ') : '',
+      customPricing,
     });
     setPackageModalOpen(true);
   };
@@ -187,14 +290,15 @@ const VendorWorkspace = () => {
   const savePackage = async (values) => {
     setSavingPackage(true);
     try {
+      // Build estimationRules from category-specific custom pricing
+      const customPricing = values.customPricing || {};
+      const estimationRules = {};
+      Object.entries(customPricing).forEach(([k, v]) => { if (v != null && v > 0) estimationRules[k] = Number(v); });
+      const { customPricing: _cp, ...rest } = values;
       const payload = {
-        ...values,
+        ...rest,
         basePrice: Number(values.basePrice || 0),
-        estimationRules: {
-          fixed: Number(values.fixed || 0),
-          perGuest: Number(values.perGuest || 0),
-          perHour: Number(values.perHour || 0),
-        },
+        estimationRules,
         deliverables: values.deliverables ? values.deliverables.split(',').map((d) => d.trim()).filter(Boolean) : [],
       };
       if (editingPackage) {
@@ -375,11 +479,9 @@ const VendorWorkspace = () => {
                               {pkg.description?.length > 120 ? pkg.description.slice(0, 120) + '...' : pkg.description}
                             </p>
                             <div style={{ fontSize: 20, fontWeight: 700, color: '#333', marginBottom: 4 }}>
-                              â‚¹{Number(pkg.basePrice || 0).toLocaleString('en-IN')}
+                              \u20B9{Number(pkg.basePrice || 0).toLocaleString('en-IN')}
                             </div>
-                            {pkg.estimationRules?.perGuest > 0 && <Tag>+â‚¹{pkg.estimationRules.perGuest}/guest</Tag>}
-                            {pkg.estimationRules?.perHour > 0 && <Tag>+â‚¹{pkg.estimationRules.perHour}/hr</Tag>}
-                            {pkg.estimationRules?.fixed > 0 && <Tag>+â‚¹{pkg.estimationRules.fixed} fixed</Tag>}
+                            {renderCustomPricingTags(pkg.estimationRules, pkg.category)}
                             {Array.isArray(pkg.deliverables) && pkg.deliverables.length > 0 && (
                               <div style={{ marginTop: 8 }}>
                                 {pkg.deliverables.slice(0, 3).map((d, i) => (
@@ -520,12 +622,13 @@ const VendorWorkspace = () => {
           <Form.Item name="description" label="Package Description" rules={[{ required: true }]}>
             <Input.TextArea rows={3} placeholder="What's included in this package..." />
           </Form.Item>
-          <Row gutter={12}>
-            <Col span={6}><Form.Item name="basePrice" label="Base Price (â‚¹)" rules={[{ required: true }]}><InputNumber min={0} style={{ width: '100%' }} /></Form.Item></Col>
-            <Col span={6}><Form.Item name="perGuest" label="Per Guest (â‚¹)"><InputNumber min={0} style={{ width: '100%' }} /></Form.Item></Col>
-            <Col span={6}><Form.Item name="perHour" label="Per Hour (â‚¹)"><InputNumber min={0} style={{ width: '100%' }} /></Form.Item></Col>
-            <Col span={6}><Form.Item name="fixed" label="Fixed Add-on (â‚¹)"><InputNumber min={0} style={{ width: '100%' }} /></Form.Item></Col>
-          </Row>
+          <Form.Item name="basePrice" label="Base Price (\u20B9)" rules={[{ required: true }]}>
+            <InputNumber min={0} style={{ width: '100%' }} placeholder="e.g. 50000" />
+          </Form.Item>
+
+          {/* Category-specific pricing */}
+          <CategoryPricingFields category={packageTargetCategory} />
+
           <Form.Item name="deliverables" label="Deliverables (comma-separated)">
             <Input placeholder="e.g. 500 photos, 1 highlight reel, drone coverage" />
           </Form.Item>
