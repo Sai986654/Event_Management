@@ -15,6 +15,9 @@ CREATE TABLE "service_categories" (
 -- CreateIndex
 CREATE UNIQUE INDEX "service_categories_name_key" ON "service_categories"("name");
 
+-- Add social_links column to vendors (was missing from earlier migrations)
+ALTER TABLE "vendors" ADD COLUMN IF NOT EXISTS "social_links" JSONB NOT NULL DEFAULT '{}';
+
 -- Convert enum columns to varchar
 ALTER TABLE "vendors" ALTER COLUMN "category" TYPE VARCHAR(60) USING "category"::text;
 ALTER TABLE "vendor_packages" ALTER COLUMN "category" TYPE VARCHAR(60) USING "category"::text;
