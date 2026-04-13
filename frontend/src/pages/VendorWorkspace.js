@@ -4,12 +4,13 @@ import { DeleteOutlined, EditOutlined, PlusOutlined, ShopOutlined } from '@ant-d
 import { AuthContext } from '../context/AuthContext';
 import { vendorService } from '../services/vendorService';
 import { packageService } from '../services/packageService';
+import { adminService } from '../services/adminService';
 import { getErrorMessage } from '../utils/helpers';
 import './PhaseFlows.css';
 
-const ALL_CATEGORIES = ['catering', 'decor', 'photography', 'videography', 'music', 'venue', 'florist', 'transportation', 'other'];
+const FALLBACK_CATEGORIES = ['catering', 'decor', 'photography', 'videography', 'music', 'venue', 'florist', 'transportation', 'other'];
 const catLabel = (c) => c ? c.charAt(0).toUpperCase() + c.slice(1) : c;
-const catColor = { catering: 'orange', decor: 'purple', photography: 'blue', videography: 'cyan', music: 'magenta', venue: 'green', florist: 'pink', transportation: 'gold', other: 'default' };
+const DEFAULT_CAT_COLORS = { catering: 'orange', decor: 'purple', photography: 'blue', videography: 'cyan', music: 'magenta', venue: 'green', florist: 'pink', transportation: 'gold', other: 'default' };
 
 // Category-specific pricing fields stored in estimationRules JSON
 const CATEGORY_FIELDS = {
@@ -117,6 +118,8 @@ const VendorWorkspace = () => {
   const [loading, setLoading] = useState(false);
   const [vendor, setVendor] = useState(null);
   const [packages, setPackages] = useState([]);
+  const [allCategories, setAllCategories] = useState(FALLBACK_CATEGORIES);
+  const [catColorMap, setCatColorMap] = useState(DEFAULT_CAT_COLORS);
 
   // Service modal
   const [serviceModalOpen, setServiceModalOpen] = useState(false);
@@ -143,6 +146,18 @@ const VendorWorkspace = () => {
   const loadData = async () => {
     setLoading(true);
     try {
+      // Load categories
+      try {
+        const catRes = await adminService.getCategories();
+        const cats = catRes.categories || [];
+        if (cats.length > 0) {
+          setAllCategories(cats.map((c) => c.name));
+          const colorMap = {};
+          cats.forEach((c) => { colorMap[c.name] = c.color || 'default'; });
+          setCatColorMap(colorMap);
+        }
+      } catch (_) { /* fallback to defaults */ }
+
       const vendorsRes = await vendorService.searchVendors({ limit: 100 });
       const mine = (vendorsRes.vendors || []).find((v) => v.user?.id === user?.id);
       setVendor(mine || null);
@@ -171,8 +186,8 @@ const VendorWorkspace = () => {
   const usedCategories = useMemo(() => services.map((s) => s.category), [services]);
 
   const availableCategories = useMemo(
-    () => ALL_CATEGORIES.filter((c) => !usedCategories.includes(c)),
-    [usedCategories]
+    () => allCategories.filter((c) => !usedCategories.includes(c)),
+    [usedCategories, allCategories]
   );
 
   // Group VendorPackage records by category
@@ -438,7 +453,7 @@ const VendorWorkspace = () => {
                   title={
                     <Space>
                       <ShopOutlined />
-                      <Tag color={catColor[cat] || 'default'} style={{ fontSize: 14, padding: '2px 12px' }}>{catLabel(cat)}</Tag>
+                      <Tag color={catColorMap[cat] || 'default'} style={{ fontSize: 14, padding: '2px 12px' }}>{catLabel(cat)}</Tag>
                       <span style={{ fontWeight: 400, color: '#666' }}>â€” {catPkgs.length} {catPkgs.length === 1 ? 'package' : 'packages'}</span>
                     </Space>
                   }
@@ -576,7 +591,7 @@ const VendorWorkspace = () => {
             <Select
               placeholder="e.g. Photography"
               disabled={!!editingService}
-              options={(editingService ? ALL_CATEGORIES : availableCategories).map((c) => ({ value: c, label: catLabel(c) }))}
+              options={(editingService ? allCategories : availableCategories).map((c) => ({ value: c, label: catLabel(c) }))}
             />
           </Form.Item>
           <Form.Item name="serviceDescription" label="Describe This Service" rules={[{ required: true, message: 'Describe your service' }]}>

@@ -4,10 +4,11 @@ import { FacebookOutlined, InstagramOutlined, MailOutlined, PhoneOutlined, Twitt
 import { AuthContext } from '../context/AuthContext';
 import { authService } from '../services/authService';
 import { vendorService } from '../services/vendorService';
+import { adminService } from '../services/adminService';
 import { getErrorMessage } from '../utils/helpers';
 import './PhaseFlows.css';
 
-const categories = ['catering', 'decor', 'photography', 'videography', 'music', 'venue', 'florist', 'transportation', 'other'];
+const FALLBACK_CATEGORIES = ['catering', 'decor', 'photography', 'videography', 'music', 'venue', 'florist', 'transportation', 'other'];
 
 const USER_FIELDS = ['name', 'phone'];
 const VENDOR_FIELDS = ['businessName', 'category', 'description', 'city', 'state', 'contactPhone', 'contactEmail', 'website', 'facebook', 'instagram', 'twitter', 'youtube'];
@@ -20,6 +21,7 @@ const Profile = () => {
   const [savingUser, setSavingUser] = useState(false);
   const [savingVendor, setSavingVendor] = useState(false);
   const [vendor, setVendor] = useState(null);
+  const [categories, setCategories] = useState(FALLBACK_CATEGORIES);
   const [userDirty, setUserDirty] = useState(false);
   const [vendorDirty, setVendorDirty] = useState(false);
   const savedUserRef = useRef({});
@@ -30,6 +32,13 @@ const Profile = () => {
   const loadData = async () => {
     setLoading(true);
     try {
+      // Load categories
+      try {
+        const catRes = await adminService.getCategories();
+        const cats = (catRes.categories || []).map((c) => c.name);
+        if (cats.length > 0) setCategories(cats);
+      } catch (_) { /* fallback */ }
+
       // Load fresh user profile
       const profileRes = await authService.getProfile();
       const u = profileRes.user || profileRes;

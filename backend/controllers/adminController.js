@@ -57,3 +57,73 @@ exports.createUserByAdmin = asyncHandler(async (req, res) => {
     user: { id: user.id, name: user.name, email: user.email, role: user.role },
   });
 });
+
+// ── Category Management ─────────────────────────────────────────────
+
+exports.getCategories = asyncHandler(async (_req, res) => {
+  const categories = await prisma.serviceCategory.findMany({ orderBy: { sortOrder: 'asc' } });
+  res.json({ categories });
+});
+
+exports.createCategory = asyncHandler(async (req, res) => {
+  const { name, label, color, icon } = req.body;
+  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+  const existing = await prisma.serviceCategory.findUnique({ where: { name: slug } });
+  if (existing) return res.status(400).json({ message: 'Category already exists' });
+
+  const maxSort = await prisma.serviceCategory.aggregate({ _max: { sortOrder: true } });
+  const category = await prisma.serviceCategory.create({
+    data: { name: slug, label: label || name, color: color || 'default', icon: icon || null, sortOrder: (maxSort._max.sortOrder || 0) + 1 },
+  });
+  res.status(201).json({ category });
+});
+
+exports.deleteCategory = asyncHandler(async (req, res) => {
+  const id = Number(req.params.id);
+  const category = await prisma.serviceCategory.findUnique({ where: { id } });
+  if (!category) return res.status(404).json({ message: 'Category not found' });
+
+  // Check if any vendors or packages use this category
+  const vendorCount = await prisma.vendor.count({ where: { category: category.name } });
+  const packageCount = await prisma.vendorPackage.count({ where: { category: category.name } });
+  if (vendorCount > 0 || packageCount > 0) {
+    return res.status(400).json({
+      message: `Cannot delete: ${vendorCount} vendor(s) and ${packageCount} package(s) use this category. Reassign them first.`,
+    });
+  }
+
+  await prisma.serviceCategory.delete({ where: { id } });
+  res.json({ message: 'Category deleted' });
+});
+
+// ── Vendor Management ───────────────────────────────────────────────
+
+exports.getAllVendors = asyncHandler(async (req, res) => {
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 50));
+  const skip = (page - 1) * limit;
+
+  const [vendors, total] = await Promise.all([
+    prisma.vendor.findMany({
+      skip,
+      take: limit,
+      orderBy: { createdAt: 'desc' },
+      include: { user: { select: { id: true, name: true, email: true, phone: true, isActive: true } } },
+    }),
+    prisma.vendor.count(),
+  ]);
+  res.json({ vendors, total, page, limit });
+});
+
+exports.deleteVendor = asyncHandler(async (req, res) => {
+  const id = Number(req.params.id);
+  const vendor = await prisma.vendor.findUnique({ where: { id } });
+  if (!vendor) return res.status(404).json({ message: 'Vendor not found' });
+
+  // Delete associated packages, testimonials, then the vendor
+  await prisma.vendorTestimonial.deleteMany({ where: { vendorId: id } });
+  await prisma.vendorPackage.deleteMany({ where: { vendorId: id } });
+  await prisma.vendor.delete({ where: { id } });
+
+  res.json({ message: 'Vendor removed from marketplace' });
+});
