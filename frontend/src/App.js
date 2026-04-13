@@ -27,6 +27,7 @@ import EventPlanner from './pages/EventPlanner';
 import ActivityTracker from './pages/ActivityTracker';
 import ContactIntelligenceCenter from './pages/ContactIntelligenceCenter';
 import NotificationsPage from './pages/NotificationsPage';
+import Profile from './pages/Profile';
 
 import './App.css';
 
@@ -183,6 +184,16 @@ const AppInner = () => {
             <ProtectedRoute>
               <AppLayout>
                 <MyBookings />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute>
+              <AppLayout>
+                <Profile />
               </AppLayout>
             </ProtectedRoute>
           }

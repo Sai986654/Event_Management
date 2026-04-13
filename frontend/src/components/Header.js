@@ -1,6 +1,6 @@
 import React, { useContext, useEffect, useState, useCallback } from 'react';
 import { Layout, Button, Dropdown, Avatar, Tag, Badge } from 'antd';
-import { UserOutlined, LogoutOutlined, BellOutlined } from '@ant-design/icons';
+import { UserOutlined, LogoutOutlined, BellOutlined, SettingOutlined } from '@ant-design/icons';
 import { Link, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { SocketContext } from '../context/SocketContext';
@@ -47,6 +47,12 @@ const Header = () => {
       disabled: true,
     },
     { type: 'divider' },
+    {
+      key: 'profile',
+      icon: <SettingOutlined />,
+      label: 'My Profile',
+      onClick: () => navigate('/profile'),
+    },
     {
       key: 'logout',
       icon: <LogoutOutlined />,
