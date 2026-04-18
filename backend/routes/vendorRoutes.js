@@ -9,12 +9,19 @@ const {
   getVendor,
   updateVendor,
   uploadVendorMedia,
+  uploadRawMaterialPhoto,
   deleteVendor,
   addReview,
   getReviews,
+  getRawMaterialItems,
+  getMyRawMaterialItems,
+  createRawMaterialItem,
+  updateRawMaterialItem,
+  deleteRawMaterialItem,
 } = require('../controllers/vendorController');
 
 router.get('/', getVendors);
+router.get('/raw-materials', getRawMaterialItems);
 router.get('/:id', getVendor);
 router.get('/:id/reviews', getReviews);
 
@@ -36,6 +43,21 @@ router.post(
   validate,
   createVendor
 );
+
+router.get('/raw-materials/mine', authorize('admin', 'vendor'), getMyRawMaterialItems);
+router.post('/raw-materials/photo', authorize('admin', 'vendor'), upload.single('file'), uploadRawMaterialPhoto);
+router.post(
+  '/raw-materials',
+  authorize('admin', 'vendor'),
+  [
+    body('itemName').trim().notEmpty().withMessage('Item name is required'),
+    body('price').optional().isFloat({ min: 0 }).withMessage('Price must be >= 0'),
+  ],
+  validate,
+  createRawMaterialItem
+);
+router.put('/raw-materials/:itemId', authorize('admin', 'vendor'), updateRawMaterialItem);
+router.delete('/raw-materials/:itemId', authorize('admin', 'vendor'), deleteRawMaterialItem);
 
 router.put('/:id', authorize('admin', 'vendor'), updateVendor);
 router.post('/:id/media', authorize('admin', 'vendor'), upload.single('file'), uploadVendorMedia);

@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useState, useCallback, useLayoutEffect } from 'react';
-import { View, StyleSheet, ScrollView, RefreshControl } from 'react-native';
+import { View, StyleSheet, ScrollView, RefreshControl, Linking } from 'react-native';
 import { Text, Card, Button, Chip, FAB, ActivityIndicator, IconButton } from 'react-native-paper';
 import { AuthContext } from '../context/AuthContext';
 import { eventService } from '../services/eventService';
@@ -59,6 +59,7 @@ const EventsDashboard = ({ user, navigation }) => {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [fabOpen, setFabOpen] = useState(false);
 
   const fetchEvents = useCallback(async () => {
     try {
@@ -187,12 +188,36 @@ const EventsDashboard = ({ user, navigation }) => {
       </ScrollView>
 
       {(user?.role === 'organizer' || user?.role === 'customer' || user?.role === 'admin') && (
-        <FAB
-          icon="plus"
-          style={styles.fab}
-          color={Colors.textOnPrimary}
-          onPress={() => navigation.navigate('EventCreate')}
-          label="New Event"
+        <FAB.Group
+          open={fabOpen}
+          visible
+          icon={fabOpen ? 'close' : 'plus'}
+          color="#fff"
+          fabStyle={styles.fab}
+          actions={[
+            {
+              icon: 'calendar-plus',
+              label: 'New Event',
+              color: Colors.primary,
+              onPress: () => navigation.navigate('EventCreate'),
+              style: { backgroundColor: Colors.surface },
+            },
+            {
+              icon: 'chat-outline',
+              label: 'In-App Chat',
+              color: Colors.primary,
+              onPress: () => navigation.navigate('ChatList'),
+              style: { backgroundColor: Colors.surface },
+            },
+            {
+              icon: 'whatsapp',
+              label: 'WhatsApp Connect',
+              color: '#25D366',
+              onPress: () => Linking.openURL('https://wa.me/917093888473?text=Hi%2C%20I%20need%20help%20with%20event%20planning'),
+              style: { backgroundColor: Colors.surface },
+            },
+          ]}
+          onStateChange={({ open }) => setFabOpen(open)}
         />
       )}
     </View>
@@ -388,7 +413,7 @@ const styles = StyleSheet.create({
   statusChipText: { fontSize: 11, fontWeight: '600' },
   emptyCard: { marginHorizontal: Spacing.lg, borderRadius: Radius.lg, backgroundColor: Colors.surface },
   emptyText: { textAlign: 'center', color: Colors.textMuted, paddingVertical: 20 },
-  fab: { position: 'absolute', right: 16, bottom: 16, backgroundColor: Colors.primary, borderRadius: Radius.lg },
+  fab: { backgroundColor: Colors.primary, borderRadius: Radius.lg },
 });
 
 export default DashboardScreen;

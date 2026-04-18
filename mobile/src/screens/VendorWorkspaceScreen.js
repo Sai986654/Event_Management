@@ -119,6 +119,18 @@ const VendorWorkspaceScreen = ({ navigation }) => {
   const [mediaCaption, setMediaCaption] = useState('');
   const [uploadingMedia, setUploadingMedia] = useState(false);
 
+  // Raw materials supplier catalog state
+  const [rawMaterialItems, setRawMaterialItems] = useState([]);
+  const [rawMaterialModalVisible, setRawMaterialModalVisible] = useState(false);
+  const [editingRawMaterial, setEditingRawMaterial] = useState(null);
+  const [rmName, setRmName] = useState('');
+  const [rmDescription, setRmDescription] = useState('');
+  const [rmPrice, setRmPrice] = useState('');
+  const [rmPhotoUrl, setRmPhotoUrl] = useState('');
+  const [rmCategories, setRmCategories] = useState([]);
+  const [savingRawMaterial, setSavingRawMaterial] = useState(false);
+  const [uploadingRawMaterialPhoto, setUploadingRawMaterialPhoto] = useState(false);
+
   if (user?.role !== 'vendor' && user?.role !== 'admin') {
     return (
       <View style={styles.centered}>
@@ -139,11 +151,16 @@ const VendorWorkspaceScreen = ({ navigation }) => {
 
       const res = await vendorService.searchVendors({ limit: 100 });
       const mine = (res.vendors || []).find((v) => v.user?.id === user?.id);
-      setVendor(mine || null);
       if (mine) {
+        const detail = await vendorService.getVendorById(mine.id);
+        const fullVendor = detail.vendor || mine;
+        setVendor(fullVendor);
+        setRawMaterialItems(Array.isArray(fullVendor.rawMaterialItems) ? fullVendor.rawMaterialItems : []);
         const pkgRes = await packageService.getMyPackages();
         setPackages(pkgRes.packages || []);
       } else {
+        setVendor(null);
+        setRawMaterialItems([]);
         setPackages([]);
       }
     } catch (err) {
@@ -409,6 +426,121 @@ const VendorWorkspaceScreen = ({ navigation }) => {
     }
   };
 
+  // ---- Raw material supplier catalog ----
+  const openAddRawMaterial = () => {
+    setEditingRawMaterial(null);
+    setRmName('');
+    setRmDescription('');
+    setRmPrice('');
+    setRmPhotoUrl('');
+    setRmCategories([]);
+    setRawMaterialModalVisible(true);
+  };
+
+  const openEditRawMaterial = (item) => {
+    setEditingRawMaterial(item);
+    setRmName(item.itemName || '');
+    setRmDescription(item.description || '');
+    setRmPrice(String(item.price || ''));
+    setRmPhotoUrl(item.photoUrl || '');
+    setRmCategories(Array.isArray(item.categories) ? item.categories : []);
+    setRawMaterialModalVisible(true);
+  };
+
+  const toggleRawMaterialCategory = (cat) => {
+    setRmCategories((prev) => (prev.includes(cat)
+      ? prev.filter((c) => c !== cat)
+      : [...prev, cat]));
+  };
+
+  const pickAndUploadRawMaterialPhoto = async () => {
+    if (!vendor?.id) return;
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Allow access to upload raw material photo.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.8,
+    });
+    if (result.canceled || !result.assets?.[0]) return;
+
+    setUploadingRawMaterialPhoto(true);
+    try {
+      const asset = result.assets[0];
+      const upload = await vendorService.uploadRawMaterialPhoto({
+        uri: asset.uri,
+        fileName: asset.fileName || `raw-material-${Date.now()}.jpg`,
+        mimeType: asset.mimeType || 'image/jpeg',
+      }, vendor.id);
+      setRmPhotoUrl(upload.photoUrl || '');
+      Alert.alert('Success', 'Photo uploaded');
+    } catch (err) {
+      Alert.alert('Upload Error', getErrorMessage(err));
+    } finally {
+      setUploadingRawMaterialPhoto(false);
+    }
+  };
+
+  const saveRawMaterialItem = async () => {
+    if (!rmName.trim()) {
+      Alert.alert('Error', 'Item name is required');
+      return;
+    }
+    if (Number(rmPrice || 0) < 0) {
+      Alert.alert('Error', 'Price must be 0 or more');
+      return;
+    }
+
+    setSavingRawMaterial(true);
+    try {
+      const payload = {
+        itemName: rmName.trim(),
+        description: rmDescription.trim() || null,
+        price: Number(rmPrice || 0),
+        photoUrl: rmPhotoUrl || null,
+        categories: rmCategories,
+        isActive: true,
+      };
+
+      if (editingRawMaterial) {
+        await vendorService.updateRawMaterialItem(editingRawMaterial.id, payload);
+        Alert.alert('Success', 'Raw material item updated');
+      } else {
+        await vendorService.createRawMaterialItem(payload);
+        Alert.alert('Success', 'Raw material item added');
+      }
+
+      setRawMaterialModalVisible(false);
+      await loadData();
+    } catch (err) {
+      Alert.alert('Error', getErrorMessage(err));
+    } finally {
+      setSavingRawMaterial(false);
+    }
+  };
+
+  const deleteRawMaterialItem = (item) => {
+    Alert.alert('Delete Item', `Delete "${item.itemName}" from your raw material catalog?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await vendorService.deleteRawMaterialItem(item.id);
+            Alert.alert('Success', 'Raw material item deleted');
+            await loadData();
+          } catch (err) {
+            Alert.alert('Error', getErrorMessage(err));
+          }
+        },
+      },
+    ]);
+  };
+
   // ---- No vendor profile ----
   if (!vendor && !loading) {
     return (
@@ -664,6 +796,55 @@ const VendorWorkspaceScreen = ({ navigation }) => {
           </Card.Content>
         </Card>
 
+        {/* Raw Material Supplier Catalog */}
+        <Card style={styles.serviceCard}>
+          <Card.Content>
+            <View style={styles.serviceHeader}>
+              <Text variant="titleMedium" style={styles.sectionTitle}>Raw Material Supplier Catalog</Text>
+              <Button compact mode="contained-tonal" icon="plus" onPress={openAddRawMaterial}>
+                Add Item
+              </Button>
+            </View>
+            <Text style={{ color: Colors.textSecondary, fontSize: 13, marginBottom: Spacing.md }}>
+              Add supply items with multi-category tags so vendors can quickly source what they need.
+            </Text>
+
+            {rawMaterialItems.length === 0 ? (
+              <Text style={{ color: Colors.textMuted, textAlign: 'center', paddingVertical: Spacing.md }}>
+                No raw material items yet. Add your first item.
+              </Text>
+            ) : (
+              rawMaterialItems.map((item) => (
+                <Card key={item.id} style={styles.rawItemCard}>
+                  <Card.Content>
+                    <View style={styles.rawItemRow}>
+                      {item.photoUrl ? <Image source={{ uri: item.photoUrl }} style={styles.rawItemPhoto} /> : null}
+                      <View style={{ flex: 1 }}>
+                        <Text variant="titleSmall" style={styles.pkgTitle}>{item.itemName}</Text>
+                        <Text style={styles.pkgPrice}>{formatCurrency(item.price)}</Text>
+                        {item.description ? (
+                          <Text numberOfLines={2} style={styles.pkgDesc}>{item.description}</Text>
+                        ) : null}
+                        <View style={styles.deliverablesRow}>
+                          {(Array.isArray(item.categories) ? item.categories : []).map((c) => (
+                            <View key={`${item.id}-${c}`} style={styles.deliverableTag}>
+                              <Text style={styles.deliverableText}>{catLabel(c)}</Text>
+                            </View>
+                          ))}
+                        </View>
+                      </View>
+                      <View style={styles.pkgActions}>
+                        <IconButton icon="pencil" size={16} onPress={() => openEditRawMaterial(item)} />
+                        <IconButton icon="delete" size={16} iconColor={Colors.danger} onPress={() => deleteRawMaterialItem(item)} />
+                      </View>
+                    </View>
+                  </Card.Content>
+                </Card>
+              ))
+            )}
+          </Card.Content>
+        </Card>
+
         <View style={{ height: 80 }} />
       </ScrollView>
 
@@ -901,6 +1082,83 @@ const VendorWorkspaceScreen = ({ navigation }) => {
 
       {/* ===== TESTIMONIAL MODAL ===== */}
       <Portal>
+        <Modal visible={rawMaterialModalVisible} onDismiss={() => setRawMaterialModalVisible(false)} contentContainerStyle={styles.modal}>
+          <ScrollView showsVerticalScrollIndicator={false}>
+            <Text variant="titleLarge" style={styles.modalTitle}>
+              {editingRawMaterial ? `Edit Item: ${editingRawMaterial.itemName}` : 'Add Raw Material Item'}
+            </Text>
+            <Text style={styles.modalSubtitle}>Add supply item details and tag it to multiple categories.</Text>
+
+            <TextInput
+              label="Item Name *"
+              value={rmName}
+              onChangeText={setRmName}
+              mode="outlined"
+              placeholder="e.g. Basmati Rice 25kg"
+              style={styles.input}
+              outlineStyle={styles.outline}
+            />
+
+            <TextInput
+              label="Description"
+              value={rmDescription}
+              onChangeText={setRmDescription}
+              mode="outlined"
+              multiline
+              numberOfLines={3}
+              placeholder="Quality, unit size, notes..."
+              style={styles.input}
+              outlineStyle={styles.outline}
+            />
+
+            <TextInput
+              label="Price (₹)"
+              value={rmPrice}
+              onChangeText={setRmPrice}
+              mode="outlined"
+              keyboardType="numeric"
+              left={<TextInput.Icon icon="currency-inr" />}
+              style={styles.input}
+              outlineStyle={styles.outline}
+            />
+
+            <Text variant="labelLarge" style={styles.fieldLabel}>Tag Categories (multiple)</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: Spacing.md }}>
+              {allCategories.map((c) => (
+                <Chip
+                  key={`rm-${c}`}
+                  selected={rmCategories.includes(c)}
+                  onPress={() => toggleRawMaterialCategory(c)}
+                  style={[styles.catChip, rmCategories.includes(c) && styles.catChipActive]}
+                  textStyle={rmCategories.includes(c) ? styles.catChipTextActive : styles.catChipText}
+                >
+                  {catLabel(c)}
+                </Chip>
+              ))}
+            </ScrollView>
+
+            <View style={styles.rawPhotoRow}>
+              <Button mode="outlined" icon="image-plus" onPress={pickAndUploadRawMaterialPhoto} loading={uploadingRawMaterialPhoto}>
+                {rmPhotoUrl ? 'Change Photo' : 'Upload Photo (optional)'}
+              </Button>
+              {rmPhotoUrl ? (
+                <Button mode="text" icon="close" onPress={() => setRmPhotoUrl('')}>Clear</Button>
+              ) : null}
+            </View>
+            {rmPhotoUrl ? <Image source={{ uri: rmPhotoUrl }} style={styles.rawPreviewPhoto} /> : null}
+
+            <View style={styles.modalActions}>
+              <Button mode="contained" onPress={saveRawMaterialItem} loading={savingRawMaterial} style={styles.modalSaveBtn}>
+                {editingRawMaterial ? 'Update Item' : 'Add Item'}
+              </Button>
+              <Button mode="text" onPress={() => setRawMaterialModalVisible(false)}>Cancel</Button>
+            </View>
+          </ScrollView>
+        </Modal>
+      </Portal>
+
+      {/* ===== TESTIMONIAL MODAL ===== */}
+      <Portal>
         <Modal visible={testimonialModalVisible} onDismiss={() => setTestimonialModalVisible(false)} contentContainerStyle={styles.modal}>
           <Text variant="titleLarge" style={styles.modalTitle}>Add Testimonial</Text>
 
@@ -1008,6 +1266,13 @@ const styles = StyleSheet.create({
 
   // Add package button
   addPkgBtn: { marginTop: Spacing.md, borderRadius: Radius.sm, borderColor: Colors.primary, borderStyle: 'dashed' },
+
+  // Raw material catalog
+  rawItemCard: { borderRadius: Radius.md, elevation: 1, backgroundColor: Colors.surfaceVariant, marginBottom: Spacing.sm },
+  rawItemRow: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.sm },
+  rawItemPhoto: { width: 64, height: 64, borderRadius: Radius.sm, backgroundColor: '#ddd' },
+  rawPhotoRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.sm },
+  rawPreviewPhoto: { width: 120, height: 120, borderRadius: Radius.sm, marginBottom: Spacing.md, backgroundColor: '#ddd' },
 
   // Section title
   sectionTitle: { fontWeight: '700', color: Colors.textPrimary },

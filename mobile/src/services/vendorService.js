@@ -44,4 +44,43 @@ export const vendorService = {
     const response = await api.get(`/vendors/${vendorId}/reviews`);
     return response.data;
   },
+
+  getRawMaterialItems: async (params = {}) => {
+    const response = await api.get('/vendors/raw-materials', { params });
+    return response.data;
+  },
+
+  getMyRawMaterialItems: async () => {
+    const response = await api.get('/vendors/raw-materials/mine');
+    return response.data;
+  },
+
+  createRawMaterialItem: async (payload) => {
+    const response = await api.post('/vendors/raw-materials', payload);
+    return response.data;
+  },
+
+  updateRawMaterialItem: async (itemId, payload) => {
+    const response = await api.put(`/vendors/raw-materials/${itemId}`, payload);
+    return response.data;
+  },
+
+  deleteRawMaterialItem: async (itemId) => {
+    const response = await api.delete(`/vendors/raw-materials/${itemId}`);
+    return response.data;
+  },
+
+  uploadRawMaterialPhoto: async (file, vendorId) => {
+    const formData = new FormData();
+    formData.append('file', {
+      uri: file.uri,
+      name: file.fileName || 'raw-material.jpg',
+      type: file.mimeType || 'image/jpeg',
+    });
+    if (vendorId) formData.append('vendorId', String(vendorId));
+    const response = await api.post('/vendors/raw-materials/photo', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
 };

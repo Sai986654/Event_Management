@@ -243,11 +243,30 @@ model Vendor {
   testimonials VendorTestimonial[]
   orderItems EventOrderItem[]
   activities EventActivity[]
+  rawMaterialItems RawMaterialItem[]
 
   @@index([category])
   @@index([city])
   @@index([averageRating])
   @@map("vendors")
+}
+
+model RawMaterialItem {
+  id          Int      @id @default(autoincrement())
+  vendorId    Int      @map("vendor_id")
+  itemName    String   @map("item_name") @db.VarChar(160)
+  description String?  @db.Text
+  price       Decimal  @default(0) @db.Decimal(12, 2)
+  photoUrl    String?  @map("photo_url") @db.VarChar(500)
+  categories  Json     @default("[]")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  vendor      Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@index([vendorId, isActive])
+  @@map("raw_material_items")
 }
 
 model VendorPackage {

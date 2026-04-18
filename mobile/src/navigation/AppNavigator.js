@@ -3,9 +3,8 @@ import { View, Text as RNText, StyleSheet, Image } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { IconButton, Badge } from 'react-native-paper';
+import { IconButton } from 'react-native-paper';
 import { AuthContext } from '../context/AuthContext';
-import { SocketContext } from '../context/SocketContext';
 import { Colors, headerScreenOptions } from '../theme';
 
 // Screens
@@ -24,6 +23,7 @@ import PlannerScreen from '../screens/PlannerScreen';
 import ActivityTrackerScreen from '../screens/ActivityTrackerScreen';
 import AdminControlScreen from '../screens/AdminControlScreen';
 import InviteIntelligenceScreen from '../screens/InviteIntelligenceScreen';
+import InviteVideoScreen from '../screens/InviteVideoScreen';
 import PublicEventScreen from '../screens/PublicEventScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import GuestManagementScreen from '../screens/GuestManagementScreen';
@@ -74,9 +74,12 @@ const DashboardStack = () => (
     <Stack.Screen name="ActivityTracker" component={ActivityTrackerScreen} options={{ title: 'Activity Tracker' }} />
     <Stack.Screen name="AdminControl" component={AdminControlScreen} options={{ title: 'Admin Control' }} />
     <Stack.Screen name="InviteIntelligence" component={InviteIntelligenceScreen} options={{ title: 'Invite Intelligence' }} />
+    <Stack.Screen name="InviteVideos" component={InviteVideoScreen} options={{ title: 'Invite Videos' }} />
     <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Notifications' }} />
     <Stack.Screen name="GuestManagement" component={GuestManagementScreen} options={{ title: 'Guest Management' }} />
     <Stack.Screen name="BudgetDashboard" component={BudgetDashboardScreen} options={{ title: 'Budget Dashboard' }} />
+    <Stack.Screen name="ChatList" component={ChatListScreen} options={{ title: 'Support Chat' }} />
+    <Stack.Screen name="ChatConversation" component={ChatScreen} options={({ route }) => ({ title: route.params?.threadSubject || 'Chat' })} />
     <Stack.Screen
       name="PublicEvent"
       component={PublicEventScreen}
@@ -87,25 +90,12 @@ const DashboardStack = () => (
   </Stack.Navigator>
 );
 
-// Chat stack (list → conversation)
-const ChatStack = () => (
-  <Stack.Navigator screenOptions={headerScreenOptions}>
-    <Stack.Screen name="ChatList" component={ChatListScreen} options={{ title: 'Support Chat' }} />
-    <Stack.Screen
-      name="ChatConversation"
-      component={ChatScreen}
-      options={({ route }) => ({ title: route.params?.threadSubject || 'Chat' })}
-    />
-  </Stack.Navigator>
-);
-
 // Tab icon helper
 const tabIcon = (name) => ({ color, size }) => <IconButton icon={name} iconColor={color} size={size} />;
 
 // Role-based tab navigator
 const MainTabs = () => {
   const { user } = useContext(AuthContext);
-  const { unreadChat } = useContext(SocketContext);
   const role = user?.role;
 
   return (
@@ -150,22 +140,6 @@ const MainTabs = () => {
           headerShown: true,
           headerTitle: 'My Bookings',
           ...headerScreenOptions,
-        }}
-      />
-
-      <Tab.Screen
-        name="ChatTab"
-        component={ChatStack}
-        options={{
-          title: 'Chat',
-          tabBarIcon: ({ color, size }) => (
-            <View>
-              <IconButton icon="chat" iconColor={color} size={size} />
-              {unreadChat > 0 && (
-                <Badge size={16} style={{ position: 'absolute', top: 4, right: 2 }}>{unreadChat}</Badge>
-              )}
-            </View>
-          ),
         }}
       />
 

@@ -493,6 +493,9 @@ const EventDetailScreen = ({ route, navigation }) => {
                 <Button mode="contained-tonal" icon="card-account-phone-outline" style={styles.manageBtn} onPress={() => navigation.navigate('InviteIntelligence')}>
                   Invite Intelligence
                 </Button>
+                <Button mode="contained-tonal" icon="video-wireless-outline" style={styles.manageBtn} onPress={() => navigation.navigate('InviteVideos', { eventId, eventTitle: event.title, eventType: event.type })}>
+                  Invite Videos
+                </Button>
               </Card.Content>
             </Card>
 

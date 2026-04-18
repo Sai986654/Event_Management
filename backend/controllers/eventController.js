@@ -168,7 +168,33 @@ exports.deleteEvent = asyncHandler(async (req, res) => {
     return res.status(403).json({ message: 'Not authorized' });
   }
 
-  await prisma.event.delete({ where: { id: event.id } });
+  await prisma.$transaction(async (tx) => {
+    // Remove dependent rows first because most Event relations are not configured
+    // with onDelete: Cascade at the DB level.
+    const orders = await tx.eventOrder.findMany({
+      where: { eventId: event.id },
+      select: { id: true },
+    });
+    const orderIds = orders.map((o) => o.id);
+
+    if (orderIds.length) {
+      await tx.eventOrderItem.deleteMany({ where: { orderId: { in: orderIds } } });
+    }
+
+    await tx.eventActivity.deleteMany({ where: { eventId: event.id } });
+    await tx.eventOrder.deleteMany({ where: { eventId: event.id } });
+    await tx.booking.deleteMany({ where: { eventId: event.id } });
+    await tx.guest.deleteMany({ where: { eventId: event.id } });
+    await tx.media.deleteMany({ where: { eventId: event.id } });
+    await tx.instantPhoto.deleteMany({ where: { eventId: event.id } });
+    await tx.review.deleteMany({ where: { eventId: event.id } });
+    await tx.budget.deleteMany({ where: { eventId: event.id } });
+    await tx.inviteJob.deleteMany({ where: { eventId: event.id } });
+    await tx.aiRecommendationSnapshot.deleteMany({ where: { eventId: event.id } });
+
+    await tx.event.delete({ where: { id: event.id } });
+  });
+
   res.json({ message: 'Event deleted' });
 });
 
