@@ -19,6 +19,7 @@ npx prisma migrate resolve --applied 20260413140000_instant_photo_download 2>/de
 npx prisma migrate resolve --applied 20260418120000_live_chat 2>/dev/null || true
 
 echo "[deploy] prisma migrate deploy"
+# Note: 20260419120000_raw_material_items will be applied by migrate deploy below
 npx prisma migrate deploy
 echo "[deploy] node server.js"
 exec node server.js

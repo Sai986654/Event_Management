@@ -1,11 +1,13 @@
-import React, { useContext } from 'react';
-import { View, Text as RNText, StyleSheet, Image } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
+import React, { useContext, useEffect, useRef } from 'react';
+import { View, Text as RNText, StyleSheet, Image, BackHandler, ToastAndroid, Platform } from 'react-native';
+import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { IconButton } from 'react-native-paper';
 import { AuthContext } from '../context/AuthContext';
 import { Colors, headerScreenOptions } from '../theme';
+
+export const navigationRef = createNavigationContainerRef();
 
 // Screens
 import LoginScreen from '../screens/LoginScreen';
@@ -178,11 +180,39 @@ const AuthStack = () => (
 // Root navigator
 const AppNavigator = () => {
   const { isAuthenticated, loading } = useContext(AuthContext);
+  const backPressedOnce = useRef(false);
 
-  if (loading) return null; // splash / loading could go here
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+
+    const onBackPress = () => {
+      if (navigationRef.isReady() && navigationRef.canGoBack()) {
+        navigationRef.goBack();
+        return true; // handled — don't exit
+      }
+
+      // Already at root: require double-press to exit
+      if (backPressedOnce.current) {
+        BackHandler.exitApp();
+        return true;
+      }
+
+      backPressedOnce.current = true;
+      ToastAndroid.show('Press back again to exit', ToastAndroid.SHORT);
+
+      // Reset flag after 2 seconds
+      setTimeout(() => { backPressedOnce.current = false; }, 2000);
+      return true; // swallow the single press
+    };
+
+    const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => sub.remove();
+  }, []);
+
+  if (loading) return null;
 
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef}>
       {isAuthenticated ? <MainTabs /> : <AuthStack />}
     </NavigationContainer>
   );
