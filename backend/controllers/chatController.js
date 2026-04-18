@@ -58,26 +58,30 @@ exports.createThread = asyncHandler(async (req, res) => {
     });
   }
 
-  // Notify via socket
-  const io = req.app.get('io');
-  const allParticipantIds = [req.user.id, ...staffUsers.map((u) => u.id)];
-  allParticipantIds.forEach((uid) => {
-    io.to(`user-${uid}`).emit('chat:new-thread', thread);
-  });
-
-  // Create in-app notification for staff
-  const { createNotification } = require('../services/inAppNotificationService');
-  for (const staff of staffUsers) {
-    await createNotification(io, {
-      userId: staff.id,
-      type: 'chat_new',
-      title: 'New Support Chat',
-      body: `${req.user.name || 'A user'} started a chat: "${subject.trim()}"`,
-      metadata: { threadId: thread.id },
-    });
-  }
-
+  // Send response immediately so the client doesn't time out
   res.status(201).json({ thread });
+
+  // Fire-and-forget: socket notifications + in-app notifications
+  try {
+    const io = req.app.get('io');
+    const allParticipantIds = [req.user.id, ...staffUsers.map((u) => u.id)];
+    allParticipantIds.forEach((uid) => {
+      io.to(`user-${uid}`).emit('chat:new-thread', thread);
+    });
+
+    const { createNotification } = require('../services/inAppNotificationService');
+    for (const staff of staffUsers) {
+      await createNotification(io, {
+        userId: staff.id,
+        type: 'chat_new',
+        title: 'New Support Chat',
+        body: `${req.user.name || 'A user'} started a chat: "${subject.trim()}"`,
+        metadata: { threadId: thread.id },
+      });
+    }
+  } catch (err) {
+    console.error('Chat notification error (non-blocking):', err.message);
+  }
 });
 
 // GET /api/chat/threads/:threadId/messages — get messages for a thread
@@ -130,30 +134,34 @@ exports.sendMessage = asyncHandler(async (req, res) => {
   // Update thread timestamp
   await prisma.chatThread.update({ where: { id: threadId }, data: { updatedAt: new Date() } });
 
-  // Emit to all participants in the thread room
-  const io = req.app.get('io');
-  io.to(`chat-${threadId}`).emit('chat:message', message);
-
-  // Also notify users not in the room via their user channel
-  const participants = await prisma.chatParticipant.findMany({
-    where: { threadId },
-    select: { userId: true },
-  });
-  const { createNotification } = require('../services/inAppNotificationService');
-  for (const p of participants) {
-    if (p.userId !== req.user.id) {
-      io.to(`user-${p.userId}`).emit('chat:message', message);
-      await createNotification(io, {
-        userId: p.userId,
-        type: 'chat_message',
-        title: `Chat: ${thread.subject}`,
-        body: `${req.user.name || 'Someone'}: ${body.trim().slice(0, 100)}`,
-        metadata: { threadId },
-      });
-    }
-  }
-
+  // Send response immediately so the client doesn't time out
   res.status(201).json({ message });
+
+  // Fire-and-forget: socket + in-app notifications
+  try {
+    const io = req.app.get('io');
+    io.to(`chat-${threadId}`).emit('chat:message', message);
+
+    const participants = await prisma.chatParticipant.findMany({
+      where: { threadId },
+      select: { userId: true },
+    });
+    const { createNotification } = require('../services/inAppNotificationService');
+    for (const p of participants) {
+      if (p.userId !== req.user.id) {
+        io.to(`user-${p.userId}`).emit('chat:message', message);
+        await createNotification(io, {
+          userId: p.userId,
+          type: 'chat_message',
+          title: `Chat: ${thread.subject}`,
+          body: `${req.user.name || 'Someone'}: ${body.trim().slice(0, 100)}`,
+          metadata: { threadId },
+        });
+      }
+    }
+  } catch (err) {
+    console.error('Chat notification error (non-blocking):', err.message);
+  }
 });
 
 // PATCH /api/chat/threads/:threadId/close — close a thread

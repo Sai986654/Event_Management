@@ -39,7 +39,8 @@
           "photosPermission": "Allow Vedika 360 to access your photos to upload blessing images for events.",
           "cameraPermission": "Allow Vedika 360 to use the camera to capture blessing photos for events."
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ],
     "extra": {
       "eas": {

@@ -5,6 +5,8 @@ import { AuthContext } from '../context/AuthContext';
 import { eventService } from '../services/eventService';
 import { getErrorMessage } from '../utils/helpers';
 import { Colors, Spacing, Radius } from '../theme';
+import DatePickerInput from '../components/DatePickerInput';
+import LocationPicker from '../components/LocationPicker';
 
 const EVENT_TYPES = [
   { value: 'wedding', label: 'Wedding' },
@@ -85,9 +87,19 @@ const EventCreateScreen = ({ navigation }) => {
           ))}
         </ScrollView>
 
-        <TextInput label="Date (YYYY-MM-DD) *" value={date} onChangeText={setDate} mode="outlined" style={styles.input} outlineStyle={styles.outline} left={<TextInput.Icon icon="calendar" />} />
-        <TextInput label="Venue *" value={venue} onChangeText={setVenue} mode="outlined" placeholder="e.g. Convention hall, lawn, resort" style={styles.input} outlineStyle={styles.outline} left={<TextInput.Icon icon="map-marker-outline" />} />
-        <TextInput label="City" value={city} onChangeText={setCity} mode="outlined" placeholder="e.g. Hyderabad, Bengaluru" style={styles.input} outlineStyle={styles.outline} left={<TextInput.Icon icon="city-variant-outline" />} />
+        <DatePickerInput label="Event Date *" value={date} onChange={setDate} style={styles.input} />
+        <LocationPicker
+          label="Venue *"
+          value={venue}
+          onChange={setVenue}
+          placeholder="Search venue or address..."
+          onLocationPick={(place) => {
+            setVenue(place.name || place.formattedAddress || '');
+            if (place.city) setCity(place.city);
+          }}
+          style={styles.input}
+        />
+        <TextInput label="City" value={city} onChangeText={setCity} mode="outlined" placeholder="Auto-filled from venue" style={styles.input} outlineStyle={styles.outline} left={<TextInput.Icon icon="city-variant-outline" />} />
         <TextInput label="Budget (₹)" value={budget} onChangeText={setBudget} mode="outlined" keyboardType="numeric" placeholder="Total in Indian Rupees" style={styles.input} outlineStyle={styles.outline} left={<TextInput.Icon icon="currency-inr" />} />
         <TextInput label="Expected Guests" value={guestCount} onChangeText={setGuestCount} mode="outlined" keyboardType="numeric" style={styles.input} outlineStyle={styles.outline} left={<TextInput.Icon icon="account-group-outline" />} />
         <TextInput label="Description" value={description} onChangeText={setDescription} mode="outlined" multiline numberOfLines={4} style={styles.input} outlineStyle={styles.outline} />

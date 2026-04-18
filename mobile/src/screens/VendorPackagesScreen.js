@@ -7,6 +7,7 @@ import { bookingService } from '../services/bookingService';
 import { eventService } from '../services/eventService';
 import { formatCurrency, getErrorMessage } from '../utils/helpers';
 import { Colors, Spacing, Radius } from '../theme';
+import DatePickerInput from '../components/DatePickerInput';
 
 /* ── Category-specific pricing field labels (mirrors VendorWorkspaceScreen) ── */
 const CATEGORY_FIELDS = {
@@ -377,7 +378,7 @@ const VendorPackagesScreen = ({ route, navigation }) => {
             {events.length === 0 && (
               <Text variant="bodySmall" style={{ color: Colors.warning, marginBottom: Spacing.sm }}>No events found. Create an event first.</Text>
             )}
-            <TextInput label="Service Date (YYYY-MM-DD)" value={serviceDate} onChangeText={setServiceDate} mode="outlined" style={{ marginBottom: Spacing.md }} outlineStyle={{ borderRadius: Radius.sm }} />
+            <DatePickerInput label="Service Date" value={serviceDate} onChange={setServiceDate} style={{ marginBottom: Spacing.md }} />
             <TextInput label="Notes (optional)" value={notes} onChangeText={setNotes} mode="outlined" multiline numberOfLines={3} style={{ marginBottom: Spacing.lg }} outlineStyle={{ borderRadius: Radius.sm }} />
             <Button mode="contained" onPress={handleBook} loading={submitting} disabled={submitting || !selectedEvent || !serviceDate} style={styles.bookBtn} labelStyle={{ fontWeight: '600' }}>
               Confirm Booking — {formatCurrency(bookingEstimatedPrice)}

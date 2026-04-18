@@ -9,6 +9,7 @@ import { bookingService } from '../services/bookingService';
 import { guestService } from '../services/guestService';
 import { formatDate, formatCurrency, getErrorMessage, getStatusColor } from '../utils/helpers';
 import { Colors, Spacing, Radius } from '../theme';
+import LocationPicker from '../components/LocationPicker';
 
 const EventDetailScreen = ({ route, navigation }) => {
   const { eventId } = route.params;
@@ -572,8 +573,8 @@ const EventDetailScreen = ({ route, navigation }) => {
             <Text variant="titleLarge" style={{ fontWeight: '800', marginBottom: Spacing.lg }}>Edit Event</Text>
             <TextInput label="Title" value={editForm.title} onChangeText={(v) => setEditForm((p) => ({ ...p, title: v }))} mode="outlined" style={styles.input} />
             <TextInput label="Description" value={editForm.description} onChangeText={(v) => setEditForm((p) => ({ ...p, description: v }))} mode="outlined" multiline numberOfLines={3} style={styles.input} />
-            <TextInput label="Venue" value={editForm.venue} onChangeText={(v) => setEditForm((p) => ({ ...p, venue: v }))} mode="outlined" style={styles.input} />
-            <TextInput label="City" value={editForm.city} onChangeText={(v) => setEditForm((p) => ({ ...p, city: v }))} mode="outlined" style={styles.input} />
+            <LocationPicker label="Venue" value={editForm.venue} onChange={(v) => setEditForm((p) => ({ ...p, venue: v }))} onLocationPick={(loc) => setEditForm((p) => ({ ...p, venue: loc.name || loc.formattedAddress, city: loc.city || p.city }))} placeholder="Search venue..." />
+            <TextInput label="City" value={editForm.city} onChangeText={(v) => setEditForm((p) => ({ ...p, city: v }))} mode="outlined" style={styles.input} placeholder="Auto-filled from venue" />
             <TextInput label="Guest Count" value={editForm.guestCount} onChangeText={(v) => setEditForm((p) => ({ ...p, guestCount: v.replace(/[^0-9]/g, '') }))} mode="outlined" keyboardType="numeric" style={styles.input} />
             <TextInput label="Budget (₹)" value={editForm.budget} onChangeText={(v) => setEditForm((p) => ({ ...p, budget: v.replace(/[^0-9.]/g, '') }))} mode="outlined" keyboardType="numeric" style={styles.input} />
             <View style={styles.modalActions}>
