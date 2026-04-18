@@ -1,9 +1,11 @@
 import React, { useContext } from 'react';
+import { View, Text as RNText, StyleSheet, Image } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { IconButton } from 'react-native-paper';
+import { IconButton, Badge } from 'react-native-paper';
 import { AuthContext } from '../context/AuthContext';
+import { SocketContext } from '../context/SocketContext';
 import { Colors, headerScreenOptions } from '../theme';
 
 // Screens
@@ -12,6 +14,7 @@ import RegisterScreen from '../screens/RegisterScreen';
 import DashboardScreen from '../screens/DashboardScreen';
 import VendorListScreen from '../screens/VendorListScreen';
 import VendorDetailScreen from '../screens/VendorDetailScreen';
+import VendorPackagesScreen from '../screens/VendorPackagesScreen';
 import BookingsScreen from '../screens/BookingsScreen';
 import EventCreateScreen from '../screens/EventCreateScreen';
 import EventDetailScreen from '../screens/EventDetailScreen';
@@ -23,6 +26,10 @@ import AdminControlScreen from '../screens/AdminControlScreen';
 import InviteIntelligenceScreen from '../screens/InviteIntelligenceScreen';
 import PublicEventScreen from '../screens/PublicEventScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
+import GuestManagementScreen from '../screens/GuestManagementScreen';
+import BudgetDashboardScreen from '../screens/BudgetDashboardScreen';
+import ChatListScreen from '../screens/ChatListScreen';
+import ChatScreen from '../screens/ChatScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -32,21 +39,44 @@ const VendorStack = () => (
   <Stack.Navigator screenOptions={headerScreenOptions}>
     <Stack.Screen name="VendorList" component={VendorListScreen} options={{ title: 'Vendors' }} />
     <Stack.Screen name="VendorDetail" component={VendorDetailScreen} options={{ title: 'Vendor' }} />
+    <Stack.Screen name="VendorPackages" component={VendorPackagesScreen} options={{ title: 'Packages' }} />
   </Stack.Navigator>
 );
+
+const BrandTitle = () => (
+  <View style={brandStyles.row}>
+    <Image source={require('../../assets/icon.jpeg')} style={brandStyles.iconImage} />
+    <RNText style={brandStyles.title}>Vedika 360</RNText>
+  </View>
+);
+const brandStyles = StyleSheet.create({
+  row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  iconImage: {
+    width: 30, height: 30, borderRadius: 15,
+  },
+  title: { fontSize: 20, fontWeight: '800', color: '#fff' },
+});
 
 // Dashboard stack (dashboard → event create/detail)
 const DashboardStack = () => (
   <Stack.Navigator screenOptions={headerScreenOptions}>
-    <Stack.Screen name="DashboardHome" component={DashboardScreen} options={{ title: 'Vedika 360' }} />
+    <Stack.Screen
+      name="DashboardHome"
+      component={DashboardScreen}
+      options={{ headerTitle: () => <BrandTitle /> }}
+    />
     <Stack.Screen name="EventCreate" component={EventCreateScreen} options={{ title: 'New Event' }} />
     <Stack.Screen name="EventDetail" component={EventDetailScreen} options={{ title: 'Event Details' }} />
     <Stack.Screen name="VendorWorkspace" component={VendorWorkspaceScreen} options={{ title: 'Vendor Workspace' }} />
     <Stack.Screen name="Planner" component={PlannerScreen} options={{ title: 'Event Planner' }} />
+    <Stack.Screen name="PlannerVendorDetail" component={VendorDetailScreen} options={{ title: 'Vendor' }} />
+    <Stack.Screen name="VendorPackages" component={VendorPackagesScreen} options={{ title: 'Packages' }} />
     <Stack.Screen name="ActivityTracker" component={ActivityTrackerScreen} options={{ title: 'Activity Tracker' }} />
     <Stack.Screen name="AdminControl" component={AdminControlScreen} options={{ title: 'Admin Control' }} />
     <Stack.Screen name="InviteIntelligence" component={InviteIntelligenceScreen} options={{ title: 'Invite Intelligence' }} />
     <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Notifications' }} />
+    <Stack.Screen name="GuestManagement" component={GuestManagementScreen} options={{ title: 'Guest Management' }} />
+    <Stack.Screen name="BudgetDashboard" component={BudgetDashboardScreen} options={{ title: 'Budget Dashboard' }} />
     <Stack.Screen
       name="PublicEvent"
       component={PublicEventScreen}
@@ -57,12 +87,25 @@ const DashboardStack = () => (
   </Stack.Navigator>
 );
 
+// Chat stack (list → conversation)
+const ChatStack = () => (
+  <Stack.Navigator screenOptions={headerScreenOptions}>
+    <Stack.Screen name="ChatList" component={ChatListScreen} options={{ title: 'Support Chat' }} />
+    <Stack.Screen
+      name="ChatConversation"
+      component={ChatScreen}
+      options={({ route }) => ({ title: route.params?.threadSubject || 'Chat' })}
+    />
+  </Stack.Navigator>
+);
+
 // Tab icon helper
 const tabIcon = (name) => ({ color, size }) => <IconButton icon={name} iconColor={color} size={size} />;
 
 // Role-based tab navigator
 const MainTabs = () => {
   const { user } = useContext(AuthContext);
+  const { unreadChat } = useContext(SocketContext);
   const role = user?.role;
 
   return (
@@ -107,6 +150,22 @@ const MainTabs = () => {
           headerShown: true,
           headerTitle: 'My Bookings',
           ...headerScreenOptions,
+        }}
+      />
+
+      <Tab.Screen
+        name="ChatTab"
+        component={ChatStack}
+        options={{
+          title: 'Chat',
+          tabBarIcon: ({ color, size }) => (
+            <View>
+              <IconButton icon="chat" iconColor={color} size={size} />
+              {unreadChat > 0 && (
+                <Badge size={16} style={{ position: 'absolute', top: 4, right: 2 }}>{unreadChat}</Badge>
+              )}
+            </View>
+          ),
         }}
       />
 

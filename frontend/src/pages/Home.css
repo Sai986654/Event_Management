@@ -4,7 +4,7 @@
 }
 
 .hero {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #0a5a8a 0%, #0e7490 60%, #d4a642 100%);
   color: white;
   padding: 80px 24px;
   text-align: center;
@@ -95,7 +95,7 @@
 }
 
 .cta-section {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #0a5a8a 0%, #0e7490 60%, #d4a642 100%);
   color: white;
   padding: 80px 24px;
   text-align: center;
@@ -152,7 +152,7 @@
   width: 50px;
   height: 50px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #0a5a8a 0%, #0e7490 60%, #d4a642 100%);
   color: white;
   display: flex;
   align-items: center;

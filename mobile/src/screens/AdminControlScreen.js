@@ -1,6 +1,9 @@
-import React, { useContext, useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
-import { ActivityIndicator, Button, Card, Chip, Text, TextInput } from 'react-native-paper';
+import React, { useContext, useEffect, useState, useCallback } from 'react';
+import { ScrollView, StyleSheet, View, Alert, RefreshControl } from 'react-native';
+import {
+  ActivityIndicator, Button, Card, Chip, Text, TextInput, Portal, Modal, IconButton, Divider,
+  SegmentedButtons,
+} from 'react-native-paper';
 import { vendorService } from '../services/vendorService';
 import { adminService } from '../services/adminService';
 import { getErrorMessage } from '../utils/helpers';
@@ -8,67 +11,173 @@ import { AuthContext } from '../context/AuthContext';
 import { Colors, Spacing, Radius } from '../theme';
 
 const roles = ['admin', 'organizer', 'customer', 'vendor', 'guest'];
+const tagColors = ['default', 'red', 'orange', 'gold', 'green', 'cyan', 'blue', 'purple', 'magenta', 'pink'];
 
 const AdminControlScreen = () => {
   const { user } = useContext(AuthContext);
+  const [activeTab, setActiveTab] = useState('categories');
+  const [refreshing, setRefreshing] = useState(false);
+
+  // ── Vendor Verification ─────────────────────────────────────────
   const [vendors, setVendors] = useState([]);
+  const [loadingVendors, setLoadingVendors] = useState(false);
+  const [verifyingId, setVerifyingId] = useState(null);
+
+  // ── Category Management ─────────────────────────────────────────
+  const [categories, setCategories] = useState([]);
+  const [loadingCategories, setLoadingCategories] = useState(false);
+  const [showCatModal, setShowCatModal] = useState(false);
+  const [savingCat, setSavingCat] = useState(false);
+  const [catForm, setCatForm] = useState({ name: '', label: '', color: 'default' });
+
+  // ── Vendor Management ───────────────────────────────────────────
+  const [allVendors, setAllVendors] = useState([]);
+  const [loadingAllVendors, setLoadingAllVendors] = useState(false);
+  const [deletingVendorId, setDeletingVendorId] = useState(null);
+
+  // ── Create User ─────────────────────────────────────────────────
+  const [creating, setCreating] = useState(false);
+  const [userForm, setUserForm] = useState({ name: '', email: '', role: 'organizer', password: '', phone: '', businessName: '' });
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState('info');
-  const [loading, setLoading] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [verifyingId, setVerifyingId] = useState(null);
-  const [userForm, setUserForm] = useState({ name: '', email: '', role: 'organizer', password: '' });
 
-  const load = async () => {
-    setLoading(true);
+  // ── Load Functions ──────────────────────────────────────────────
+  const loadVerificationQueue = useCallback(async () => {
+    setLoadingVendors(true);
     try {
       const res = await vendorService.searchVendors({ limit: 100 });
       setVendors(res.vendors || []);
     } catch (err) {
-      setMessage(getErrorMessage(err));
-      setMessageType('error');
+      setMessage(getErrorMessage(err)); setMessageType('error');
     } finally {
-      setLoading(false);
+      setLoadingVendors(false);
     }
-  };
+  }, []);
 
-  useEffect(() => { load(); }, []);
+  const loadCategories = useCallback(async () => {
+    setLoadingCategories(true);
+    try {
+      const res = await adminService.getCategories();
+      setCategories(res.categories || []);
+    } catch (err) {
+      setMessage(getErrorMessage(err)); setMessageType('error');
+    } finally {
+      setLoadingCategories(false);
+    }
+  }, []);
 
+  const loadAllVendors = useCallback(async () => {
+    setLoadingAllVendors(true);
+    try {
+      const res = await adminService.getAllVendors({ limit: 100 });
+      setAllVendors(res.vendors || []);
+    } catch (err) {
+      setMessage(getErrorMessage(err)); setMessageType('error');
+    } finally {
+      setLoadingAllVendors(false);
+    }
+  }, []);
+
+  const loadAll = useCallback(async () => {
+    await Promise.all([loadVerificationQueue(), loadCategories(), loadAllVendors()]);
+    setRefreshing(false);
+  }, [loadVerificationQueue, loadCategories, loadAllVendors]);
+
+  useEffect(() => { loadAll(); }, [loadAll]);
+
+  // ── Verification Actions ────────────────────────────────────────
   const verify = async (vendorId, status) => {
     setVerifyingId(vendorId);
     try {
       await adminService.verifyVendor(vendorId, status);
-      setMessage(`Vendor ${status}`);
-      setMessageType('success');
-      await load();
+      setMessage(`Vendor ${status}`); setMessageType('success');
+      await loadVerificationQueue();
     } catch (err) {
-      setMessage(getErrorMessage(err));
-      setMessageType('error');
+      setMessage(getErrorMessage(err)); setMessageType('error');
     } finally {
       setVerifyingId(null);
     }
   };
 
+  // ── Category Actions ────────────────────────────────────────────
+  const addCategory = async () => {
+    if (!catForm.name.trim() || !catForm.label.trim()) {
+      Alert.alert('Validation', 'Name and label are required');
+      return;
+    }
+    setSavingCat(true);
+    try {
+      await adminService.createCategory(catForm);
+      setMessage('Category added'); setMessageType('success');
+      setCatForm({ name: '', label: '', color: 'default' });
+      setShowCatModal(false);
+      await loadCategories();
+    } catch (err) {
+      Alert.alert('Error', getErrorMessage(err));
+    } finally {
+      setSavingCat(false);
+    }
+  };
+
+  const removeCategory = (id, name) => {
+    Alert.alert('Delete Category', `Delete "${name}"? Only categories with no vendors/packages can be deleted.`, [
+      { text: 'Cancel' },
+      {
+        text: 'Delete', style: 'destructive',
+        onPress: async () => {
+          try {
+            await adminService.deleteCategory(id);
+            setMessage('Category deleted'); setMessageType('success');
+            await loadCategories();
+          } catch (err) {
+            Alert.alert('Error', getErrorMessage(err));
+          }
+        },
+      },
+    ]);
+  };
+
+  // ── Vendor Management Actions ───────────────────────────────────
+  const removeVendor = (id, name) => {
+    Alert.alert('Remove Vendor', `Remove "${name}" from marketplace? This deletes the vendor profile, all packages, and testimonials. This cannot be undone.`, [
+      { text: 'Cancel' },
+      {
+        text: 'Delete', style: 'destructive',
+        onPress: async () => {
+          setDeletingVendorId(id);
+          try {
+            await adminService.deleteVendor(id);
+            setMessage('Vendor removed'); setMessageType('success');
+            await loadAllVendors();
+          } catch (err) {
+            Alert.alert('Error', getErrorMessage(err));
+          } finally {
+            setDeletingVendorId(null);
+          }
+        },
+      },
+    ]);
+  };
+
+  // ── Create User ─────────────────────────────────────────────────
   const createUser = async () => {
     if (!userForm.name.trim() || !userForm.email.trim() || !userForm.role.trim()) {
-      setMessage('Name, email, and role are required');
-      setMessageType('error');
+      setMessage('Name, email, and role are required'); setMessageType('error');
       return;
     }
     try {
       setCreating(true);
       await adminService.createUser(userForm);
-      setMessage('User created');
-      setMessageType('success');
-      setUserForm({ name: '', email: '', role: 'organizer', password: '' });
+      setMessage('User created'); setMessageType('success');
+      setUserForm({ name: '', email: '', role: 'organizer', password: '', phone: '', businessName: '' });
     } catch (err) {
-      setMessage(getErrorMessage(err));
-      setMessageType('error');
+      setMessage(getErrorMessage(err)); setMessageType('error');
     } finally {
       setCreating(false);
     }
   };
 
+  // ── Auth Guard ──────────────────────────────────────────────────
   if (user?.role !== 'admin') {
     return (
       <View style={styles.centered}>
@@ -78,58 +187,218 @@ const AdminControlScreen = () => {
     );
   }
 
+  // ── Tab Content Renderers ───────────────────────────────────────
+  const renderCategories = () => (
+    <View>
+      <View style={styles.tabHeader}>
+        <Text variant="titleMedium" style={styles.sectionTitle}>Service Categories</Text>
+        <Button mode="contained-tonal" compact icon="plus" onPress={() => setShowCatModal(true)}>Add</Button>
+      </View>
+      {loadingCategories && <ActivityIndicator style={{ marginVertical: Spacing.md }} color={Colors.primary} />}
+      {categories.length === 0 && !loadingCategories && (
+        <Text style={styles.emptyText}>No categories yet.</Text>
+      )}
+      {categories.map((cat) => (
+        <Card key={cat.id} style={styles.itemCard}>
+          <Card.Content style={styles.itemRow}>
+            <View style={{ flex: 1 }}>
+              <Text variant="titleSmall" style={{ fontWeight: '700' }}>{cat.label}</Text>
+              <Text variant="bodySmall" style={{ color: Colors.textSecondary }}>{cat.name} • {cat.color || 'default'}</Text>
+              <View style={{ flexDirection: 'row', marginTop: 4, gap: 4 }}>
+                <Chip compact textStyle={{ fontSize: 10 }} style={cat.isActive ? styles.activeChip : styles.inactiveChip}>
+                  {cat.isActive ? 'Active' : 'Inactive'}
+                </Chip>
+                {cat.sortOrder != null && (
+                  <Chip compact textStyle={{ fontSize: 10, color: Colors.textSecondary }}>#{cat.sortOrder}</Chip>
+                )}
+              </View>
+            </View>
+            <IconButton icon="delete-outline" iconColor={Colors.danger} size={20} onPress={() => removeCategory(cat.id, cat.label)} />
+          </Card.Content>
+        </Card>
+      ))}
+    </View>
+  );
+
+  const renderVendorManagement = () => (
+    <View>
+      <Text variant="titleMedium" style={styles.sectionTitle}>All Marketplace Vendors</Text>
+      {loadingAllVendors && <ActivityIndicator style={{ marginVertical: Spacing.md }} color={Colors.primary} />}
+      {allVendors.length === 0 && !loadingAllVendors && (
+        <Text style={styles.emptyText}>No vendors registered yet.</Text>
+      )}
+      {allVendors.map((v) => (
+        <Card key={v.id} style={styles.itemCard}>
+          <Card.Content>
+            <View style={styles.itemRow}>
+              <View style={{ flex: 1 }}>
+                <Text variant="titleSmall" style={{ fontWeight: '700' }}>{v.businessName}</Text>
+                <Text variant="bodySmall" style={{ color: Colors.textSecondary }}>
+                  {v.category} • {v.user?.name || '-'} • {v.user?.email || '-'}
+                </Text>
+                <View style={{ flexDirection: 'row', marginTop: 4, gap: 4 }}>
+                  <Chip compact textStyle={{ fontSize: 10 }} style={v.isVerified ? styles.activeChip : styles.pendingChip}>
+                    {v.verificationStatus || 'pending'}
+                  </Chip>
+                  <Chip compact textStyle={{ fontSize: 10, color: Colors.textSecondary }}>
+                    ⭐ {Number(v.averageRating || 0).toFixed(1)} ({v.totalReviews || 0})
+                  </Chip>
+                </View>
+              </View>
+              <IconButton
+                icon="delete-outline"
+                iconColor={Colors.danger}
+                size={20}
+                disabled={deletingVendorId === v.id}
+                onPress={() => removeVendor(v.id, v.businessName)}
+              />
+            </View>
+          </Card.Content>
+        </Card>
+      ))}
+    </View>
+  );
+
+  const renderVerificationQueue = () => (
+    <View>
+      <Text variant="titleMedium" style={styles.sectionTitle}>Vendor Verification Queue</Text>
+      {loadingVendors && <ActivityIndicator style={{ marginVertical: Spacing.md }} color={Colors.primary} />}
+      {vendors.length === 0 && !loadingVendors && (
+        <Text style={styles.emptyText}>No vendors pending verification right now.</Text>
+      )}
+      {vendors.map((v) => (
+        <Card key={v.id} style={styles.itemCard}>
+          <Card.Content>
+            <View style={styles.itemRow}>
+              <View style={{ flex: 1 }}>
+                <Text variant="titleSmall" style={{ fontWeight: '700' }}>{v.businessName}</Text>
+                <Text variant="bodySmall" style={{ color: Colors.textSecondary }}>
+                  {v.category} • {v.user?.name || '-'}
+                </Text>
+                <Chip compact textStyle={{ fontSize: 10 }} style={v.isVerified ? styles.activeChip : styles.pendingChip}>
+                  {v.verificationStatus || 'pending'}
+                </Chip>
+              </View>
+              <View style={styles.vendorActions}>
+                <Button compact mode="contained" loading={verifyingId === v.id} onPress={() => verify(v.id, 'approved')} style={styles.approveBtn} labelStyle={{ fontWeight: '600', fontSize: 12 }}>Approve</Button>
+                <Button compact mode="outlined" loading={verifyingId === v.id} onPress={() => verify(v.id, 'rejected')} textColor={Colors.danger} style={styles.rejectBtn}>Reject</Button>
+              </View>
+            </View>
+          </Card.Content>
+        </Card>
+      ))}
+    </View>
+  );
+
+  const renderCreateUser = () => (
+    <View>
+      <Text variant="titleMedium" style={styles.sectionTitle}>Create User</Text>
+      <TextInput label="Name *" mode="outlined" value={userForm.name} onChangeText={(v) => setUserForm((p) => ({ ...p, name: v }))} style={styles.input} outlineStyle={styles.outline} />
+      <TextInput label="Email *" mode="outlined" value={userForm.email} onChangeText={(v) => setUserForm((p) => ({ ...p, email: v }))} keyboardType="email-address" autoCapitalize="none" style={styles.input} outlineStyle={styles.outline} />
+      <TextInput label="Password" mode="outlined" value={userForm.password} onChangeText={(v) => setUserForm((p) => ({ ...p, password: v }))} secureTextEntry style={styles.input} outlineStyle={styles.outline} />
+      <TextInput label="Phone" mode="outlined" value={userForm.phone} onChangeText={(v) => setUserForm((p) => ({ ...p, phone: v }))} keyboardType="phone-pad" style={styles.input} outlineStyle={styles.outline} />
+      <TextInput label="Business Name (for vendor)" mode="outlined" value={userForm.businessName} onChangeText={(v) => setUserForm((p) => ({ ...p, businessName: v }))} style={styles.input} outlineStyle={styles.outline} />
+      <Text variant="labelMedium" style={styles.fieldLabel}>Role</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: Spacing.md }}>
+        {roles.map((r) => (
+          <Chip key={r} selected={userForm.role === r} onPress={() => setUserForm((p) => ({ ...p, role: r }))} style={styles.chip} textStyle={{ textTransform: 'capitalize' }}>{r}</Chip>
+        ))}
+      </ScrollView>
+      <Button mode="contained" loading={creating} disabled={creating} onPress={createUser} style={styles.btn} labelStyle={{ fontWeight: '600' }}>Create User</Button>
+    </View>
+  );
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.scrollContent}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadAll(); }} colors={[Colors.primary]} />}
+    >
+      {/* Hero */}
       <Card style={styles.heroCard}>
         <Card.Content>
-          <Text variant="headlineSmall" style={styles.heroTitle}>Admin Control</Text>
-          <Text style={styles.heroSubtitle}>Moderate vendors and manage user onboarding.</Text>
+          <Text variant="headlineSmall" style={styles.heroTitle}>Admin Control Center</Text>
+          <Text style={styles.heroSubtitle}>Manage categories, vendors, verification, and users.</Text>
         </Card.Content>
       </Card>
 
-      {/* Vendor Verification */}
-      <Card style={styles.card}>
-        <Card.Content>
-          <Text variant="titleMedium" style={styles.sectionTitle}>Vendor Verification</Text>
-          {loading ? <ActivityIndicator style={{ marginVertical: Spacing.sm }} color={Colors.primary} /> : null}
-          {vendors.length === 0 && !loading ? <Text style={{ color: Colors.textMuted }}>No vendors found.</Text> : null}
-          {vendors.map((v) => (
-            <Card key={v.id} style={styles.vendorCard}>
-              <Card.Content>
-                <View style={styles.vendorRow}>
-                  <View style={{ flex: 1 }}>
-                    <Text variant="titleSmall" style={{ fontWeight: '700' }}>{v.businessName}</Text>
-                    <Text variant="bodySmall" style={{ color: Colors.textSecondary }}>{v.category} • {v.verificationStatus || 'pending'}</Text>
-                  </View>
-                  <View style={styles.vendorActions}>
-                    <Button compact mode="contained" loading={verifyingId === v.id} onPress={() => verify(v.id, 'approved')} style={styles.approveBtn} labelStyle={{ fontWeight: '600', fontSize: 12 }}>Approve</Button>
-                    <Button compact mode="outlined" loading={verifyingId === v.id} onPress={() => verify(v.id, 'rejected')} textColor={Colors.danger} style={styles.rejectBtn}>Reject</Button>
-                  </View>
-                </View>
-              </Card.Content>
-            </Card>
-          ))}
-        </Card.Content>
-      </Card>
+      {/* Tab Switcher */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabScroll}>
+        {[
+          { value: 'categories', label: 'Categories' },
+          { value: 'vendors', label: 'Vendors' },
+          { value: 'verification', label: 'Verification' },
+          { value: 'users', label: 'Create User' },
+        ].map((tab) => (
+          <Chip
+            key={tab.value}
+            selected={activeTab === tab.value}
+            onPress={() => setActiveTab(tab.value)}
+            style={[styles.tabChip, activeTab === tab.value && styles.tabChipActive]}
+            textStyle={[styles.tabChipText, activeTab === tab.value && styles.tabChipTextActive]}
+          >
+            {tab.label}
+          </Chip>
+        ))}
+      </ScrollView>
 
-      {/* Create User */}
+      {/* Tab Content */}
       <Card style={styles.card}>
         <Card.Content>
-          <Text variant="titleMedium" style={styles.sectionTitle}>Create User</Text>
-          <TextInput label="Name" mode="outlined" value={userForm.name} onChangeText={(v) => setUserForm((p) => ({ ...p, name: v }))} style={styles.input} outlineStyle={styles.outline} />
-          <TextInput label="Email" mode="outlined" value={userForm.email} onChangeText={(v) => setUserForm((p) => ({ ...p, email: v }))} keyboardType="email-address" autoCapitalize="none" style={styles.input} outlineStyle={styles.outline} />
-          <Text variant="labelMedium" style={styles.fieldLabel}>Role</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: Spacing.sm }}>
-            {roles.map((r) => (
-              <Chip key={r} selected={userForm.role === r} onPress={() => setUserForm((p) => ({ ...p, role: r }))} style={styles.chip} textStyle={{ textTransform: 'capitalize' }}>{r}</Chip>
-            ))}
-          </ScrollView>
-          <TextInput label="Password" mode="outlined" value={userForm.password} onChangeText={(v) => setUserForm((p) => ({ ...p, password: v }))} secureTextEntry style={styles.input} outlineStyle={styles.outline} />
-          <Button mode="contained" loading={creating} disabled={creating} onPress={createUser} style={styles.btn} labelStyle={{ fontWeight: '600' }}>Create User</Button>
+          {activeTab === 'categories' && renderCategories()}
+          {activeTab === 'vendors' && renderVendorManagement()}
+          {activeTab === 'verification' && renderVerificationQueue()}
+          {activeTab === 'users' && renderCreateUser()}
         </Card.Content>
       </Card>
 
       {message ? <Text style={messageType === 'error' ? styles.msgError : styles.msgSuccess}>{message}</Text> : null}
+
+      {/* Add Category Modal */}
+      <Portal>
+        <Modal visible={showCatModal} onDismiss={() => setShowCatModal(false)} contentContainerStyle={styles.modal}>
+          <Text variant="titleLarge" style={{ fontWeight: '800', marginBottom: Spacing.lg }}>Add Category</Text>
+          <TextInput
+            label="Category Name (slug)"
+            placeholder="e.g. makeup_artist"
+            value={catForm.name}
+            onChangeText={(v) => setCatForm((p) => ({ ...p, name: v }))}
+            mode="outlined"
+            style={styles.input}
+          />
+          <Text variant="bodySmall" style={{ color: Colors.textMuted, marginBottom: Spacing.sm, marginTop: -8 }}>
+            Lowercase identifier used internally
+          </Text>
+          <TextInput
+            label="Display Label"
+            placeholder="e.g. Makeup Artist"
+            value={catForm.label}
+            onChangeText={(v) => setCatForm((p) => ({ ...p, label: v }))}
+            mode="outlined"
+            style={styles.input}
+          />
+          <Text variant="labelMedium" style={styles.fieldLabel}>Tag Color</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: Spacing.md }}>
+            {tagColors.map((c) => (
+              <Chip
+                key={c}
+                selected={catForm.color === c}
+                onPress={() => setCatForm((p) => ({ ...p, color: c }))}
+                style={styles.chip}
+                textStyle={{ textTransform: 'capitalize' }}
+              >
+                {c}
+              </Chip>
+            ))}
+          </ScrollView>
+          <View style={styles.modalActions}>
+            <Button mode="text" onPress={() => { setShowCatModal(false); setCatForm({ name: '', label: '', color: 'default' }); }}>Cancel</Button>
+            <Button mode="contained" onPress={addCategory} loading={savingCat} disabled={savingCat}>Add Category</Button>
+          </View>
+        </Modal>
+      </Portal>
+
+      <View style={{ height: 20 }} />
     </ScrollView>
   );
 };
@@ -141,20 +410,32 @@ const styles = StyleSheet.create({
   heroCard: { marginBottom: Spacing.md, borderRadius: Radius.lg, elevation: 3, backgroundColor: Colors.surface },
   heroTitle: { fontWeight: '800', color: Colors.textPrimary },
   heroSubtitle: { marginTop: 6, color: Colors.textSecondary },
+  tabScroll: { marginBottom: Spacing.md },
+  tabChip: { marginRight: Spacing.sm, backgroundColor: Colors.surface, borderRadius: Radius.full },
+  tabChipActive: { backgroundColor: Colors.primary },
+  tabChipText: { color: Colors.textSecondary, fontWeight: '600' },
+  tabChipTextActive: { color: Colors.textOnPrimary },
   card: { marginBottom: Spacing.md, borderRadius: Radius.lg, elevation: 2, backgroundColor: Colors.surface },
   sectionTitle: { fontWeight: '700', marginBottom: Spacing.md, color: Colors.textPrimary },
+  tabHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.md },
   fieldLabel: { marginTop: Spacing.sm, marginBottom: Spacing.xs, color: Colors.textSecondary, fontWeight: '600' },
-  vendorCard: { marginBottom: Spacing.sm, borderRadius: Radius.sm, elevation: 1, backgroundColor: Colors.background },
-  vendorRow: { flexDirection: 'row', alignItems: 'center' },
+  itemCard: { marginBottom: Spacing.sm, borderRadius: Radius.sm, elevation: 1, backgroundColor: Colors.background },
+  itemRow: { flexDirection: 'row', alignItems: 'center' },
   vendorActions: { flexDirection: 'row', gap: Spacing.xs },
   approveBtn: { backgroundColor: Colors.success, borderRadius: Radius.sm },
   rejectBtn: { borderColor: Colors.danger, borderRadius: Radius.sm },
+  activeChip: { backgroundColor: '#dcfce7' },
+  inactiveChip: { backgroundColor: '#fee2e2' },
+  pendingChip: { backgroundColor: '#fef3c7' },
+  emptyText: { color: Colors.textMuted, textAlign: 'center', paddingVertical: Spacing.lg },
   input: { marginBottom: Spacing.md },
   outline: { borderRadius: Radius.sm },
   chip: { marginRight: Spacing.sm },
   btn: { marginTop: Spacing.sm, backgroundColor: Colors.primary, borderRadius: Radius.sm },
   msgError: { color: Colors.danger, marginTop: Spacing.sm, fontSize: 13 },
   msgSuccess: { color: Colors.success, marginTop: Spacing.sm, fontSize: 13 },
+  modal: { backgroundColor: Colors.surface, margin: Spacing.lg, padding: Spacing.xl, borderRadius: Radius.lg },
+  modalActions: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: Spacing.md },
 });
 
 export default AdminControlScreen;

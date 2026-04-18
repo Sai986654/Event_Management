@@ -1,6 +1,7 @@
 import React, { useContext, useEffect, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View, TouchableOpacity } from 'react-native';
 import { ActivityIndicator, Button, Card, Chip, Text, TextInput } from 'react-native-paper';
+import { useNavigation } from '@react-navigation/native';
 import { eventService } from '../services/eventService';
 import { packageService } from '../services/packageService';
 import { orderService } from '../services/orderService';
@@ -11,6 +12,7 @@ import { Colors, Spacing, Radius } from '../theme';
 
 const PlannerScreen = () => {
   const { user } = useContext(AuthContext);
+  const navigation = useNavigation();
   const [events, setEvents] = useState([]);
   const [packages, setPackages] = useState([]);
   const [eventId, setEventId] = useState('');
@@ -262,7 +264,9 @@ const PlannerScreen = () => {
               <Text variant="titleMedium" style={{ flex: 1, fontWeight: '700' }}>{p.title}</Text>
               <Chip compact textStyle={{ textTransform: 'capitalize', fontSize: 11 }}>{p.category}</Chip>
             </View>
-            <Text variant="bodySmall" style={{ color: Colors.textSecondary }}>{p.vendor?.businessName}</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('PlannerVendorDetail', { vendorId: p.vendorId })}>
+              <Text variant="bodySmall" style={styles.vendorLink}>{p.vendor?.businessName}</Text>
+            </TouchableOpacity>
             <Text variant="titleSmall" style={{ color: Colors.primary, fontWeight: '700', marginTop: 4 }}>{formatCurrency(p.basePrice)}</Text>
             {aiReasons[p.category] ? (
               <Text variant="bodySmall" style={styles.aiReason}>🤖 {aiReasons[p.category]}</Text>
@@ -322,6 +326,7 @@ const styles = StyleSheet.create({
   tipsBox: { marginTop: Spacing.md, padding: Spacing.md, backgroundColor: Colors.surfaceVariant, borderRadius: Radius.sm },
   filterLabel: { marginBottom: Spacing.xs, marginLeft: Spacing.xs, color: Colors.textSecondary, fontWeight: '600' },
   pkgHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
+  vendorLink: { color: Colors.primary, fontWeight: '600', textDecorationLine: 'underline' },
   aiReason: { marginTop: 4, color: '#7c3aed', fontStyle: 'italic' },
   selectBtn: { marginTop: Spacing.sm, borderRadius: Radius.sm },
   criteriaRow: { flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.sm },

@@ -118,6 +118,8 @@ model User {
   media         Media[]
   appNotifications AppNotification[]
   instantPhotos InstantPhoto[]
+  chatThreadsStarted ChatThread[] @relation("ThreadCreator")
+  chatMessages       ChatMessage[]
 
   @@map("users")
 }
@@ -521,4 +523,47 @@ model InstantPhoto {
 
   @@index([eventId, createdAt(sort: Desc)])
   @@map("instant_photos")
+}
+
+// ── Live Chat ──────────────────────────────────────────────
+model ChatThread {
+  id          Int       @id @default(autoincrement())
+  subject     String    @db.VarChar(200)
+  creatorId   Int       @map("creator_id")
+  status      String    @default("open") @db.VarChar(20) // open | closed
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  creator     User          @relation("ThreadCreator", fields: [creatorId], references: [id])
+  participants ChatParticipant[]
+  messages    ChatMessage[]
+
+  @@index([creatorId, status])
+  @@map("chat_threads")
+}
+
+model ChatParticipant {
+  id        Int      @id @default(autoincrement())
+  threadId  Int      @map("thread_id")
+  userId    Int      @map("user_id")
+  joinedAt  DateTime @default(now()) @map("joined_at")
+
+  thread ChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@unique([threadId, userId])
+  @@map("chat_participants")
+}
+
+model ChatMessage {
+  id        Int      @id @default(autoincrement())
+  threadId  Int      @map("thread_id")
+  senderId  Int      @map("sender_id")
+  body      String   @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+
+  thread ChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  sender User       @relation(fields: [senderId], references: [id])
+
+  @@index([threadId, createdAt])
+  @@map("chat_messages")
 }

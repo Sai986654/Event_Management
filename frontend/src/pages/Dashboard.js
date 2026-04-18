@@ -26,8 +26,7 @@ const OrganizerDashboard = ({ user }) => {
           totalEvents: evts.length,
           upcomingEvents: upcoming,
           totalGuests: evts.reduce((s, e) => s + Number(e.guestCount || 0), 0),
-          // Prisma/JSON often returns Decimal as string — must Number() or reduce string-concatenates
-          totalBudget: evts.reduce((s, e) => s + Number(e.budget ?? 0), 0),
+          totalBudget: evts.reduce((s, e) => s + (parseFloat(e.budget) || 0), 0),
         });
       } catch (err) {
         message.error(getErrorMessage(err));

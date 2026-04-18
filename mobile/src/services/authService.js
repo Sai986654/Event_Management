@@ -32,4 +32,17 @@ export const authService = {
   getToken: async () => {
     return await AsyncStorage.getItem('token');
   },
+
+  getProfile: async () => {
+    const response = await api.get('/auth/me');
+    return response.data;
+  },
+
+  updateProfile: async (data) => {
+    const response = await api.put('/auth/profile', data);
+    if (response.data.user) {
+      await AsyncStorage.setItem('user', JSON.stringify(response.data.user));
+    }
+    return response.data;
+  },
 };

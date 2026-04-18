@@ -26,6 +26,21 @@ export const eventService = {
     return response.data;
   },
 
+  updateShareSettings: async (eventId, shareData) => {
+    const response = await api.put(`/events/${eventId}/share-settings`, shareData);
+    return response.data;
+  },
+
+  publishNetlifyMicrosite: async (eventId) => {
+    const response = await api.post(`/events/${eventId}/publish-netlify`);
+    return response.data;
+  },
+
+  triggerInviteDrip: async (eventId, body = {}) => {
+    const response = await api.post(`/events/${eventId}/invite-drip/trigger`, body);
+    return response.data;
+  },
+
   deleteEvent: async (eventId) => {
     const response = await api.delete(`/events/${eventId}`);
     return response.data;

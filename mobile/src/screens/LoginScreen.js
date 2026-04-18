@@ -1,5 +1,5 @@
 import React, { useContext, useState } from 'react';
-import { View, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, Image } from 'react-native';
 import { TextInput, Button, Text, HelperText } from 'react-native-paper';
 import { AuthContext } from '../context/AuthContext';
 import { getErrorMessage } from '../utils/helpers';
@@ -37,8 +37,11 @@ const LoginScreen = ({ navigation }) => {
     >
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         <View style={styles.brandHeader}>
+          <View style={styles.logoContainer}>
+            <Image source={require('../../assets/icon.jpeg')} style={styles.logoImage} />
+          </View>
           <Text variant="displaySmall" style={styles.brandName}>Vedika 360</Text>
-          <Text variant="bodyMedium" style={styles.brandTagline}>Event Management Platform</Text>
+          <Text variant="bodySmall" style={styles.brandTagline}>RELY ON US FOR EVERYTHING</Text>
         </View>
 
         <View style={styles.card}>
@@ -138,8 +141,14 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   scroll: { flexGrow: 1, justifyContent: 'center', padding: Spacing.xl },
   brandHeader: { alignItems: 'center', marginBottom: Spacing.xxl },
-  brandName: { color: Colors.primary, fontWeight: '900', letterSpacing: 0.5 },
-  brandTagline: { color: Colors.textSecondary, marginTop: Spacing.xs },
+  logoContainer: { marginBottom: Spacing.md },
+  logoImage: {
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+  },
+  brandName: { color: Colors.primary, fontWeight: '900', letterSpacing: 1 },
+  brandTagline: { color: Colors.textMuted, marginTop: Spacing.sm, letterSpacing: 3, fontWeight: '600' },
   card: {
     backgroundColor: Colors.surface,
     borderRadius: Radius.lg,

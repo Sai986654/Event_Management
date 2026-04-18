@@ -105,6 +105,7 @@ const Header = () => {
     <Layout.Header className="header">
       <div className="header-container">
         <Link to="/" className="logo">
+          <img src="/icon.jpeg" alt="Vedika 360" className="logo-icon" />
           Vedika 360
         </Link>
 

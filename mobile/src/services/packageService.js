@@ -16,6 +16,16 @@ export const packageService = {
     return response.data;
   },
 
+  updatePackage: async (id, payload) => {
+    const response = await api.put(`/packages/${id}`, payload);
+    return response.data;
+  },
+
+  deletePackage: async (id) => {
+    const response = await api.delete(`/packages/${id}`);
+    return response.data;
+  },
+
   addTestimonial: async (payload) => {
     const response = await api.post('/packages/testimonials', payload);
     return response.data;

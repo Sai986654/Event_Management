@@ -10,7 +10,7 @@ const Footer = () => {
       <div className="footer-content">
         <div className="footer-section">
           <h3>Vedika 360</h3>
-          <p>Technology-driven event management platform</p>
+          <p>Rely on us for everything</p>
         </div>
 
         <div className="footer-section">

@@ -1,5 +1,5 @@
 import React, { useContext, useState } from 'react';
-import { View, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, Image } from 'react-native';
 import { TextInput, Button, Text, HelperText, SegmentedButtons } from 'react-native-paper';
 import { AuthContext } from '../context/AuthContext';
 import { getErrorMessage } from '../utils/helpers';
@@ -47,13 +47,14 @@ const RegisterScreen = ({ navigation }) => {
     >
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         <View style={styles.brandHeader}>
+          <Image source={require('../../assets/icon.jpeg')} style={styles.logoImage} />
           <Text variant="displaySmall" style={styles.brandName}>Vedika 360</Text>
-          <Text variant="bodyMedium" style={styles.brandTagline}>Create your account</Text>
+          <Text variant="bodySmall" style={styles.brandTagline}>RELY ON US FOR EVERYTHING</Text>
         </View>
 
         <View style={styles.card}>
           <Text variant="headlineMedium" style={styles.title}>Get Started</Text>
-          <Text variant="bodyMedium" style={styles.subtitle}>Join our event management platform</Text>
+          <Text variant="bodyMedium" style={styles.subtitle}>Join Vedika 360 — rely on us for everything</Text>
 
           {error ? <HelperText type="error" visible>{error}</HelperText> : null}
 
@@ -149,8 +150,11 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   scroll: { flexGrow: 1, justifyContent: 'center', padding: Spacing.xl },
   brandHeader: { alignItems: 'center', marginBottom: Spacing.xxl },
-  brandName: { color: Colors.primary, fontWeight: '900', letterSpacing: 0.5 },
-  brandTagline: { color: Colors.textSecondary, marginTop: Spacing.xs },
+  logoImage: {
+    width: 80, height: 80, borderRadius: 40, marginBottom: Spacing.md,
+  },
+  brandName: { color: Colors.primary, fontWeight: '900', letterSpacing: 1 },
+  brandTagline: { color: Colors.textMuted, marginTop: Spacing.sm, letterSpacing: 3, fontWeight: '600' },
   card: {
     backgroundColor: Colors.surface,
     borderRadius: Radius.lg,

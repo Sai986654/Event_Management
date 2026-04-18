@@ -11,13 +11,15 @@ import { Colors, Spacing, Radius } from '../theme';
 const StatCard = ({ label, value, color, accent }) => (
   <View style={[statStyles.card, accent && statStyles.cardAccent]}>
     <Text variant="bodySmall" style={statStyles.label}>{label}</Text>
-    <Text variant="headlineMedium" style={[statStyles.value, color && { color }]}>{value}</Text>
+    <Text variant="headlineMedium" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.5} style={[statStyles.value, color && { color }]}>{value}</Text>
   </View>
 );
 
 const statStyles = StyleSheet.create({
   card: {
-    width: 140,
+    flex: 1,
+    minWidth: 100,
+    maxWidth: 160,
     marginHorizontal: 5,
     borderRadius: Radius.lg,
     elevation: 2,
@@ -26,7 +28,7 @@ const statStyles = StyleSheet.create({
   },
   cardAccent: { borderWidth: 1.5, borderColor: Colors.surfaceVariant },
   label: { color: Colors.textSecondary, fontWeight: '600', fontSize: 12 },
-  value: { fontWeight: '800', marginTop: 4, color: Colors.textPrimary, fontSize: 22 },
+  value: { fontWeight: '800', marginTop: 4, color: Colors.textPrimary, fontSize: 20 },
 });
 
 /* ── Quick Action Card ── */
@@ -73,7 +75,7 @@ const EventsDashboard = ({ user, navigation }) => {
   useEffect(() => { fetchEvents(); }, [fetchEvents]);
 
   const upcoming = events.filter((e) => new Date(e.date) > new Date()).length;
-  const totalBudget = events.reduce((s, e) => s + (e.budget || 0), 0);
+  const totalBudget = events.reduce((s, e) => s + (parseFloat(e.budget) || 0), 0);
 
   if (loading) return <ActivityIndicator style={styles.loader} size="large" color={Colors.primary} />;
 
@@ -91,11 +93,11 @@ const EventsDashboard = ({ user, navigation }) => {
         </Card>
 
         {/* Stats */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.statsRow}>
+        <View style={styles.statsRow}>
           <StatCard label="Events" value={events.length} accent />
           <StatCard label="Upcoming" value={upcoming} color={Colors.primary} />
           <StatCard label="Total Budget" value={formatCurrency(totalBudget)} color={Colors.success} />
-        </ScrollView>
+        </View>
 
         {/* Event List */}
         <Text variant="titleMedium" style={styles.sectionTitle}>Your Events</Text>
@@ -147,6 +149,22 @@ const EventsDashboard = ({ user, navigation }) => {
             title="Update Activity Progress"
             subtitle="Track spend and progress transparently"
             onPress={() => navigation.navigate('ActivityTracker')}
+          />
+        )}
+        {(user?.role === 'organizer' || user?.role === 'admin') && events.length > 0 && (
+          <ActionCard
+            icon="account-group-outline"
+            title="Guest Management"
+            subtitle="Add guests, track RSVPs, check-ins"
+            onPress={() => navigation.navigate('GuestManagement', { eventId: events[0].id })}
+          />
+        )}
+        {(user?.role === 'organizer' || user?.role === 'admin') && events.length > 0 && (
+          <ActionCard
+            icon="cash-multiple"
+            title="Budget Dashboard"
+            subtitle="Track allocations and spending"
+            onPress={() => navigation.navigate('BudgetDashboard', { eventId: events[0].id })}
           />
         )}
         {(user?.role === 'organizer' || user?.role === 'admin') && (
@@ -205,7 +223,7 @@ const VendorDashboard = ({ user, navigation }) => {
   const confirmed = bookings.filter((b) => b.status === 'confirmed').length;
   const revenue = bookings
     .filter((b) => b.status === 'confirmed' || b.status === 'completed')
-    .reduce((s, b) => s + (b.price || 0), 0);
+    .reduce((s, b) => s + (parseFloat(b.price) || 0), 0);
 
   if (loading) return <ActivityIndicator style={styles.loader} size="large" color={Colors.primary} />;
 
@@ -221,12 +239,28 @@ const VendorDashboard = ({ user, navigation }) => {
           </Card.Content>
         </Card>
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.statsRow}>
-          <StatCard label="Total" value={bookings.length} accent />
-          <StatCard label="Pending" value={pending} color={Colors.statusPending} />
-          <StatCard label="Confirmed" value={confirmed} color={Colors.statusConfirmed} />
-          <StatCard label="Revenue" value={formatCurrency(revenue)} color={Colors.success} />
-        </ScrollView>
+        <View style={vendorStatStyles.grid}>
+          <View style={vendorStatStyles.row}>
+            <View style={vendorStatStyles.cell}>
+              <Text style={vendorStatStyles.label}>Total Bookings</Text>
+              <Text style={vendorStatStyles.value}>{bookings.length}</Text>
+            </View>
+            <View style={vendorStatStyles.cell}>
+              <Text style={vendorStatStyles.label}>Pending</Text>
+              <Text style={[vendorStatStyles.value, { color: Colors.statusPending }]}>{pending}</Text>
+            </View>
+          </View>
+          <View style={vendorStatStyles.row}>
+            <View style={vendorStatStyles.cell}>
+              <Text style={vendorStatStyles.label}>Confirmed</Text>
+              <Text style={[vendorStatStyles.value, { color: Colors.statusConfirmed }]}>{confirmed}</Text>
+            </View>
+            <View style={vendorStatStyles.cell}>
+              <Text style={vendorStatStyles.label}>Revenue</Text>
+              <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} style={[vendorStatStyles.value, { color: Colors.success }]}>{formatCurrency(revenue)}</Text>
+            </View>
+          </View>
+        </View>
 
         <Text variant="titleMedium" style={styles.sectionTitle}>Recent Bookings</Text>
         {bookings.length === 0 ? (
@@ -262,11 +296,40 @@ const VendorDashboard = ({ user, navigation }) => {
           subtitle="Add service details, estimation rules, testimonials"
           onPress={() => navigation.navigate('VendorWorkspace')}
         />
+        <ActionCard
+          icon="account-cog-outline"
+          title="Edit Business Profile"
+          subtitle="Update info, social links, verification"
+          onPress={() => navigation.navigate('ProfileTab')}
+        />
         <View style={{ height: 20 }} />
       </ScrollView>
     </View>
   );
 };
+
+const vendorStatStyles = StyleSheet.create({
+  grid: {
+    marginHorizontal: Spacing.lg,
+    marginVertical: Spacing.sm,
+    borderRadius: Radius.lg,
+    backgroundColor: Colors.surface,
+    elevation: 2,
+    overflow: 'hidden',
+  },
+  row: { flexDirection: 'row' },
+  cell: {
+    flex: 1,
+    paddingVertical: Spacing.lg,
+    paddingHorizontal: Spacing.md,
+    alignItems: 'center',
+    borderBottomWidth: 0.5,
+    borderRightWidth: 0.5,
+    borderColor: Colors.divider,
+  },
+  label: { fontSize: 12, color: Colors.textSecondary, fontWeight: '600', marginBottom: 4 },
+  value: { fontSize: 22, fontWeight: '800', color: Colors.textPrimary },
+});
 
 /* ── Main Dashboard ── */
 const DashboardScreen = ({ navigation }) => {
@@ -302,7 +365,7 @@ const styles = StyleSheet.create({
   },
   greeting: { fontWeight: '800', color: Colors.textPrimary, marginBottom: 4 },
   heroSubtext: { color: Colors.textSecondary, lineHeight: 20 },
-  statsRow: { paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm },
+  statsRow: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm },
   sectionTitle: {
     fontWeight: '800',
     marginHorizontal: Spacing.lg,

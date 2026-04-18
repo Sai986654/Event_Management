@@ -49,6 +49,18 @@ const initSocket = (io) => {
       socket.leave(`live-photos-${eventId}`);
     });
 
+    // Live chat rooms
+    socket.on('join-chat', (threadId) => {
+      if (!threadId) return;
+      socket.join(`chat-${threadId}`);
+      console.log(`Socket ${socket.id} joined chat-${threadId}`);
+    });
+
+    socket.on('leave-chat', (threadId) => {
+      if (!threadId) return;
+      socket.leave(`chat-${threadId}`);
+    });
+
     socket.on('disconnect', () => {
       console.log(`Socket disconnected: ${socket.id}`);
     });

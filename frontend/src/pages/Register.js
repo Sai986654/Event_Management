@@ -34,7 +34,7 @@ const Register = () => {
     <div className="auth-container">
       <Card className="auth-card">
         <h1 className="auth-title">Create Your Account</h1>
-        <p className="auth-subtitle">Join Vedika 360 and start planning amazing events</p>
+        <p className="auth-subtitle">Join Vedika 360 — rely on us for everything</p>
 
         <Form form={form} layout="vertical" onFinish={onFinish}>
           <Form.Item

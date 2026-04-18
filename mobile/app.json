@@ -5,10 +5,12 @@
     "version": "1.0.0",
     "scheme": "vedika360",
     "orientation": "portrait",
+    "icon": "./assets/icon.jpeg",
     "userInterfaceStyle": "light",
     "splash": {
+      "image": "./assets/icon.jpeg",
       "resizeMode": "contain",
-      "backgroundColor": "#667eea"
+      "backgroundColor": "#0a4f7a"
     },
     "assetBundlePatterns": [
       "**/*"
@@ -19,7 +21,8 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#667eea"
+        "foregroundImage": "./assets/icon.jpeg",
+        "backgroundColor": "#0a4f7a"
       },
       "package": "com.vedika360.mobile",
       "versionCode": 1,

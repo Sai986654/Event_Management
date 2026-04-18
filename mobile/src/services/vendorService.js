@@ -25,4 +25,23 @@ export const vendorService = {
     const response = await api.put(`/vendors/${vendorId}`, vendorData);
     return response.data;
   },
+
+  uploadVendorMedia: async (vendorId, file, caption = '') => {
+    const formData = new FormData();
+    formData.append('file', {
+      uri: file.uri,
+      name: file.fileName || 'media.jpg',
+      type: file.mimeType || 'image/jpeg',
+    });
+    if (caption) formData.append('caption', caption);
+    const response = await api.post(`/vendors/${vendorId}/media`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+
+  getVendorReviews: async (vendorId) => {
+    const response = await api.get(`/vendors/${vendorId}/reviews`);
+    return response.data;
+  },
 };

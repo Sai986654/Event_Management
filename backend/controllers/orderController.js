@@ -145,6 +145,23 @@ exports.placeOrder = asyncHandler(async (req, res) => {
     data: { status: 'placed', finalTotal: order.quotedTotal },
   });
 
+  // Create Booking records for each vendor in the order so they appear in the event's Vendors tab
+  for (const item of order.items) {
+    await prisma.booking.upsert({
+      where: { eventId_vendorId: { eventId: order.eventId, vendorId: item.vendorId } },
+      update: { price: item.quotedPrice },
+      create: {
+        eventId: order.eventId,
+        vendorId: item.vendorId,
+        organizerId: order.organizerId,
+        price: item.quotedPrice,
+        serviceDate: order.event.date,
+        notes: `Order #${order.id} – ${item.packageTitle}`,
+        status: 'confirmed',
+      },
+    });
+  }
+
   const io = req.app.get('io');
   io.emit('order:placed', { orderId: updated.id, eventId: updated.eventId });
 
