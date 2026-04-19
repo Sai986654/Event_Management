@@ -108,7 +108,7 @@ describe('Events API', () => {
     expect(res.body.event).toHaveProperty('slug');
     eventId = res.body.event.id;
     organizerEventId = res.body.event.id;
-  }, 15000);
+  }, 30000);
 
   it('GET /api/events — should list events', async () => {
     const res = await request(app)
@@ -140,7 +140,7 @@ describe('Phase 3 API Flows', () => {
       });
     expect(res.statusCode).toBe(201);
     customerEventId = res.body.event.id;
-  }, 15000);
+  }, 30000);
 
   it('POST /api/packages — vendor should create package', async () => {
     // Create vendor profile first

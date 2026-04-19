@@ -20,8 +20,10 @@ describe("Webhook API", () => {
     description: "Test description",
     website: "https://example.com",
     basePrice: 1000,
-    serviceType: "Both",
-    maxGuests: "500"
+    categoryDetails: {
+      serviceType: "Both",
+      maxGuests: "500"
+    }
   };
 
   afterAll(async () => {
