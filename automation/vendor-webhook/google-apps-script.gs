@@ -287,8 +287,8 @@ function extractCategoryDetails(byTitle, category) {
   return details;
 }
 
-function onFormSubmit(e) {
-  const responses = e.response.getItemResponses();
+function submitVendorWebhookFromResponse(response, sourceLabel) {
+  const responses = response.getItemResponses();
   const byTitle = {};
 
   responses.forEach((r) => {
@@ -342,6 +342,41 @@ function onFormSubmit(e) {
   };
 
   const res = UrlFetchApp.fetch(WEBHOOK_URL, options);
-  Logger.log('Vendor webhook status: %s', res.getResponseCode());
-  Logger.log('Vendor webhook response: %s', res.getContentText());
+  Logger.log('[%s] Vendor webhook status: %s', sourceLabel || 'submit', res.getResponseCode());
+  Logger.log('[%s] Vendor webhook response: %s', sourceLabel || 'submit', res.getContentText());
+}
+
+function replayLatestResponse() {
+  const form = FormApp.getActiveForm();
+  const allResponses = form.getResponses();
+
+  if (!allResponses.length) {
+    Logger.log('No saved form responses found to replay.');
+    return;
+  }
+
+  const latest = allResponses[allResponses.length - 1];
+  submitVendorWebhookFromResponse(latest, 'replay-latest');
+}
+
+function replayResponseByNumber(responseNumber) {
+  const form = FormApp.getActiveForm();
+  const allResponses = form.getResponses();
+  const idx = Number(responseNumber) - 1;
+
+  if (!allResponses.length) {
+    Logger.log('No saved form responses found to replay.');
+    return;
+  }
+
+  if (!Number.isInteger(idx) || idx < 0 || idx >= allResponses.length) {
+    Logger.log('Invalid responseNumber=%s. Valid range is 1..%s', responseNumber, allResponses.length);
+    return;
+  }
+
+  submitVendorWebhookFromResponse(allResponses[idx], 'replay-' + responseNumber);
+}
+
+function onFormSubmit(e) {
+  submitVendorWebhookFromResponse(e.response, 'trigger');
 }
