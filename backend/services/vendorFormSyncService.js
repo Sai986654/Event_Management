@@ -164,13 +164,13 @@ function mapFormToVendor(formData) {
     // User data
     email: formData['Email address'] || formData['email'],
     name: formData['Business Owner Name'] || formData['name'],
-    phone: formData['Phone Number'] || formData['contact_phone'],
+    phone: formData['Phone Number'] || formData.phone || formData['contact_phone'],
     
     // Vendor data
-    businessName: formData['Business Name'] || formData['business_name'],
+    businessName: formData['Business Name'] || formData.businessName || formData['business_name'],
     category,
     description: formData['Business Description'] || formData['description'],
-    contactPhone: formData['Phone Number'] || formData['contact_phone'],
+    contactPhone: formData['Phone Number'] || formData.phone || formData['contact_phone'],
     contactEmail: formData['Email address'] || formData['email'],
     city: formData['City'] || formData['city'],
     state: formData['State'] || formData['state'],
@@ -211,11 +211,11 @@ function validateVendorData(data) {
   if (!data.email || !data.email.includes('@')) {
     errors.push('Invalid email address');
   }
-  if (!data.name || data.name.trim().length < 2) {
-    errors.push('Invalid business owner name');
+  if (data.name === undefined || data.name === null || String(data.name).trim() === '') {
+    errors.push('Business owner name is required');
   }
-  if (!data.businessName || data.businessName.trim().length < 2) {
-    errors.push('Invalid business name');
+  if (data.businessName === undefined || data.businessName === null || String(data.businessName).trim() === '') {
+    errors.push('Business name is required');
   }
   if (!data.category) {
     errors.push('Invalid service category');
