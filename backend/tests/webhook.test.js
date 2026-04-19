@@ -19,7 +19,9 @@ describe("Webhook API", () => {
     state: "Maharashtra",
     description: "Test description",
     website: "https://example.com",
-    basePrice: 1000
+    basePrice: 1000,
+    serviceType: "Both",
+    maxGuests: "500"
   };
 
   afterAll(async () => {
