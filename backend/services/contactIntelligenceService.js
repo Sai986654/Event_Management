@@ -651,10 +651,202 @@ async function correlateContactsSubset(contacts, options = {}) {
   };
 }
 
+/**
+ * Build an actionable invite strategy from analyzed contacts.
+ * Uses LLM (Groq/OpenAI) when available, otherwise returns deterministic rule-based guidance.
+ */
+async function generateInviteStrategy(contacts = [], options = {}) {
+  if (!Array.isArray(contacts) || contacts.length === 0) {
+    return {
+      source: 'rules',
+      strategySummary: 'No contacts available. Analyze contacts first to generate an invite strategy.',
+      priorities: [],
+      messageVariants: [],
+      followUps: [],
+    };
+  }
+
+  const listOwnerContext = normalizeListOwnerContext(options.listOwnerContext);
+  const listOwnerNotes = String(options.listOwnerNotes || '').trim();
+
+  const safeGroup = (g) => (['relatives', 'friends', 'work', 'others'].includes(g) ? g : 'others');
+  const stats = {
+    total: contacts.length,
+    whatsAppEligible: 0,
+    groups: {
+      relatives: { total: 0, wa: 0 },
+      friends: { total: 0, wa: 0 },
+      work: { total: 0, wa: 0 },
+      others: { total: 0, wa: 0 },
+    },
+  };
+
+  for (const c of contacts) {
+    const g = safeGroup(c.group);
+    stats.groups[g].total += 1;
+    if (c.canNotifyWhatsApp) {
+      stats.whatsAppEligible += 1;
+      stats.groups[g].wa += 1;
+    }
+  }
+
+  const ranked = Object.entries(stats.groups)
+    .map(([group, value]) => ({
+      group,
+      total: value.total,
+      wa: value.wa,
+      waRate: value.total ? Number((value.wa / value.total).toFixed(2)) : 0,
+    }))
+    .filter((r) => r.total > 0)
+    .sort((a, b) => b.wa - a.wa || b.total - a.total);
+
+  const fallbackPriorities = ranked.slice(0, 3).map((r, idx) => ({
+    group: r.group,
+    reason:
+      idx === 0
+        ? `Largest reachable segment (${r.wa}/${r.total} with WhatsApp).`
+        : `Strong reachable audience (${r.wa}/${r.total} with WhatsApp).`,
+    recommendedWindow:
+      r.group === 'relatives'
+        ? 'Evening 7:00-9:00 PM'
+        : r.group === 'work'
+          ? 'Lunch 12:30-2:00 PM'
+          : 'Evening 6:00-8:00 PM',
+    suggestedTone:
+      r.group === 'relatives'
+        ? 'Warm and respectful'
+        : r.group === 'work'
+          ? 'Polite and concise'
+          : 'Friendly and celebratory',
+  }));
+
+  const fallbackMessages = ranked.slice(0, 3).map((r) => ({
+    group: r.group,
+    text:
+      r.group === 'relatives'
+        ? 'Namaskaram! Our event is approaching soon. Your presence and blessings mean a lot to us. Please check the invite and RSVP.'
+        : r.group === 'work'
+          ? 'Hello! A gentle reminder about our upcoming event. Please review the invite details and RSVP at your convenience.'
+          : 'Hi! We are excited to celebrate soon. Please check our invite details and confirm your RSVP. Looking forward to seeing you!',
+  }));
+
+  const fallback = {
+    source: 'rules',
+    strategySummary: `Focus first on ${fallbackPriorities[0]?.group || 'top segments'} to maximize RSVP response from reachable contacts.`,
+    priorities: fallbackPriorities,
+    messageVariants: fallbackMessages,
+    followUps: [
+      'Send first reminder to top segment 10-14 days before event.',
+      'Send a short follow-up 3-5 days before event to non-responders.',
+      'Call key family contacts manually for VIP confirmations.',
+    ],
+  };
+
+  const apiKey = getContactAiApiKey();
+  if (!apiKey) {
+    return fallback;
+  }
+
+  const provider = getContactAiProvider();
+  const model = getContactAiModel();
+  const sampleContacts = contacts.slice(0, 40).map((c) => ({
+    name: c.name,
+    group: safeGroup(c.group),
+    relationTelugu: c.relationTelugu,
+    inferredRelation: c.inferredRelation,
+    canNotifyWhatsApp: Boolean(c.canNotifyWhatsApp),
+  }));
+
+  const body = {
+    model,
+    temperature: 0.3,
+    max_tokens: Number(process.env.CONTACT_AI_STRATEGY_MAX_TOKENS) || 1500,
+    response_format: { type: 'json_object' },
+    messages: [
+      {
+        role: 'system',
+        content: [
+          'You are an event invite strategist for Indian weddings and family events.',
+          `List owner context: ${listOwnerPromptLine(listOwnerContext)}`,
+          listOwnerNotes ? `Organizer notes: ${listOwnerNotes}` : '',
+          'Return practical outreach strategy to improve RSVP and attendance.',
+          'Output JSON only.',
+          'Schema: {"strategySummary":"string","priorities":[{"group":"relatives|friends|work|others","reason":"string","recommendedWindow":"string","suggestedTone":"string"}],"messageVariants":[{"group":"relatives|friends|work|others","text":"string"}],"followUps":["string"]}',
+        ]
+          .filter(Boolean)
+          .join('\n'),
+      },
+      {
+        role: 'user',
+        content: JSON.stringify({
+          stats,
+          rankedGroups: ranked,
+          sampleContacts,
+        }),
+      },
+    ],
+  };
+
+  try {
+    const res = await fetch(getContactAiChatCompletionsUrl(), {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      const t = await res.text();
+      console.error(`${LOG} strategy:llm_http provider=${provider}`, res.status, t.slice(0, 600));
+      return fallback;
+    }
+
+    const data = await res.json();
+    const parsed = parseOpenAiMessageJson(data?.choices?.[0]?.message?.content || '{}');
+    const priorities = Array.isArray(parsed.priorities)
+      ? parsed.priorities
+          .map((p) => ({
+            group: safeGroup(p.group),
+            reason: String(p.reason || '').trim(),
+            recommendedWindow: String(p.recommendedWindow || '').trim(),
+            suggestedTone: String(p.suggestedTone || '').trim(),
+          }))
+          .filter((p) => p.reason)
+      : [];
+    const messageVariants = Array.isArray(parsed.messageVariants)
+      ? parsed.messageVariants
+          .map((m) => ({
+            group: safeGroup(m.group),
+            text: String(m.text || '').trim(),
+          }))
+          .filter((m) => m.text)
+      : [];
+    const followUps = Array.isArray(parsed.followUps)
+      ? parsed.followUps.map((f) => String(f || '').trim()).filter(Boolean)
+      : [];
+
+    return {
+      source: provider,
+      strategySummary:
+        String(parsed.strategySummary || '').trim() ||
+        fallback.strategySummary,
+      priorities: priorities.length ? priorities : fallback.priorities,
+      messageVariants: messageVariants.length ? messageVariants : fallback.messageVariants,
+      followUps: followUps.length ? followUps : fallback.followUps,
+    };
+  } catch (e) {
+    console.error(`${LOG} strategy:llm_exception`, e.message);
+    return fallback;
+  }
+}
+
 module.exports = {
   analyzeContacts,
   analyzeContactsPipeline,
   correlateContactsSubset,
+  generateInviteStrategy,
   normalizePhone,
   inferRelation,
   inferNameSuffixHint,

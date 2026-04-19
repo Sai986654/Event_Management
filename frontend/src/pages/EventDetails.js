@@ -19,10 +19,11 @@ import {
   Select,
   Image,
 } from 'antd';
-import { EditOutlined, DeleteOutlined, ControlOutlined, ShopOutlined, CopyOutlined, VideoCameraOutlined } from '@ant-design/icons';
+import { EditOutlined, DeleteOutlined, ControlOutlined, ShopOutlined, CopyOutlined, VideoCameraOutlined, BulbOutlined, CheckSquareOutlined } from '@ant-design/icons';
 import { eventService } from '../services/eventService';
 import { guestService } from '../services/guestService';
 import { bookingService } from '../services/bookingService';
+import { aiService } from '../services/aiService';
 import { useEventSocket } from '../hooks/useEventSocket';
 import { formatDate, formatCurrency, getErrorMessage } from '../utils/helpers';
 import { notificationService } from '../services/notificationService';
@@ -53,6 +54,9 @@ const EventDetails = () => {
   const [shareQrCodeDataUrl, setShareQrCodeDataUrl] = useState('');
   const [qrDestinationType, setQrDestinationType] = useState('auto');
   const [shareSaving, setShareSaving] = useState(false);
+  const [generatingChecklist, setGeneratingChecklist] = useState(false);
+  const [loadingInsights, setLoadingInsights] = useState(false);
+  const [postEventInsights, setPostEventInsights] = useState(null);
 
   // Real-time handlers
   const handleGuestRsvp = useCallback((data) => {
@@ -269,6 +273,31 @@ const EventDetails = () => {
     }
   };
 
+  const handleGenerateChecklist = async () => {
+    setGeneratingChecklist(true);
+    try {
+      const res = await aiService.generateChecklist(Number(eventId));
+      message.success(`AI generated ${res.taskCount} tasks (${res.source})`);
+      fetchEventDetails();
+    } catch (err) {
+      message.error(getErrorMessage(err));
+    } finally {
+      setGeneratingChecklist(false);
+    }
+  };
+
+  const handleLoadInsights = async () => {
+    setLoadingInsights(true);
+    try {
+      const res = await aiService.getPostEventInsights(Number(eventId));
+      setPostEventInsights(res);
+    } catch (err) {
+      message.error(getErrorMessage(err));
+    } finally {
+      setLoadingInsights(false);
+    }
+  };
+
   const bookingStatusColor = {
     pending: 'orange',
     confirmed: 'green',
@@ -372,6 +401,11 @@ const EventDetails = () => {
               {isOrgOrAdmin && (
                 <Button danger icon={<DeleteOutlined />} onClick={handleDeleteEvent}>
                   Delete
+                </Button>
+              )}
+              {isOrgOrAdmin && (
+                <Button icon={<CheckSquareOutlined />} onClick={handleGenerateChecklist} loading={generatingChecklist}>
+                  AI Checklist
                 </Button>
               )}
             </div>
@@ -605,6 +639,50 @@ const EventDetails = () => {
                 ),
                 children: (
                   <InviteVideoManager eventId={Number(eventId)} guests={guests} />
+                ),
+              }] : []),
+              // ── Post-Event Insights tab ──
+              ...(isOrgOrAdmin ? [{
+                key: 'insights',
+                label: (
+                  <span>
+                    <BulbOutlined /> Post-Event Insights
+                  </span>
+                ),
+                children: (
+                  <Card>
+                    <Paragraph type="secondary">
+                      AI analyzes your actual event data — guest attendance, budget spend, vendor performance — and generates actionable insights.
+                    </Paragraph>
+                    <Button type="primary" icon={<BulbOutlined />} onClick={handleLoadInsights} loading={loadingInsights}>
+                      Generate Insights
+                    </Button>
+                    {postEventInsights ? (
+                      <div style={{ marginTop: 16 }}>
+                        <Tag color={postEventInsights.source === 'groq' || postEventInsights.source === 'openai' ? 'purple' : 'default'}>
+                          {postEventInsights.source === 'groq' ? 'Groq AI' : postEventInsights.source === 'openai' ? 'OpenAI' : 'Rule-based'}
+                        </Tag>
+                        <Divider />
+                        <h4>Summary</h4>
+                        <Paragraph>{postEventInsights.overallSummary}</Paragraph>
+                        <h4>Attendance</h4>
+                        <Paragraph>{postEventInsights.attendanceInsight}</Paragraph>
+                        <h4>Budget</h4>
+                        <Paragraph>{postEventInsights.budgetInsight}</Paragraph>
+                        <h4>Vendors</h4>
+                        <Paragraph>{postEventInsights.vendorInsight}</Paragraph>
+                        {postEventInsights.keyWins?.length ? (
+                          <><h4>What went well</h4><ul>{postEventInsights.keyWins.map((w, i) => <li key={i}>{w}</li>)}</ul></>
+                        ) : null}
+                        {postEventInsights.improvements?.length ? (
+                          <><h4>Areas to improve</h4><ul>{postEventInsights.improvements.map((w, i) => <li key={i}>{w}</li>)}</ul></>
+                        ) : null}
+                        {postEventInsights.nextEventTips?.length ? (
+                          <><h4>Tips for next event</h4><ul>{postEventInsights.nextEventTips.map((w, i) => <li key={i}>{w}</li>)}</ul></>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </Card>
                 ),
               }] : []),
             ]}

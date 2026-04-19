@@ -8,6 +8,7 @@
 const { prisma } = require('../config/db');
 const bcrypt = require('bcryptjs');
 const { google } = require('googleapis');
+const { geocode } = require('./locationService');
 const { CATEGORY_FIELD_TEMPLATES } = require('./vendorFormSchemaService');
 
 const CATEGORY_REQUIRED_FIELDS = Object.keys(CATEGORY_FIELD_TEMPLATES).reduce((acc, category) => {
@@ -319,6 +320,14 @@ async function syncVendorFromForm(formData) {
     const importedPortfolio = buildImportedPortfolio(mapped.portfolioLinks);
     const testimonials = buildTestimonialsFromForm(mapped);
 
+    // Auto-geocode city/state to lat/lng
+    let latitude = null;
+    let longitude = null;
+    if (mapped.city || mapped.state) {
+      const coords = await geocode(mapped.city, mapped.state);
+      if (coords) { latitude = coords.lat; longitude = coords.lng; }
+    }
+
     // Create vendor profile
     const vendor = await prisma.vendor.create({
       data: {
@@ -330,6 +339,8 @@ async function syncVendorFromForm(formData) {
         contactEmail: mapped.contactEmail,
         city: mapped.city,
         state: mapped.state,
+        latitude,
+        longitude,
         website: mapped.website,
         socialLinks,
         portfolio: importedPortfolio,

@@ -81,9 +81,8 @@ const ContactIntelligenceCenter = () => {
   /** Table filter: segment + optional name search */
   const [segmentFilter, setSegmentFilter] = useState('all');
   const [nameFilter, setNameFilter] = useState('');
-  const [selectedRowKeys, setSelectedRowKeys] = useState([]);
-  const [correlating, setCorrelating] = useState(false);
-  const [correlationResult, setCorrelationResult] = useState(null);
+  const [generatingStrategy, setGeneratingStrategy] = useState(false);
+  const [inviteStrategy, setInviteStrategy] = useState(null);
 
   useEffect(() => {
     (async () => {
@@ -137,8 +136,7 @@ const ContactIntelligenceCenter = () => {
           });
       setSegmentFilter('all');
       setNameFilter('');
-      setSelectedRowKeys([]);
-      setCorrelationResult(null);
+      setInviteStrategy(null);
       setAnalyzed(res);
       console.log('[ContactIntelligence UI] analyze done', {
         aiUsed: res.aiUsed,
@@ -232,8 +230,7 @@ const ContactIntelligenceCenter = () => {
     setListOwnerNotes(prev.listOwnerNotes || '');
     setSegmentFilter('all');
     setNameFilter('');
-    setSelectedRowKeys([]);
-    setCorrelationResult(null);
+    setInviteStrategy(null);
     setAnalyzed({
       contacts: prev.contacts,
       summary: prev.summary,
@@ -300,36 +297,34 @@ const ContactIntelligenceCenter = () => {
     }
   };
 
-  const correlateSelected = async () => {
-    if (selectedRowKeys.length < 2) {
-      message.warning('Select at least two rows in the table.');
+  const generateInviteStrategy = async () => {
+    const contacts = analyzed?.contacts || [];
+    if (!contacts.length) {
+      message.warning('Analyze contacts first.');
       return;
     }
-    const keySet = new Set(selectedRowKeys.map(String));
-    const selected = (analyzed.contacts || []).filter((c) => keySet.has(String(c.index)));
-    if (selected.length < 2) {
-      message.warning('Could not resolve selected contacts. Try analyzing again.');
-      return;
-    }
-    setCorrelating(true);
-    setCorrelationResult(null);
+    setGeneratingStrategy(true);
+    setInviteStrategy(null);
     try {
-      const res = await notificationService.correlateContacts({
-        contacts: selected,
+      const res = await notificationService.generateInviteStrategy({
+        contacts,
         listOwnerContext,
         listOwnerNotes,
       });
-      setCorrelationResult(res);
-      console.log('[ContactIntelligence UI] correlate done', { source: res.source, pairs: res.pairs?.length });
+      setInviteStrategy(res);
+      console.log('[ContactIntelligence UI] strategy done', {
+        source: res.source,
+        priorities: res.priorities?.length,
+      });
       message.success(
         res.source === 'openai' || res.source === 'groq'
-          ? 'AI correlation ready.'
-          : 'Rules-only correlation (no LLM key on server).'
+          ? 'AI invite strategy ready.'
+          : 'Rules-only invite strategy ready.'
       );
     } catch (err) {
       message.error(getErrorMessage(err));
     } finally {
-      setCorrelating(false);
+      setGeneratingStrategy(false);
     }
   };
 
@@ -523,66 +518,48 @@ const ContactIntelligenceCenter = () => {
                 {nameFilter.trim() ? ` (search: “${nameFilter.trim()}”)` : ''}
               </Text>
               <Space wrap align="center">
-                <Button
-                  type="primary"
-                  onClick={correlateSelected}
-                  loading={correlating}
-                  disabled={selectedRowKeys.length < 2 || correlating}
-                >
-                  Correlate selected with AI ({selectedRowKeys.length})
+                <Button type="primary" onClick={generateInviteStrategy} loading={generatingStrategy} disabled={generatingStrategy}>
+                  Generate AI Invite Strategy
                 </Button>
-                <Button
-                  onClick={() => {
-                    setSelectedRowKeys([]);
-                    setCorrelationResult(null);
-                  }}
-                  disabled={!selectedRowKeys.length && !correlationResult}
-                >
-                  Clear selection &amp; result
-                </Button>
-                <Text type="secondary">Pick two or more rows, then run OpenAI correlation using labels above.</Text>
+                {inviteStrategy?.source ? (
+                  <Tag color={inviteStrategy.source === 'groq' || inviteStrategy.source === 'openai' ? 'purple' : 'default'}>
+                    {inviteStrategy.source === 'groq' ? 'Groq' : inviteStrategy.source === 'openai' ? 'OpenAI' : 'Rules-only'}
+                  </Tag>
+                ) : null}
+                <Text type="secondary">Uses your analyzed segments to produce practical send order, tone, and copy.</Text>
               </Space>
-              {correlationResult?.correlationSummary ? (
-                <Card size="small" title="AI correlation (selected contacts)">
-                  <Paragraph style={{ marginBottom: 8 }}>{correlationResult.correlationSummary}</Paragraph>
-                  {correlationResult.source ? (
-                    <Tag
-                      color={
-                        correlationResult.source === 'openai' || correlationResult.source === 'groq' ? 'purple' : 'default'
-                      }
-                    >
-                      {correlationResult.source === 'groq'
-                        ? 'Groq'
-                        : correlationResult.source === 'openai'
-                          ? 'OpenAI'
-                          : 'Rules-only'}
-                    </Tag>
-                  ) : null}
-                  {Array.isArray(correlationResult.relationshipNotes) && correlationResult.relationshipNotes.length ? (
-                    <ul style={{ marginTop: 8, paddingLeft: 20 }}>
-                      {correlationResult.relationshipNotes.map((n, i) => (
-                        <li key={i}>
-                          <Text>{n}</Text>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : null}
-                  {Array.isArray(correlationResult.pairs) && correlationResult.pairs.length ? (
+              {inviteStrategy ? (
+                <Card size="small" title="Invite strategy (actionable)">
+                  <Paragraph style={{ marginBottom: 8 }}>{inviteStrategy.strategySummary}</Paragraph>
+                  {Array.isArray(inviteStrategy.priorities) && inviteStrategy.priorities.length ? (
                     <Space direction="vertical" size={4} style={{ marginTop: 8, width: '100%' }}>
-                      <Text strong>Pairs</Text>
-                      {correlationResult.pairs.map((p, i) => (
+                      <Text strong>Send Priority</Text>
+                      {inviteStrategy.priorities.map((p, i) => (
                         <Text key={i}>
-                          {p.personA || '?'} ↔ {p.personB || '?'}
-                          {p.relationshipHypothesis ? ` — ${p.relationshipHypothesis}` : ''}
+                          {i + 1}. {p.group} - {p.reason}
+                          {p.recommendedWindow ? ` (${p.recommendedWindow})` : ''}
+                          {p.suggestedTone ? `, tone: ${p.suggestedTone}` : ''}
                         </Text>
                       ))}
                     </Space>
                   ) : null}
-                  {Array.isArray(correlationResult.duplicatePhones) && correlationResult.duplicatePhones.length ? (
-                    <Paragraph type="secondary" style={{ marginTop: 8, marginBottom: 0 }}>
-                      <Text strong>Duplicate phone hints: </Text>
-                      {correlationResult.duplicatePhones.map((d) => `${d.digits} (${d.people.map((x) => x.name).join(', ')})`).join('; ')}
-                    </Paragraph>
+                  {Array.isArray(inviteStrategy.messageVariants) && inviteStrategy.messageVariants.length ? (
+                    <Space direction="vertical" size={4} style={{ marginTop: 8, width: '100%' }}>
+                      <Text strong>Message Variants</Text>
+                      {inviteStrategy.messageVariants.map((m, i) => (
+                        <Text key={i}>
+                          {m.group}: {m.text}
+                        </Text>
+                      ))}
+                    </Space>
+                  ) : null}
+                  {Array.isArray(inviteStrategy.followUps) && inviteStrategy.followUps.length ? (
+                    <Space direction="vertical" size={4} style={{ marginTop: 8, width: '100%' }}>
+                      <Text strong>Follow-up Plan</Text>
+                      {inviteStrategy.followUps.map((f, i) => (
+                        <Text key={i}>{i + 1}. {f}</Text>
+                      ))}
+                    </Space>
                   ) : null}
                 </Card>
               ) : null}
@@ -590,11 +567,6 @@ const ContactIntelligenceCenter = () => {
                 rowKey={(row) => String(row.index)}
                 dataSource={filteredContacts}
                 columns={columns}
-                rowSelection={{
-                  selectedRowKeys,
-                  onChange: setSelectedRowKeys,
-                  preserveSelectedRowKeys: true,
-                }}
                 pagination={{ pageSize: 8, showSizeChanger: true, pageSizeOptions: [8, 16, 32, 64] }}
               />
             </Space>

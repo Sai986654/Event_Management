@@ -24,7 +24,7 @@ import VendorWorkspaceScreen from '../screens/VendorWorkspaceScreen';
 import PlannerScreen from '../screens/PlannerScreen';
 import ActivityTrackerScreen from '../screens/ActivityTrackerScreen';
 import AdminControlScreen from '../screens/AdminControlScreen';
-import InviteIntelligenceScreen from '../screens/InviteIntelligenceScreen';
+
 import InviteVideoScreen from '../screens/InviteVideoScreen';
 import PublicEventScreen from '../screens/PublicEventScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
@@ -75,7 +75,7 @@ const DashboardStack = () => (
     <Stack.Screen name="VendorPackages" component={VendorPackagesScreen} options={{ title: 'Packages' }} />
     <Stack.Screen name="ActivityTracker" component={ActivityTrackerScreen} options={{ title: 'Activity Tracker' }} />
     <Stack.Screen name="AdminControl" component={AdminControlScreen} options={{ title: 'Admin Control' }} />
-    <Stack.Screen name="InviteIntelligence" component={InviteIntelligenceScreen} options={{ title: 'Invite Intelligence' }} />
+
     <Stack.Screen name="InviteVideos" component={InviteVideoScreen} options={{ title: 'Invite Videos' }} />
     <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Notifications' }} />
     <Stack.Screen name="GuestManagement" component={GuestManagementScreen} options={{ title: 'Guest Management' }} />

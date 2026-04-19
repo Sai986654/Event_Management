@@ -61,6 +61,7 @@ exports.correlateContactSelection = asyncHandler(async (req, res) => {
   res.json(result);
 });
 
+
 // POST /api/notifications/events/:eventId/reminders/whatsapp
 exports.sendEventWhatsAppReminders = asyncHandler(async (req, res) => {
   const eventId = Number(req.params.eventId);

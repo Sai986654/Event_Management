@@ -42,6 +42,7 @@ router.post(
   validate,
   correlateContactSelection
 );
+
 router.post(
   '/events/:eventId/reminders/whatsapp',
   [

@@ -111,7 +111,45 @@ const placeDetails = async ({ placeId, sessionToken }) => {
   return normalized;
 };
 
+const geocodeCache = new Map();
+
+/**
+ * Convert a city+state string into { lat, lng } using Google Geocoding API.
+ * Returns null if key is missing or geocoding fails.
+ */
+const geocode = async (city, state) => {
+  const address = [city, state, 'India'].filter(Boolean).join(', ').trim();
+  if (!address || address === 'India') return null;
+
+  const apiKey = mapsKey();
+  if (!apiKey) return null;
+
+  const cacheKey = `geo:${address.toLowerCase()}`;
+  const cached = getCache(geocodeCache, cacheKey);
+  if (cached) return cached;
+
+  const params = new URLSearchParams({
+    address,
+    key: apiKey,
+    components: 'country:IN',
+  });
+
+  try {
+    const response = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?${params.toString()}`);
+    const body = await response.json();
+    const loc = body?.results?.[0]?.geometry?.location;
+    if (!loc) return null;
+
+    const coords = { lat: Number(loc.lat), lng: Number(loc.lng) };
+    setCache(geocodeCache, cacheKey, coords);
+    return coords;
+  } catch {
+    return null;
+  }
+};
+
 module.exports = {
   autocomplete,
   placeDetails,
+  geocode,
 };

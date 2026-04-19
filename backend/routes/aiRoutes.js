@@ -10,6 +10,9 @@ const {
   createEventCollageJob,
   getEventCollageJobStatus,
   getVendorFit,
+  generateChecklist,
+  getVendorReviewSummary,
+  getPostEventInsights,
 } = require('../controllers/aiController');
 
 router.post('/suggestions', protect, getAISuggestions);
@@ -62,5 +65,15 @@ router.post(
   createEventCollageJob
 );
 router.get('/collage/event/:eventId/status', protect, getEventCollageJobStatus);
+
+router.post(
+  '/generate-checklist',
+  protect,
+  [body('eventId').isInt({ min: 1 }).withMessage('Valid eventId is required')],
+  validate,
+  generateChecklist
+);
+router.get('/vendor/:vendorId/review-summary', protect, getVendorReviewSummary);
+router.post('/event/:eventId/post-event-insights', protect, getPostEventInsights);
 
 module.exports = router;

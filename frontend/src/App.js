@@ -25,7 +25,7 @@ import VendorWorkspace from './pages/VendorWorkspace';
 import AdminControlCenter from './pages/AdminControlCenter';
 import EventPlanner from './pages/EventPlanner';
 import ActivityTracker from './pages/ActivityTracker';
-import ContactIntelligenceCenter from './pages/ContactIntelligenceCenter';
+
 import NotificationsPage from './pages/NotificationsPage';
 import Profile from './pages/Profile';
 import PhotoBooth from './pages/PhotoBooth';
@@ -243,16 +243,7 @@ const AppInner = () => {
             </ProtectedRoute>
           }
         />
-        <Route
-          path="/contact-intelligence"
-          element={
-            <ProtectedRoute allowedRoles={['organizer', 'admin']}>
-              <AppLayout>
-                <ContactIntelligenceCenter />
-              </AppLayout>
-            </ProtectedRoute>
-          }
-        />
+
         <Route
           path="/events/:eventId/photo-booth"
           element={

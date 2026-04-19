@@ -1,6 +1,7 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { View, StyleSheet, FlatList, RefreshControl, TouchableOpacity } from 'react-native';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { View, StyleSheet, FlatList, RefreshControl, TouchableOpacity, Alert, Platform } from 'react-native';
 import { Searchbar, Card, Text, Chip, ActivityIndicator, Button, Menu, IconButton, Divider } from 'react-native-paper';
+import * as Location from 'expo-location';
 import { vendorService } from '../services/vendorService';
 import { formatCurrency, getErrorMessage } from '../utils/helpers';
 import { Colors, Spacing, Radius } from '../theme';
@@ -22,6 +23,7 @@ const CATEGORY_ICONS = {
 
 const SORT_OPTIONS = [
   { label: 'Top Rated', value: 'top-rated' },
+  { label: 'Nearest First', value: 'nearest' },
   { label: 'Price: Low to High', value: 'price-low' },
   { label: 'Price: High to Low', value: 'price-high' },
   { label: 'Most Reviews', value: 'most-reviews' },
@@ -36,20 +38,97 @@ const VendorListScreen = ({ navigation }) => {
   const [sortBy, setSortBy] = useState('top-rated');
   const [sortMenuVisible, setSortMenuVisible] = useState(false);
 
-  const fetchVendors = useCallback(async () => {
+  // Location state
+  const [nearMe, setNearMe] = useState(false);
+  const [userLocation, setUserLocation] = useState(null); // { latitude, longitude }
+  const [locationCity, setLocationCity] = useState('');
+  const [radiusKm, setRadiusKm] = useState(50);
+  const [nearbyCount, setNearbyCount] = useState(null);
+  const [locationLoading, setLocationLoading] = useState(false);
+  const locationRequested = useRef(false);
+
+  // Request location permission and get current position
+  const requestLocation = useCallback(async () => {
+    if (locationLoading) return null;
+    setLocationLoading(true);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Location Permission', 'Please enable location access in Settings to see nearby vendors.');
+        setNearMe(false);
+        return null;
+      }
+      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      const coords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
+      setUserLocation(coords);
+
+      // Reverse-geocode to get city name
+      try {
+        const [place] = await Location.reverseGeocodeAsync(coords);
+        if (place) {
+          setLocationCity(place.city || place.subregion || place.region || '');
+        }
+      } catch (_) { /* ignore reverse geocode failures */ }
+
+      return coords;
+    } catch (err) {
+      Alert.alert('Location Error', getErrorMessage(err));
+      setNearMe(false);
+      return null;
+    } finally {
+      setLocationLoading(false);
+    }
+  }, [locationLoading]);
+
+  const fetchVendors = useCallback(async (locOverride) => {
     try {
       const params = {};
-      if (search) params.search = search;
       if (category !== 'all') params.category = category;
+
+      const loc = locOverride || userLocation;
+      if (nearMe && loc) {
+        params.lat = loc.latitude;
+        params.lng = loc.longitude;
+        params.radius = radiusKm;
+      } else if (search) {
+        // Use search text as city filter when not in "near me" mode
+        params.city = search;
+      }
+
       const data = await vendorService.searchVendors(params);
       setVendors(data.vendors || []);
+      setNearbyCount(data.nearby != null ? data.nearby : null);
     } catch (err) {
       console.warn(getErrorMessage(err));
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [search, category]);
+  }, [search, category, nearMe, userLocation, radiusKm]);
+
+  // Toggle "Near Me" - request location on first enable
+  const handleToggleNearMe = useCallback(async () => {
+    if (!nearMe) {
+      // Turning ON
+      setNearMe(true);
+      setLoading(true);
+      if (!userLocation) {
+        const coords = await requestLocation();
+        if (!coords) { setLoading(false); return; }
+        fetchVendors(coords);
+      } else {
+        fetchVendors();
+      }
+    } else {
+      // Turning OFF
+      setNearMe(false);
+      setUserLocation(null);
+      setLocationCity('');
+      setNearbyCount(null);
+      setLoading(true);
+      fetchVendors();
+    }
+  }, [nearMe, userLocation, requestLocation, fetchVendors]);
 
   useEffect(() => { fetchVendors(); }, [fetchVendors]);
 
@@ -58,6 +137,13 @@ const VendorListScreen = ({ navigation }) => {
     switch (sortBy) {
       case 'top-rated':
         sorted.sort((a, b) => Number(b.averageRating || 0) - Number(a.averageRating || 0));
+        break;
+      case 'nearest':
+        sorted.sort((a, b) => {
+          const da = a.distance != null ? a.distance : 99999;
+          const db = b.distance != null ? b.distance : 99999;
+          return da - db;
+        });
         break;
       case 'price-low':
         sorted.sort((a, b) => Number(a.basePrice || 0) - Number(b.basePrice || 0));
@@ -140,6 +226,7 @@ const VendorListScreen = ({ navigation }) => {
                 <Text style={styles.locationPin}>📍</Text>
                 <Text style={styles.locationText} numberOfLines={1}>
                   {item.city}{item.state ? `, ${item.state}` : ''}
+                  {item.distance != null ? ` • ${item.distance} km` : ''}
                 </Text>
               </View>
             )}
@@ -182,12 +269,46 @@ const VendorListScreen = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <Searchbar
-        placeholder="Search vendors..."
+        placeholder={nearMe ? 'Showing nearby vendors...' : 'Search by city or vendor name...'}
         value={search}
         onChangeText={setSearch}
         style={styles.searchbar}
         inputStyle={styles.searchInput}
+        editable={!nearMe}
       />
+
+      {/* Location bar */}
+      <View style={styles.locationBar}>
+        <TouchableOpacity
+          style={[styles.nearMeBtn, nearMe && styles.nearMeBtnActive]}
+          onPress={handleToggleNearMe}
+          disabled={locationLoading}
+        >
+          {locationLoading ? (
+            <ActivityIndicator size={14} color={nearMe ? '#fff' : Colors.primary} style={{ marginRight: 6 }} />
+          ) : (
+            <Text style={[styles.nearMeIcon, nearMe && styles.nearMeIconActive]}>📍</Text>
+          )}
+          <Text style={[styles.nearMeText, nearMe && styles.nearMeTextActive]}>
+            {nearMe ? (locationCity || 'Near Me') : 'Near Me'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {nearMe && (
+        <View style={styles.radiusRow}>
+          <Text style={styles.radiusTitle}>Radius:</Text>
+          {[10, 25, 50, 100, 200].map((r) => (
+            <TouchableOpacity
+              key={r}
+              style={[styles.radiusChip, radiusKm === r && styles.radiusChipActive]}
+              onPress={() => { setRadiusKm(r); setLoading(true); }}
+            >
+              <Text style={[styles.radiusChipText, radiusKm === r && styles.radiusChipTextActive]}>{r} km</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
 
       {/* Category chips */}
       <FlatList
@@ -212,7 +333,9 @@ const VendorListScreen = ({ navigation }) => {
       {/* Sort bar + count */}
       <View style={styles.sortBar}>
         <Text style={styles.resultCount}>
-          {sortedVendors.length} vendor{sortedVendors.length !== 1 ? 's' : ''} found
+          {nearMe && nearbyCount != null
+            ? `${nearbyCount} nearby within ${radiusKm} km`
+            : `${sortedVendors.length} vendor${sortedVendors.length !== 1 ? 's' : ''} found`}
         </Text>
         <Menu
           visible={sortMenuVisible}
@@ -268,6 +391,55 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
   },
   searchInput: { fontSize: 14 },
+
+  // Location bar
+  locationBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.xs,
+  },
+  nearMeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.surface,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  nearMeBtnActive: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  nearMeIcon: { fontSize: 14, marginRight: 6 },
+  nearMeIconActive: { fontSize: 14, marginRight: 6 },
+  nearMeText: { fontSize: 13, fontWeight: '600', color: Colors.textPrimary },
+  nearMeTextActive: { color: '#fff' },
+  radiusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.sm,
+    gap: 6,
+  },
+  radiusTitle: { fontSize: 12, fontWeight: '600', color: Colors.textSecondary, marginRight: 2 },
+  radiusChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  radiusChipActive: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  radiusChipText: { fontSize: 11, fontWeight: '600', color: Colors.textSecondary },
+  radiusChipTextActive: { color: '#fff' },
+
   chipRow: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.sm, height: 48 },
   filterChip: { marginRight: Spacing.sm, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border },
   filterChipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },

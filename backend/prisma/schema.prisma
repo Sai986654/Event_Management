@@ -221,6 +221,8 @@ model Vendor {
   availability  Json           @default("[]")
   city          String?
   state         String?
+  latitude      Float?
+  longitude     Float?
   contactPhone  String?        @map("contact_phone")
   contactEmail  String?        @map("contact_email")
   website       String?

@@ -2,6 +2,7 @@ const { prisma } = require('../config/db');
 const asyncHandler = require('../utils/asyncHandler');
 const { paginate } = require('../utils/pagination');
 const { uploadFile } = require('../services/fileService');
+const { geocode } = require('../services/locationService');
 
 const normalizeCategoryTags = (categories) => {
   if (Array.isArray(categories)) {
@@ -17,11 +18,32 @@ const getVendorForUser = async (userId) => prisma.vendor.findUnique({ where: { u
 
 // POST /api/vendors
 exports.createVendor = asyncHandler(async (req, res) => {
-  const vendor = await prisma.vendor.create({
-    data: { ...req.body, userId: req.user.id },
-  });
+  const data = { ...req.body, userId: req.user.id };
+
+  // Auto-geocode city/state to lat/lng
+  if (data.city || data.state) {
+    const coords = await geocode(data.city, data.state);
+    if (coords) {
+      data.latitude = coords.lat;
+      data.longitude = coords.lng;
+    }
+  }
+
+  const vendor = await prisma.vendor.create({ data });
   res.status(201).json({ vendor });
 });
+
+// Haversine distance in km between two lat/lng points
+function haversineKm(lat1, lng1, lat2, lng2) {
+  const toRad = (v) => (v * Math.PI) / 180;
+  const R = 6371;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
 
 // GET /api/vendors
 exports.getVendors = asyncHandler(async (req, res) => {
@@ -32,6 +54,40 @@ exports.getVendors = asyncHandler(async (req, res) => {
   if (req.query.city) where.city = { contains: req.query.city, mode: 'insensitive' };
   if (req.query.state) where.state = { contains: req.query.state, mode: 'insensitive' };
   if (req.query.minRating) where.averageRating = { gte: Number(req.query.minRating) };
+
+  const userLat = req.query.lat ? Number(req.query.lat) : null;
+  const userLng = req.query.lng ? Number(req.query.lng) : null;
+  const radiusKm = req.query.radius ? Number(req.query.radius) : 50;
+
+  // When geo params provided, fetch without pagination first to compute distance
+  if (userLat != null && userLng != null) {
+    const all = await prisma.vendor.findMany({
+      where,
+      include: { user: { select: { id: true, name: true, email: true } } },
+      orderBy: { averageRating: 'desc' },
+    });
+
+    // Compute distance for vendors with coordinates, keep others as null distance
+    const withDistance = all.map((v) => {
+      if (v.latitude != null && v.longitude != null) {
+        const dist = haversineKm(userLat, userLng, v.latitude, v.longitude);
+        return { ...v, distance: Math.round(dist * 10) / 10 };
+      }
+      return { ...v, distance: null };
+    });
+
+    // Vendors within radius (with coords) come first, sorted by distance
+    // Vendors without coords go to the end
+    const nearby = withDistance.filter((v) => v.distance !== null && v.distance <= radiusKm);
+    const noCoords = withDistance.filter((v) => v.distance === null);
+    nearby.sort((a, b) => a.distance - b.distance);
+
+    const combined = [...nearby, ...noCoords];
+    const total = combined.length;
+    const paged = combined.slice(skip, skip + limit);
+
+    return res.json({ vendors: paged, page, totalPages: Math.ceil(total / limit), total, nearby: nearby.length });
+  }
 
   const [vendors, total] = await Promise.all([
     prisma.vendor.findMany({
@@ -76,9 +132,24 @@ exports.updateVendor = asyncHandler(async (req, res) => {
     return res.status(403).json({ message: 'Not authorized' });
   }
 
+  const data = { ...req.body };
+
+  // Re-geocode if city or state changed
+  const newCity = data.city !== undefined ? data.city : vendor.city;
+  const newState = data.state !== undefined ? data.state : vendor.state;
+  if (data.city !== undefined || data.state !== undefined) {
+    if (newCity !== vendor.city || newState !== vendor.state) {
+      const coords = await geocode(newCity, newState);
+      if (coords) {
+        data.latitude = coords.lat;
+        data.longitude = coords.lng;
+      }
+    }
+  }
+
   const updated = await prisma.vendor.update({
     where: { id: vendor.id },
-    data: req.body,
+    data,
   });
   res.json({ vendor: updated });
 });

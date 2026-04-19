@@ -11,6 +11,7 @@ import {
 import { vendorService } from '../services/vendorService';
 import { bookingService } from '../services/bookingService';
 import { eventService } from '../services/eventService';
+import { aiService } from '../services/aiService';
 import { AuthContext } from '../context/AuthContext';
 import { formatCurrency, getErrorMessage } from '../utils/helpers';
 import './VendorDetail.css';
@@ -28,6 +29,8 @@ const VendorDetail = () => {
   const [bookingLoading, setBookingLoading] = useState(false);
   const [userEvents, setUserEvents] = useState([]);
   const [bookingForm] = Form.useForm();
+  const [reviewSummary, setReviewSummary] = useState(null);
+  const [loadingReviewSummary, setLoadingReviewSummary] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -47,6 +50,18 @@ const VendorDetail = () => {
     };
     load();
   }, [vendorId]);
+
+  const loadReviewSummary = async () => {
+    setLoadingReviewSummary(true);
+    try {
+      const res = await aiService.getVendorReviewSummary(vendorId);
+      setReviewSummary(res);
+    } catch (err) {
+      message.error(getErrorMessage(err));
+    } finally {
+      setLoadingReviewSummary(false);
+    }
+  };
 
   const openBookingModal = async (pkg) => {
     if (!user) {
@@ -239,6 +254,39 @@ const VendorDetail = () => {
           </div>
         )}
       </Card>
+
+      {/* AI Review Summary */}
+      {reviews.length >= 2 && (
+        <>
+          <Divider orientation="left"><h2 style={{ margin: 0 }}>AI Review Summary</h2></Divider>
+          <Card>
+            {!reviewSummary ? (
+              <div style={{ textAlign: 'center', padding: 16 }}>
+                <p>Get an instant AI-powered summary of all reviews for this vendor.</p>
+                <Button type="primary" onClick={loadReviewSummary} loading={loadingReviewSummary}>
+                  Summarize Reviews with AI
+                </Button>
+              </div>
+            ) : (
+              <div>
+                <Tag color={reviewSummary.source === 'groq' || reviewSummary.source === 'openai' ? 'purple' : 'default'} style={{ marginBottom: 12 }}>
+                  {reviewSummary.source === 'groq' ? 'Groq AI' : reviewSummary.source === 'openai' ? 'OpenAI' : 'Rule-based'}
+                </Tag>
+                <p>{reviewSummary.summary}</p>
+                {reviewSummary.strengths?.length ? (
+                  <><strong>Strengths:</strong><ul>{reviewSummary.strengths.map((s, i) => <li key={i}>{s}</li>)}</ul></>
+                ) : null}
+                {reviewSummary.watchOuts?.length ? (
+                  <><strong>Watch out for:</strong><ul>{reviewSummary.watchOuts.map((s, i) => <li key={i}>{s}</li>)}</ul></>
+                ) : null}
+                {reviewSummary.bestFor ? (
+                  <p><strong>Best for:</strong> {reviewSummary.bestFor}</p>
+                ) : null}
+              </div>
+            )}
+          </Card>
+        </>
+      )}
 
       {/* Reviews Section */}
       <Divider orientation="left"><h2 style={{ margin: 0 }}>Reviews</h2></Divider>

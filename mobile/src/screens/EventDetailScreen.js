@@ -8,6 +8,7 @@ import { eventService } from '../services/eventService';
 import { bookingService } from '../services/bookingService';
 import { guestService } from '../services/guestService';
 import { formatDate, formatCurrency, getErrorMessage, getStatusColor } from '../utils/helpers';
+import { aiService } from '../services/aiService';
 import { Colors, Spacing, Radius } from '../theme';
 import LocationPicker from '../components/LocationPicker';
 
@@ -28,6 +29,9 @@ const EventDetailScreen = ({ route, navigation }) => {
   // Netlify / Share state
   const [publishingNetlify, setPublishingNetlify] = useState(false);
   const [shareDestinationUrl, setShareDestinationUrl] = useState('');
+  const [generatingChecklist, setGeneratingChecklist] = useState(false);
+  const [loadingInsights, setLoadingInsights] = useState(false);
+  const [postEventInsights, setPostEventInsights] = useState(null);
 
   // Status options
   const statusOptions = ['draft', 'planning', 'confirmed', 'completed', 'cancelled'];
@@ -490,8 +494,28 @@ const EventDetailScreen = ({ route, navigation }) => {
                 <Button mode="contained-tonal" icon="chart-timeline-variant" style={styles.manageBtn} onPress={() => navigation.navigate('ActivityTracker')}>
                   Activity Tracker
                 </Button>
-                <Button mode="contained-tonal" icon="card-account-phone-outline" style={styles.manageBtn} onPress={() => navigation.navigate('InviteIntelligence')}>
-                  Invite Intelligence
+                <Button mode="contained-tonal" icon="clipboard-check-outline" style={styles.manageBtn} loading={generatingChecklist} onPress={async () => {
+                  setGeneratingChecklist(true);
+                  try {
+                    const res = await aiService.generateChecklist(eventId);
+                    Alert.alert('AI Checklist', `Generated ${res.taskCount} tasks (${res.source}). Refresh to see them.`);
+                    load();
+                  } catch (err) { Alert.alert('Error', getErrorMessage(err)); }
+                  finally { setGeneratingChecklist(false); }
+                }}>
+                  AI Checklist
+                </Button>
+                <Button mode="contained-tonal" icon="lightbulb-on-outline" style={styles.manageBtn} loading={loadingInsights} onPress={async () => {
+                  setLoadingInsights(true);
+                  try {
+                    const res = await aiService.getPostEventInsights(eventId);
+                    setPostEventInsights(res);
+                    const msg = `${res.overallSummary}\n\nAttendance: ${res.attendanceInsight}\n\nBudget: ${res.budgetInsight}`;
+                    Alert.alert('Post-Event Insights', msg);
+                  } catch (err) { Alert.alert('Error', getErrorMessage(err)); }
+                  finally { setLoadingInsights(false); }
+                }}>
+                  Post-Event Insights
                 </Button>
                 <Button mode="contained-tonal" icon="video-wireless-outline" style={styles.manageBtn} onPress={() => navigation.navigate('InviteVideos', { eventId, eventTitle: event.title, eventType: event.type })}>
                   Invite Videos

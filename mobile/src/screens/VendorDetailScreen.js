@@ -3,6 +3,7 @@ import { View, StyleSheet, ScrollView, Alert, Image, Dimensions } from 'react-na
 import { Text, Card, Button, Chip, Divider, ActivityIndicator } from 'react-native-paper';
 import { AuthContext } from '../context/AuthContext';
 import { vendorService } from '../services/vendorService';
+import { aiService } from '../services/aiService';
 import { formatCurrency, getErrorMessage } from '../utils/helpers';
 import { Colors, Spacing, Radius } from '../theme';
 
@@ -13,6 +14,8 @@ const VendorDetailScreen = ({ route, navigation }) => {
   const { user } = useContext(AuthContext);
   const [vendor, setVendor] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [reviewSummary, setReviewSummary] = useState(null);
+  const [loadingReviewSummary, setLoadingReviewSummary] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -139,6 +142,45 @@ const VendorDetailScreen = ({ route, navigation }) => {
                 </Card.Content>
               </Card>
             ))}
+          </View>
+        )}
+
+        {/* ── AI Review Summary ── */}
+        {reviews.length >= 2 && (
+          <View style={styles.section}>
+            <Text variant="titleMedium" style={styles.sectionTitle}>AI Review Summary</Text>
+            {!reviewSummary ? (
+              <Button mode="contained-tonal" icon="brain" loading={loadingReviewSummary} onPress={async () => {
+                setLoadingReviewSummary(true);
+                try {
+                  const res = await aiService.getVendorReviewSummary(vendorId);
+                  setReviewSummary(res);
+                } catch (err) { Alert.alert('Error', getErrorMessage(err)); }
+                finally { setLoadingReviewSummary(false); }
+              }} style={{ borderRadius: Radius.sm }}>
+                Summarize Reviews with AI
+              </Button>
+            ) : (
+              <Card style={styles.reviewCard}>
+                <Card.Content>
+                  <Chip compact style={{ alignSelf: 'flex-start', marginBottom: 8 }}>{reviewSummary.source === 'groq' ? 'Groq AI' : reviewSummary.source === 'openai' ? 'OpenAI' : 'Rule-based'}</Chip>
+                  <Text variant="bodyMedium" style={{ color: Colors.textPrimary, marginBottom: 8 }}>{reviewSummary.summary}</Text>
+                  {reviewSummary.strengths?.length ? (
+                    <View style={{ marginBottom: 6 }}>
+                      <Text variant="labelLarge" style={{ fontWeight: '700' }}>Strengths</Text>
+                      {reviewSummary.strengths.map((s, i) => <Text key={i} variant="bodySmall" style={{ color: Colors.textSecondary }}>• {s}</Text>)}
+                    </View>
+                  ) : null}
+                  {reviewSummary.watchOuts?.length ? (
+                    <View style={{ marginBottom: 6 }}>
+                      <Text variant="labelLarge" style={{ fontWeight: '700' }}>Watch out for</Text>
+                      {reviewSummary.watchOuts.map((s, i) => <Text key={i} variant="bodySmall" style={{ color: Colors.textSecondary }}>• {s}</Text>)}
+                    </View>
+                  ) : null}
+                  {reviewSummary.bestFor ? <Text variant="bodySmall" style={{ color: Colors.primary, fontWeight: '600' }}>Best for: {reviewSummary.bestFor}</Text> : null}
+                </Card.Content>
+              </Card>
+            )}
           </View>
         )}
 

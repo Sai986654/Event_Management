@@ -67,4 +67,19 @@ export const aiService = {
     const response = await api.get(`/ai/collage/event/${eventId}/status`);
     return response.data;
   },
+
+  generateChecklist: async (eventId) => {
+    const response = await api.post('/ai/generate-checklist', { eventId });
+    return response.data;
+  },
+
+  getVendorReviewSummary: async (vendorId) => {
+    const response = await api.get(`/ai/vendor/${vendorId}/review-summary`);
+    return response.data;
+  },
+
+  getPostEventInsights: async (eventId) => {
+    const response = await api.post(`/ai/event/${eventId}/post-event-insights`);
+    return response.data;
+  },
 };

@@ -168,14 +168,7 @@ const EventsDashboard = ({ user, navigation }) => {
             onPress={() => navigation.navigate('BudgetDashboard', { eventId: events[0].id })}
           />
         )}
-        {(user?.role === 'organizer' || user?.role === 'admin') && (
-          <ActionCard
-            icon="card-account-phone-outline"
-            title="Invite Intelligence"
-            subtitle="Contact segments, WhatsApp reminders"
-            onPress={() => navigation.navigate('InviteIntelligence')}
-          />
-        )}
+
         {user?.role === 'admin' && (
           <ActionCard
             icon="shield-check-outline"

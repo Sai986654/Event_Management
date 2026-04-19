@@ -1,6 +1,6 @@
 import React, { useContext, useEffect, useMemo, useState, useCallback } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
-import { ActivityIndicator, Button, Card, Checkbox, Chip, Text, TextInput, Snackbar } from 'react-native-paper';
+import { ActivityIndicator, Button, Card, Chip, Text, TextInput, Snackbar } from 'react-native-paper';
 import { AuthContext } from '../context/AuthContext';
 import { eventService } from '../services/eventService';
 import { notificationService } from '../services/notificationService';
@@ -62,9 +62,8 @@ const InviteIntelligenceScreen = () => {
   const [sending, setSending] = useState(false);
   const [runningCollage, setRunningCollage] = useState(false);
   const [fetchingCollage, setFetchingCollage] = useState(false);
-  const [selectedForCorrelate, setSelectedForCorrelate] = useState([]);
-  const [correlating, setCorrelating] = useState(false);
-  const [correlationResult, setCorrelationResult] = useState(null);
+  const [generatingStrategy, setGeneratingStrategy] = useState(false);
+  const [inviteStrategy, setInviteStrategy] = useState(null);
   const [snack, setSnack] = useState({ visible: false, text: '', type: 'info' });
 
   const showSnack = (text, type = 'info') => setSnack({ visible: true, text, type });
@@ -88,7 +87,7 @@ const InviteIntelligenceScreen = () => {
       const res = hasCsv
         ? await notificationService.analyzeContacts({ csv: csvPaste, useOpenAi: true, listOwnerContext, listOwnerNotes })
         : await notificationService.analyzeContacts({ contacts: parsedContacts, useOpenAi: true, listOwnerContext, listOwnerNotes });
-      setSelectedForCorrelate([]); setCorrelationResult(null); setAnalyzed(res);
+      setInviteStrategy(null); setAnalyzed(res);
       try {
         await AsyncStorage.setItem(CONTACT_INTEL_STORAGE_KEY, JSON.stringify({
           version: 1, savedAt: new Date().toISOString(), listOwnerContext, listOwnerNotes,
@@ -102,21 +101,16 @@ const InviteIntelligenceScreen = () => {
     finally { setAnalyzing(false); }
   };
 
-  const toggleCorrelateSelect = (index) => {
-    setSelectedForCorrelate((prev) => prev.includes(index) ? prev.filter((i) => i !== index) : [...prev, index].sort((a, b) => a - b));
-  };
-
-  const runCorrelateSelected = async () => {
-    if (selectedForCorrelate.length < 2) { showSnack('Select at least two contacts.', 'error'); return; }
-    const contacts = (analyzed?.contacts || []).filter((c) => selectedForCorrelate.includes(c.index));
-    if (contacts.length < 2) { showSnack('Could not resolve selected rows.', 'error'); return; }
-    setCorrelating(true); setCorrelationResult(null);
+  const runInviteStrategy = async () => {
+    const contacts = analyzed?.contacts || [];
+    if (!contacts.length) { showSnack('Analyze contacts first.', 'error'); return; }
+    setGeneratingStrategy(true); setInviteStrategy(null);
     try {
-      const res = await notificationService.correlateContacts({ contacts, listOwnerContext, listOwnerNotes });
-      setCorrelationResult(res);
-      showSnack(res.source === 'openai' || res.source === 'groq' ? 'AI correlation ready.' : 'Rules-only (no LLM).');
+      const res = await notificationService.generateInviteStrategy({ contacts, listOwnerContext, listOwnerNotes });
+      setInviteStrategy(res);
+      showSnack(res.source === 'openai' || res.source === 'groq' ? 'AI strategy ready.' : 'Rules-only strategy ready.');
     } catch (err) { showSnack(getErrorMessage(err), 'error'); }
-    finally { setCorrelating(false); }
+    finally { setGeneratingStrategy(false); }
   };
 
   const sendReminder = async () => {
@@ -211,24 +205,20 @@ const InviteIntelligenceScreen = () => {
               ))}
               {(analyzed.contacts || []).length > 12 ? <Text style={styles.muted}>+{(analyzed.contacts || []).length - 12} more</Text> : null}
 
-              {/* Correlate */}
-              <Text variant="titleSmall" style={styles.subsectionTitle}>Correlate with AI (select 2+)</Text>
-              <Text style={styles.hint}>Select people to find relationships using AI.</Text>
-              {(analyzed.contacts || []).map((c) => (
-                <View key={`cb-${c.index}`} style={styles.correlateRow}>
-                  <Checkbox status={selectedForCorrelate.includes(c.index) ? 'checked' : 'unchecked'} onPress={() => toggleCorrelateSelect(c.index)} />
-                  <Text style={styles.correlateRowText} numberOfLines={3}>{c.name} · {c.inferredRelation} · {c.relationTelugu || '—'}</Text>
-                </View>
-              ))}
-              <Button mode="contained-tonal" onPress={runCorrelateSelected} loading={correlating} disabled={selectedForCorrelate.length < 2 || correlating} style={styles.btn}>
-                Correlate selected ({selectedForCorrelate.length})
+              <Text variant="titleSmall" style={styles.subsectionTitle}>AI Invite Strategy</Text>
+              <Text style={styles.hint}>Generate practical send order, tone, and message variants using your segments.</Text>
+              <Button mode="contained-tonal" onPress={runInviteStrategy} loading={generatingStrategy} disabled={generatingStrategy} style={styles.btn}>
+                Generate strategy
               </Button>
-              {correlationResult?.correlationSummary ? (
+              {inviteStrategy ? (
                 <View style={styles.correlationBox}>
-                  <Text variant="labelLarge" style={{ fontWeight: '700' }}>{correlationResult.source === 'groq' ? 'Groq' : correlationResult.source === 'openai' ? 'OpenAI' : 'Rules-only'}</Text>
-                  <Text style={styles.overview}>{correlationResult.correlationSummary}</Text>
-                  {Array.isArray(correlationResult.pairs) && correlationResult.pairs.map((p, j) => (
-                    <Text key={`pr-${j}`} style={styles.rowLine} numberOfLines={3}>{p.personA} ↔ {p.personB}{p.relationshipHypothesis ? ` — ${p.relationshipHypothesis}` : ''}</Text>
+                  <Text variant="labelLarge" style={{ fontWeight: '700' }}>{inviteStrategy.source === 'groq' ? 'Groq' : inviteStrategy.source === 'openai' ? 'OpenAI' : 'Rules-only'}</Text>
+                  <Text style={styles.overview}>{inviteStrategy.strategySummary}</Text>
+                  {Array.isArray(inviteStrategy.priorities) && inviteStrategy.priorities.map((p, j) => (
+                    <Text key={`pr-${j}`} style={styles.rowLine} numberOfLines={3}>{j + 1}. {p.group} · {p.reason}{p.recommendedWindow ? ` · ${p.recommendedWindow}` : ''}</Text>
+                  ))}
+                  {Array.isArray(inviteStrategy.messageVariants) && inviteStrategy.messageVariants.map((m, j) => (
+                    <Text key={`mv-${j}`} style={styles.rowLine} numberOfLines={4}>{m.group}: {m.text}</Text>
                   ))}
                 </View>
               ) : null}
@@ -317,8 +307,6 @@ const styles = StyleSheet.create({
   overview: { fontSize: 13, color: Colors.textPrimary, marginBottom: Spacing.sm, lineHeight: 20 },
   warnText: { fontSize: 12, color: Colors.danger, marginBottom: Spacing.sm, lineHeight: 18 },
   rowLine: { fontSize: 13, color: Colors.textPrimary, marginBottom: 4 },
-  correlateRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 4 },
-  correlateRowText: { flex: 1, fontSize: 13, color: Colors.textPrimary, paddingTop: 6 },
   correlationBox: { marginTop: Spacing.md, padding: Spacing.md, backgroundColor: '#f4f0ff', borderRadius: Radius.sm, borderWidth: 1, borderColor: '#e0d4ff' },
   statusBox: { marginTop: Spacing.md, padding: Spacing.md, backgroundColor: Colors.surfaceVariant, borderRadius: Radius.sm },
   url: { fontSize: 11, color: Colors.primary, marginTop: 4 },
