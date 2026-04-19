@@ -4,14 +4,14 @@
  * Steps:
  * 1) Open your Google Form > Script editor
  * 2) Replace all code with this file
- * 3) Run setupDynamicCategoryForm() once from script editor
+ * 3) Run rebuildDynamicCategoryForm() once from script editor
  * 4) Save
  * 5) Create trigger: Function=onFormSubmit, Event=On form submit
  */
 
 const WEBHOOK_URL = 'https://event-management-9i4d.onrender.com/api/webhooks/vendor-form';
 const SCHEMA_URL = 'https://event-management-9i4d.onrender.com/api/public/vendor-form/schema';
-const WEBHOOK_SECRET = '6e3bf7bc7afcc4e62e5f3d68dbae97a15a9220bfeff24933';
+const WEBHOOK_SECRET = '3fec6b30e94be23ce9d7ef62a8736c78f032e374b943dded';
 const CATEGORY_ITEM_TITLE = 'Service Category';
 
 const FALLBACK_SCHEMA = {
@@ -117,6 +117,38 @@ function getOrCreateCategoryItem(form) {
   return form.addMultipleChoiceItem().setTitle(CATEGORY_ITEM_TITLE).setRequired(true);
 }
 
+function ensureStandaloneFieldItem(form, field) {
+  const title = field.title;
+
+  if (field.type === 'multiple') {
+    const existing = findItemByTitle(form, FormApp.ItemType.MULTIPLE_CHOICE, title);
+    const item = existing ? existing.asMultipleChoiceItem() : form.addMultipleChoiceItem().setTitle(title);
+    item.setChoiceValues(field.choices || []);
+    item.setRequired(!!field.required);
+    return item;
+  }
+
+  if (field.type === 'checkbox') {
+    const existing = findItemByTitle(form, FormApp.ItemType.CHECKBOX, title);
+    const item = existing ? existing.asCheckboxItem() : form.addCheckboxItem().setTitle(title);
+    item.setChoiceValues(field.choices || []);
+    item.setRequired(!!field.required);
+    return item;
+  }
+
+  if (field.type === 'paragraph') {
+    const existing = findItemByTitle(form, FormApp.ItemType.PARAGRAPH_TEXT, title);
+    const item = existing ? existing.asParagraphTextItem() : form.addParagraphTextItem().setTitle(title);
+    item.setRequired(!!field.required);
+    return item;
+  }
+
+  const existing = findItemByTitle(form, FormApp.ItemType.TEXT, title);
+  const item = existing ? existing.asTextItem() : form.addTextItem().setTitle(title);
+  item.setRequired(!!field.required);
+  return item;
+}
+
 function ensureFieldItem(form, category, field) {
   const title = '[' + category + '] ' + field.title;
 
@@ -150,8 +182,21 @@ function ensureFieldItem(form, category, field) {
 
 function setupDynamicCategoryForm() {
   const form = FormApp.getActiveForm();
-  const categoryItem = getOrCreateCategoryItem(form);
   const schema = getSchema();
+  const baseFields = schema.baseFields || [];
+
+  baseFields.forEach(function (field) {
+    if (field.key === 'category') return;
+    ensureStandaloneFieldItem(form, field);
+  });
+
+  const categoryItem = getOrCreateCategoryItem(form);
+
+  var categoryField = baseFields.find(function (field) { return field.key === 'category'; });
+  if (categoryField && categoryField.choices && categoryField.choices.length) {
+    categoryItem.setChoiceValues(categoryField.choices);
+  }
+
   const categories = (schema.categories || []).map(function (c) {
     return {
       name: normalizeCategory(c.name || c.label),
@@ -186,12 +231,15 @@ function setupDynamicCategoryForm() {
 }
 
 function rebuildDynamicCategoryForm() {
+  Logger.log('Rebuilding form from live backend schema...');
   deleteGeneratedCategoryItems();
   setupDynamicCategoryForm();
+  Logger.log('Rebuild complete. Refresh the Google Form editor page now.');
 }
 
 function debugVendorFormSchema() {
   var schema = getSchema();
+  Logger.log('Schema fetched only. This does not change the form.');
   Logger.log(JSON.stringify(schema));
 }
 
@@ -245,6 +293,23 @@ function onFormSubmit(e) {
     state: byTitle['State'] || '',
     description: byTitle['Business Description'] || '',
     website: byTitle['Website'] || '',
+    portfolioLinks: byTitle['Portfolio Media Links (public image/video URLs, one per line)'] || '',
+    driveFolderUrl: byTitle['Google Drive Folder URL'] || '',
+    instagram: byTitle['Instagram Profile URL'] || '',
+    facebook: byTitle['Facebook Page URL'] || '',
+    youtube: byTitle['YouTube / Reel URL'] || '',
+    testimonial1ClientName: byTitle['Testimonial 1 - Client Name'] || '',
+    testimonial1Rating: byTitle['Testimonial 1 - Rating'] || '',
+    testimonial1Content: byTitle['Testimonial 1 - Feedback'] || '',
+    testimonial1Source: byTitle['Testimonial 1 - Source (Wedding/Event Name)'] || '',
+    testimonial2ClientName: byTitle['Testimonial 2 - Client Name'] || '',
+    testimonial2Rating: byTitle['Testimonial 2 - Rating'] || '',
+    testimonial2Content: byTitle['Testimonial 2 - Feedback'] || '',
+    testimonial2Source: byTitle['Testimonial 2 - Source (Wedding/Event Name)'] || '',
+    testimonial3ClientName: byTitle['Testimonial 3 - Client Name'] || '',
+    testimonial3Rating: byTitle['Testimonial 3 - Rating'] || '',
+    testimonial3Content: byTitle['Testimonial 3 - Feedback'] || '',
+    testimonial3Source: byTitle['Testimonial 3 - Source (Wedding/Event Name)'] || '',
     basePrice: Number(byTitle['Base Price'] || 0),
     priceType: (byTitle['Price Type'] || 'fixed').toString().toLowerCase().replace(/s+/g, '_'),
     categoryDetails: categoryDetails,

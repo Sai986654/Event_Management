@@ -10,6 +10,7 @@ This is the only guide you need to run vendor registration with Google Form -> w
 - Admin approves from panel.
 - Form shows category-specific fields based on selected category.
 - Form schema is fetched from backend endpoint, so it stays aligned with your app category list.
+- Form also includes vendor media/social fields like portfolio links, drive folder, Instagram, Facebook and YouTube.
 
 ## Cost
 
@@ -87,6 +88,18 @@ npm run vendor:webhook:apply-env
 - Form still looks old or minimal:
   - Run `debugVendorFormSchema()` in Apps Script and check execution logs.
   - Then run `rebuildDynamicCategoryForm()` to wipe old generated category sections and rebuild from current backend schema.
+
+## Media Support
+
+- In this Google Form flow, media is collected as links, not binary uploads.
+- Added fields include:
+  - `Portfolio Media Links (public image/video URLs, one per line)`
+  - `Google Drive Folder URL`
+  - `Instagram Profile URL`
+  - `Facebook Page URL`
+  - `YouTube / Reel URL`
+- These are saved into vendor `socialLinks`, and public image/video URLs are also imported into vendor `portfolio`.
+- Direct file upload through Google Forms is not used here because it usually forces Google sign-in and is worse for vendor onboarding.
 
 ## Required Files (Already in Project)
 

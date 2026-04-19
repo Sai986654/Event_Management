@@ -58,6 +58,54 @@ const formatCategoryDetailsForDescription = (categoryDetails) => {
   return `Category Details:\n${lines.join('\n')}`;
 };
 
+const splitLines = (value) =>
+  String(value || '')
+    .split(/\r?\n|,/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+const looksLikeVideoUrl = (url) => /youtube\.com|youtu\.be|vimeo\.com|\.mp4($|\?)|\.webm($|\?)/i.test(url);
+const looksLikeImageUrl = (url) => /\.png($|\?)|\.jpe?g($|\?)|\.webp($|\?)|\.gif($|\?)/i.test(url);
+
+const buildImportedPortfolio = (links) => {
+  return splitLines(links)
+    .filter((url) => /^https?:\/\//i.test(url))
+    .map((url, index) => ({
+      id: `imported-${Date.now()}-${index}`,
+      url,
+      type: looksLikeVideoUrl(url) ? 'video' : 'photo',
+      caption: 'Imported from vendor registration form',
+      createdAt: new Date().toISOString(),
+      source: 'vendor_form',
+      isExternal: !looksLikeImageUrl(url) && !looksLikeVideoUrl(url),
+    }));
+};
+
+const parseRating = (value) => {
+  const n = Number(value);
+  if (Number.isNaN(n)) return 5;
+  return Math.max(1, Math.min(5, Math.round(n)));
+};
+
+const buildTestimonialsFromForm = (formData) => {
+  const items = [];
+  for (let i = 1; i <= 3; i++) {
+    const clientName = String(formData[`testimonial${i}ClientName`] || '').trim();
+    const content = String(formData[`testimonial${i}Content`] || '').trim();
+    const source = String(formData[`testimonial${i}Source`] || '').trim();
+    const ratingRaw = formData[`testimonial${i}Rating`];
+
+    if (!clientName || !content) continue;
+    items.push({
+      clientName,
+      content,
+      source: source || null,
+      rating: parseRating(ratingRaw || 5),
+    });
+  }
+  return items;
+};
+
 /**
  * Initialize Google Sheets API client
  * Requires GOOGLE_SHEETS_CREDENTIALS as JSON string in env
@@ -127,6 +175,23 @@ function mapFormToVendor(formData) {
     city: formData['City'] || formData['city'],
     state: formData['State'] || formData['state'],
     website: formData['Website'] || formData['website'],
+    portfolioLinks: formData['Portfolio Media Links (public image/video URLs, one per line)'] || formData.portfolioLinks,
+    driveFolderUrl: formData['Google Drive Folder URL'] || formData.driveFolderUrl,
+    instagram: formData['Instagram Profile URL'] || formData.instagram,
+    facebook: formData['Facebook Page URL'] || formData.facebook,
+    youtube: formData['YouTube / Reel URL'] || formData.youtube,
+    testimonial1ClientName: formData['Testimonial 1 - Client Name'] || formData.testimonial1ClientName,
+    testimonial1Rating: formData['Testimonial 1 - Rating'] || formData.testimonial1Rating,
+    testimonial1Content: formData['Testimonial 1 - Feedback'] || formData.testimonial1Content,
+    testimonial1Source: formData['Testimonial 1 - Source (Wedding/Event Name)'] || formData.testimonial1Source,
+    testimonial2ClientName: formData['Testimonial 2 - Client Name'] || formData.testimonial2ClientName,
+    testimonial2Rating: formData['Testimonial 2 - Rating'] || formData.testimonial2Rating,
+    testimonial2Content: formData['Testimonial 2 - Feedback'] || formData.testimonial2Content,
+    testimonial2Source: formData['Testimonial 2 - Source (Wedding/Event Name)'] || formData.testimonial2Source,
+    testimonial3ClientName: formData['Testimonial 3 - Client Name'] || formData.testimonial3ClientName,
+    testimonial3Rating: formData['Testimonial 3 - Rating'] || formData.testimonial3Rating,
+    testimonial3Content: formData['Testimonial 3 - Feedback'] || formData.testimonial3Content,
+    testimonial3Source: formData['Testimonial 3 - Source (Wedding/Event Name)'] || formData.testimonial3Source,
     basePrice: parseFloat(formData['Base Price'] || 0),
     currency: formData['Currency'] || 'INR',
     priceType: formData['Price Type'] || 'fixed',
@@ -244,6 +309,15 @@ async function syncVendorFromForm(formData) {
       .filter(Boolean)
       .join('\n\n')
       .trim();
+    const socialLinks = {
+      ...(mapped.instagram ? { instagram: mapped.instagram } : {}),
+      ...(mapped.facebook ? { facebook: mapped.facebook } : {}),
+      ...(mapped.youtube ? { youtube: mapped.youtube } : {}),
+      ...(mapped.driveFolderUrl ? { driveFolder: mapped.driveFolderUrl } : {}),
+      ...(mapped.portfolioLinks ? { portfolioLinks: splitLines(mapped.portfolioLinks) } : {}),
+    };
+    const importedPortfolio = buildImportedPortfolio(mapped.portfolioLinks);
+    const testimonials = buildTestimonialsFromForm(mapped);
 
     // Create vendor profile
     const vendor = await prisma.vendor.create({
@@ -257,6 +331,8 @@ async function syncVendorFromForm(formData) {
         city: mapped.city,
         state: mapped.state,
         website: mapped.website,
+        socialLinks,
+        portfolio: importedPortfolio,
         basePrice: mapped.basePrice,
         currency: mapped.currency,
         priceType: mapped.priceType,
@@ -264,6 +340,18 @@ async function syncVendorFromForm(formData) {
         isVerified: false,
       },
     });
+
+    if (testimonials.length) {
+      await prisma.vendorTestimonial.createMany({
+        data: testimonials.map((t) => ({
+          vendorId: vendor.id,
+          clientName: t.clientName,
+          content: t.content,
+          rating: t.rating,
+          source: t.source,
+        })),
+      });
+    }
     
     return {
       success: true,
