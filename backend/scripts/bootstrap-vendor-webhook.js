@@ -125,6 +125,34 @@ function findItemByTitle(form, itemType, title) {
   return null;
 }
 
+function isGeneratedCategoryItem(title) {
+  return String(title || '').startsWith('[');
+}
+
+function isGeneratedCategorySection(title) {
+  return String(title || '').startsWith('Category: ');
+}
+
+function deleteGeneratedCategoryItems() {
+  const form = FormApp.getActiveForm();
+  const items = form.getItems();
+
+  for (var i = items.length - 1; i >= 0; i--) {
+    var item = items[i];
+    var title = '';
+
+    try {
+      title = item.getTitle ? item.getTitle() : '';
+    } catch (_e) {
+      title = '';
+    }
+
+    if (isGeneratedCategoryItem(title) || isGeneratedCategorySection(title)) {
+      form.deleteItem(item);
+    }
+  }
+}
+
 function getOrCreateCategoryItem(form) {
   const existing = findItemByTitle(form, FormApp.ItemType.MULTIPLE_CHOICE, CATEGORY_ITEM_TITLE);
   if (existing) return existing.asMultipleChoiceItem();
@@ -193,7 +221,20 @@ function setupDynamicCategoryForm() {
   });
   categoryItem.setChoices(choices);
 
-  Logger.log('Dynamic category form setup complete.');
+  Logger.log('Dynamic category form setup complete. Categories: %s', categories.length);
+  categories.forEach(function (categoryObj) {
+    Logger.log('Category %s -> %s field(s)', categoryObj.label, (categoryObj.fields || []).length);
+  });
+}
+
+function rebuildDynamicCategoryForm() {
+  deleteGeneratedCategoryItems();
+  setupDynamicCategoryForm();
+}
+
+function debugVendorFormSchema() {
+  var schema = getSchema();
+  Logger.log(JSON.stringify(schema));
 }
 
 function normalizeCategory(value) {

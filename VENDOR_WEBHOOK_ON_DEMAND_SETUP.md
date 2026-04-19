@@ -39,10 +39,10 @@ Manual step 1:
 
 - Open Google Form -> Script editor
 - Paste [automation/vendor-webhook/google-apps-script.gs](automation/vendor-webhook/google-apps-script.gs)
-- Run function `setupDynamicCategoryForm()` once (from Apps Script Run button)
+- Run function `rebuildDynamicCategoryForm()` once (from Apps Script Run button)
 - Create trigger: `onFormSubmit` -> `On form submit`
 
-Whenever categories are updated in your app admin panel, run `setupDynamicCategoryForm()` again to refresh form sections/questions from backend schema.
+Whenever categories are updated in your app admin panel, run `rebuildDynamicCategoryForm()` again to refresh form sections/questions from backend schema.
 
 Manual step 2:
 
@@ -84,6 +84,9 @@ npm run vendor:webhook:apply-env
   - Ensure category-specific required fields are answered (e.g. `catering -> serviceType, maxGuests`).
 - No vendor created:
   - Ensure Apps Script trigger is enabled and backend is reachable from internet.
+- Form still looks old or minimal:
+  - Run `debugVendorFormSchema()` in Apps Script and check execution logs.
+  - Then run `rebuildDynamicCategoryForm()` to wipe old generated category sections and rebuild from current backend schema.
 
 ## Required Files (Already in Project)
 

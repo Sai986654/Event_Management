@@ -11,7 +11,7 @@
 
 const WEBHOOK_URL = 'https://event-management-9i4d.onrender.com/api/webhooks/vendor-form';
 const SCHEMA_URL = 'https://event-management-9i4d.onrender.com/api/public/vendor-form/schema';
-const WEBHOOK_SECRET = '9783320eea44145b46dc6e79f7b2124e5c72245d9e5a1695';
+const WEBHOOK_SECRET = '6e3bf7bc7afcc4e62e5f3d68dbae97a15a9220bfeff24933';
 const CATEGORY_ITEM_TITLE = 'Service Category';
 
 const FALLBACK_SCHEMA = {
@@ -83,6 +83,34 @@ function findItemByTitle(form, itemType, title) {
   return null;
 }
 
+function isGeneratedCategoryItem(title) {
+  return String(title || '').startsWith('[');
+}
+
+function isGeneratedCategorySection(title) {
+  return String(title || '').startsWith('Category: ');
+}
+
+function deleteGeneratedCategoryItems() {
+  const form = FormApp.getActiveForm();
+  const items = form.getItems();
+
+  for (var i = items.length - 1; i >= 0; i--) {
+    var item = items[i];
+    var title = '';
+
+    try {
+      title = item.getTitle ? item.getTitle() : '';
+    } catch (_e) {
+      title = '';
+    }
+
+    if (isGeneratedCategoryItem(title) || isGeneratedCategorySection(title)) {
+      form.deleteItem(item);
+    }
+  }
+}
+
 function getOrCreateCategoryItem(form) {
   const existing = findItemByTitle(form, FormApp.ItemType.MULTIPLE_CHOICE, CATEGORY_ITEM_TITLE);
   if (existing) return existing.asMultipleChoiceItem();
@@ -151,7 +179,20 @@ function setupDynamicCategoryForm() {
   });
   categoryItem.setChoices(choices);
 
-  Logger.log('Dynamic category form setup complete.');
+  Logger.log('Dynamic category form setup complete. Categories: %s', categories.length);
+  categories.forEach(function (categoryObj) {
+    Logger.log('Category %s -> %s field(s)', categoryObj.label, (categoryObj.fields || []).length);
+  });
+}
+
+function rebuildDynamicCategoryForm() {
+  deleteGeneratedCategoryItems();
+  setupDynamicCategoryForm();
+}
+
+function debugVendorFormSchema() {
+  var schema = getSchema();
+  Logger.log(JSON.stringify(schema));
 }
 
 function normalizeCategory(value) {
