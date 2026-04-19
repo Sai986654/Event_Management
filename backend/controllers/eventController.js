@@ -65,7 +65,7 @@ exports.createEvent = asyncHandler(async (req, res) => {
 
   const creator = await prisma.user.findUnique({ where: { id: req.user.id } });
   const io = req.app.get('io');
-  await dispatchEventCreated(io, event, creator, vendorIds).catch((err) =>
+  dispatchEventCreated(io, event, creator, vendorIds).catch((err) =>
     console.error('[EventCreate] notifications', err.message)
   );
 
