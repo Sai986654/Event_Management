@@ -3,7 +3,7 @@ const express = require('express');
 const http = require('http');
 const cors = require('cors');
 const { Server } = require('socket.io');
-const { connectDB, prisma } = require('./config/db');
+const { connectDBWithRetry, getDatabaseState, prisma } = require('./config/db');
 const errorHandler = require('./middleware/errorHandler');
 const initSocket = require('./socket');
 const { createOriginHandler } = require('./config/corsOrigins');
@@ -59,6 +59,23 @@ app.use('/api', (req, res, next) => {
   next();
 });
 
+app.use('/api', (req, res, next) => {
+  if (req.path === '/health') return next();
+
+  const dbState = getDatabaseState();
+  if (dbState.ready) return next();
+
+  return res.status(503).json({
+    message: 'Server is waking up. Please retry in a few seconds.',
+    code: 'SERVER_STARTING',
+    db: {
+      ready: dbState.ready,
+      connecting: dbState.connecting,
+      attempts: dbState.attempts,
+    },
+  });
+});
+
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/events', eventRoutes);
@@ -81,7 +98,20 @@ app.use('/api/chat', chatRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  const dbState = getDatabaseState();
+  const status = dbState.ready ? 'ok' : 'starting';
+
+  res.status(dbState.ready ? 200 : 503).json({
+    status,
+    timestamp: new Date().toISOString(),
+    db: {
+      ready: dbState.ready,
+      connecting: dbState.connecting,
+      attempts: dbState.attempts,
+      connectedAt: dbState.connectedAt,
+      lastError: dbState.lastError,
+    },
+  });
 });
 
 // Error handler
@@ -91,9 +121,12 @@ app.use(errorHandler);
 const PORT = process.env.PORT || 5000;
 
 const start = async () => {
-  await connectDB();
   server.listen(PORT, () => {
     console.log(`Vedika 360 server running on port ${PORT}`);
+  });
+
+  connectDBWithRetry().catch((error) => {
+    console.error('[DB] Unable to establish connection loop:', error?.message || error);
   });
 
   if (String(process.env.INVITE_DRIP_ENABLED || 'true').toLowerCase() !== 'false') {

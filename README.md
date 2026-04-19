@@ -76,6 +76,9 @@ Workflows under `.github/workflows/` run on pull requests and pushes to `main`:
 - **Backend** — install, `prisma validate` / `generate`, tests against PostgreSQL service (when applicable).
 - **Frontend** — install and production build (`CI=true`).
 - **Mobile** — install dependencies (sanity check).
+- **Keep Render Awake** — every 10 minutes, ping the backend health URL so the free Render service is less likely to sleep.
+
+For the keep-awake workflow, add a repository variable named `RENDER_BACKEND_HEALTHCHECK_URL` and set it to your deployed backend health endpoint, for example `https://your-service.onrender.com/api/health`.
 
 ## Deployment (high level)
 
