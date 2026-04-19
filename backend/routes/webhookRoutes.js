@@ -50,7 +50,18 @@ router.post(
     body('city').trim().notEmpty().withMessage('City is required'),
     body('state').trim().notEmpty().withMessage('State is required'),
     body('description').optional().trim(),
-    body('website').optional().trim().isURL().withMessage('Invalid website URL'),
+    body('website')
+      .optional()
+      .trim()
+      .customSanitizer((value) => {
+        if (!value) return value;
+        if (!/^https?:\/\//i.test(value)) {
+          return 'https://' + value;
+        }
+        return value;
+      })
+      .isURL()
+      .withMessage('Invalid website URL'),
     body('basePrice').optional().isFloat({ min: 0 }).withMessage('Price must be >= 0'),
     body('categoryDetails').optional().isObject().withMessage('categoryDetails must be an object'),
   ],

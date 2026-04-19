@@ -11,7 +11,7 @@
 
 const WEBHOOK_URL = 'https://event-management-9i4d.onrender.com/api/webhooks/vendor-form';
 const SCHEMA_URL = 'https://event-management-9i4d.onrender.com/api/public/vendor-form/schema';
-const WEBHOOK_SECRET = 'ab41cef69854e7ec038627bfe7dd9bfe1513d13a1e5506c8';
+const WEBHOOK_SECRET = '9783320eea44145b46dc6e79f7b2124e5c72245d9e5a1695';
 const CATEGORY_ITEM_TITLE = 'Service Category';
 
 const FALLBACK_SCHEMA = {
