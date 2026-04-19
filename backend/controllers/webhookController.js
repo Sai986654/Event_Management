@@ -129,6 +129,6 @@ exports.validateVendorFormWebhook = asyncHandler(async (req, res) => {
 });
 
 module.exports = {
-  receiveVendorFormWebhook,
-  validateVendorFormWebhook,
+  receiveVendorFormWebhook: exports.receiveVendorFormWebhook,
+  validateVendorFormWebhook: exports.validateVendorFormWebhook,
 };
