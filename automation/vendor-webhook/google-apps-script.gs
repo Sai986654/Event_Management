@@ -11,7 +11,7 @@
 
 const WEBHOOK_URL = 'https://event-management-9i4d.onrender.com/api/webhooks/vendor-form';
 const SCHEMA_URL = 'https://event-management-9i4d.onrender.com/api/public/vendor-form/schema';
-const WEBHOOK_SECRET = '3fec6b30e94be23ce9d7ef62a8736c78f032e374b943dded';
+const WEBHOOK_SECRET = 'ab41cef69854e7ec038627bfe7dd9bfe1513d13a1e5506c8';
 const CATEGORY_ITEM_TITLE = 'Service Category';
 
 const FALLBACK_SCHEMA = {
@@ -93,9 +93,17 @@ function isGeneratedCategorySection(title) {
 
 function deleteGeneratedCategoryItems() {
   const form = FormApp.getActiveForm();
-  const items = form.getItems();
+  const categoryItem = getOrCreateCategoryItem(form);
 
-  for (var i = items.length - 1; i >= 0; i--) {
+  // Break existing section-navigation links before deleting section items.
+  categoryItem.setChoices([
+    categoryItem.createChoice('Refreshing categories...', FormApp.PageNavigationType.SUBMIT),
+  ]);
+
+  const items = form.getItems();
+  const deleteIndexes = [];
+
+  for (var i = 0; i < items.length; i++) {
     var item = items[i];
     var title = '';
 
@@ -106,7 +114,15 @@ function deleteGeneratedCategoryItems() {
     }
 
     if (isGeneratedCategoryItem(title) || isGeneratedCategorySection(title)) {
-      form.deleteItem(item);
+      deleteIndexes.push(i);
+    }
+  }
+
+  for (var j = deleteIndexes.length - 1; j >= 0; j--) {
+    try {
+      form.deleteItem(deleteIndexes[j]);
+    } catch (e) {
+      Logger.log('Skipping item delete at index %s: %s', deleteIndexes[j], e.message);
     }
   }
 }

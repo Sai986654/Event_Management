@@ -135,9 +135,17 @@ function isGeneratedCategorySection(title) {
 
 function deleteGeneratedCategoryItems() {
   const form = FormApp.getActiveForm();
-  const items = form.getItems();
+  const categoryItem = getOrCreateCategoryItem(form);
 
-  for (var i = items.length - 1; i >= 0; i--) {
+  // Break existing section-navigation links before deleting section items.
+  categoryItem.setChoices([
+    categoryItem.createChoice('Refreshing categories...', FormApp.PageNavigationType.SUBMIT),
+  ]);
+
+  const items = form.getItems();
+  const deleteIndexes = [];
+
+  for (var i = 0; i < items.length; i++) {
     var item = items[i];
     var title = '';
 
@@ -148,7 +156,15 @@ function deleteGeneratedCategoryItems() {
     }
 
     if (isGeneratedCategoryItem(title) || isGeneratedCategorySection(title)) {
-      form.deleteItem(item);
+      deleteIndexes.push(i);
+    }
+  }
+
+  for (var j = deleteIndexes.length - 1; j >= 0; j--) {
+    try {
+      form.deleteItem(deleteIndexes[j]);
+    } catch (e) {
+      Logger.log('Skipping item delete at index %s: %s', deleteIndexes[j], e.message);
     }
   }
 }
