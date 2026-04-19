@@ -8,18 +8,13 @@
 const { prisma } = require('../config/db');
 const bcrypt = require('bcryptjs');
 const { google } = require('googleapis');
+const { CATEGORY_FIELD_TEMPLATES } = require('./vendorFormSchemaService');
 
-const CATEGORY_REQUIRED_FIELDS = {
-  catering: ['serviceType', 'maxGuests'],
-  decor: ['decorStyle', 'setupLeadHours'],
-  photography: ['photoStyles', 'deliveryDays'],
-  videography: ['videoStyles', 'deliveryDays'],
-  music: ['performanceType', 'teamSize'],
-  venue: ['capacity', 'indoorOutdoor'],
-  florist: ['flowerSpecialty', 'bookingLeadDays'],
-  transportation: ['fleetType', 'vehicleCount'],
-  other: [],
-};
+const CATEGORY_REQUIRED_FIELDS = Object.keys(CATEGORY_FIELD_TEMPLATES).reduce((acc, category) => {
+  const fields = CATEGORY_FIELD_TEMPLATES[category] || [];
+  acc[category] = fields.filter((f) => f.required).map((f) => f.key);
+  return acc;
+}, {});
 
 const toObject = (value) => {
   if (!value) return {};
@@ -161,12 +156,7 @@ function validateVendorData(data) {
     errors.push('Invalid service category');
   }
 
-  const allowedCategories = Object.keys(CATEGORY_REQUIRED_FIELDS);
-  if (data.category && !allowedCategories.includes(data.category)) {
-    errors.push(`Unsupported category: ${data.category}`);
-  }
-
-  const requiredFields = CATEGORY_REQUIRED_FIELDS[data.category] || [];
+  const requiredFields = CATEGORY_REQUIRED_FIELDS[data.category] || CATEGORY_REQUIRED_FIELDS.other || [];
   requiredFields.forEach((field) => {
     const val = data.categoryDetails?.[field];
     const missing =

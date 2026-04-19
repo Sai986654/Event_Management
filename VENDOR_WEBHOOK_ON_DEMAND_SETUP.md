@@ -9,6 +9,7 @@ This is the only guide you need to run vendor registration with Google Form -> w
 - Vendor user + profile are created automatically.
 - Admin approves from panel.
 - Form shows category-specific fields based on selected category.
+- Form schema is fetched from backend endpoint, so it stays aligned with your app category list.
 
 ## Cost
 
@@ -40,6 +41,8 @@ Manual step 1:
 - Paste [automation/vendor-webhook/google-apps-script.gs](automation/vendor-webhook/google-apps-script.gs)
 - Run function `setupDynamicCategoryForm()` once (from Apps Script Run button)
 - Create trigger: `onFormSubmit` -> `On form submit`
+
+Whenever categories are updated in your app admin panel, run `setupDynamicCategoryForm()` again to refresh form sections/questions from backend schema.
 
 Manual step 2:
 
@@ -86,6 +89,7 @@ npm run vendor:webhook:apply-env
 
 - [backend/controllers/webhookController.js](backend/controllers/webhookController.js)
 - [backend/routes/webhookRoutes.js](backend/routes/webhookRoutes.js)
+- [backend/routes/vendorFormSchemaRoutes.js](backend/routes/vendorFormSchemaRoutes.js)
 - [backend/scripts/setup-vendor-webhook.js](backend/scripts/setup-vendor-webhook.js)
 - [backend/scripts/bootstrap-vendor-webhook.js](backend/scripts/bootstrap-vendor-webhook.js)
 - [backend/scripts/apply-vendor-webhook-env.js](backend/scripts/apply-vendor-webhook-env.js)

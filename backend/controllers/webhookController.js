@@ -124,6 +124,7 @@ exports.validateVendorFormWebhook = asyncHandler(async (req, res) => {
       businessName: formData.businessName,
       name: formData.name,
       category: formData.category,
+      categoryDetails: formData.categoryDetails || {},
     },
   });
 });

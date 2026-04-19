@@ -1,4 +1,4 @@
-curl -X POST "http://localhost:5000/api/webhooks/vendor-form" ^
+curl -X POST "https://event-management-9i4d.onrender.com/api/webhooks/vendor-form" ^
   -H "Content-Type: application/json" ^
-  -H "X-Webhook-Secret: 62ea71f51e90ba57fecdc81e50acb1196d729bab498efccb" ^
+  -H "X-Webhook-Secret: 9783320eea44145b46dc6e79f7b2124e5c72245d9e5a1695" ^
   --data-binary @"C:\Users\wwwsa\OneDrive\Desktop\Event_Management\automation\vendor-webhook\sample-vendor-payload.json"

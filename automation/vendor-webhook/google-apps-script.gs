@@ -9,45 +9,63 @@
  * 5) Create trigger: Function=onFormSubmit, Event=On form submit
  */
 
-const WEBHOOK_URL = 'http://localhost:5000/api/webhooks/vendor-form';
-const WEBHOOK_SECRET = '62ea71f51e90ba57fecdc81e50acb1196d729bab498efccb';
+const WEBHOOK_URL = 'https://event-management-9i4d.onrender.com/api/webhooks/vendor-form';
+const SCHEMA_URL = 'https://event-management-9i4d.onrender.com/api/public/vendor-form/schema';
+const WEBHOOK_SECRET = '9783320eea44145b46dc6e79f7b2124e5c72245d9e5a1695';
 const CATEGORY_ITEM_TITLE = 'Service Category';
 
-const CATEGORY_FIELD_CONFIG = {
-  catering: [
-    { key: 'serviceType', title: 'Catering Service Type', type: 'multiple', choices: ['Veg', 'Non-Veg', 'Both'], required: true },
-    { key: 'maxGuests', title: 'Max Guests You Can Serve', type: 'text', required: true },
+const FALLBACK_SCHEMA = {
+  categories: [
+    { name: 'catering', label: 'Catering', fields: [
+      { key: 'serviceType', title: 'Catering Service Type', type: 'multiple', choices: ['Veg', 'Non-Veg', 'Both'], required: true },
+      { key: 'maxGuests', title: 'Max Guests You Can Serve', type: 'text', required: true },
+    ] },
+    { name: 'decor', label: 'Decor', fields: [
+      { key: 'decorStyle', title: 'Decor Style Focus', type: 'multiple', choices: ['Traditional', 'Modern', 'Floral', 'Theme-based'], required: true },
+      { key: 'setupLeadHours', title: 'Setup Lead Time (hours)', type: 'text', required: true },
+    ] },
+    { name: 'photography', label: 'Photography', fields: [
+      { key: 'photoStyles', title: 'Photography Styles', type: 'checkbox', choices: ['Candid', 'Traditional', 'Cinematic', 'Drone'], required: true },
+      { key: 'deliveryDays', title: 'Photo Delivery Timeline (days)', type: 'text', required: true },
+    ] },
+    { name: 'videography', label: 'Videography', fields: [
+      { key: 'videoStyles', title: 'Videography Styles', type: 'checkbox', choices: ['Cinematic', 'Traditional', 'Teaser'], required: true },
+      { key: 'deliveryDays', title: 'Video Delivery Timeline (days)', type: 'text', required: true },
+    ] },
+    { name: 'music', label: 'Music', fields: [
+      { key: 'performanceType', title: 'Performance Type', type: 'multiple', choices: ['DJ', 'Live Band', 'Singer', 'Instrumental'], required: true },
+      { key: 'teamSize', title: 'Team Size', type: 'text', required: true },
+    ] },
+    { name: 'venue', label: 'Venue', fields: [
+      { key: 'capacity', title: 'Venue Capacity', type: 'text', required: true },
+      { key: 'indoorOutdoor', title: 'Indoor / Outdoor', type: 'multiple', choices: ['Indoor', 'Outdoor', 'Both'], required: true },
+    ] },
+    { name: 'florist', label: 'Florist', fields: [
+      { key: 'flowerSpecialty', title: 'Flower Specialty', type: 'text', required: true },
+      { key: 'bookingLeadDays', title: 'Preferred Booking Lead Time (days)', type: 'text', required: true },
+    ] },
+    { name: 'transportation', label: 'Transportation', fields: [
+      { key: 'fleetType', title: 'Fleet Type', type: 'multiple', choices: ['Cars', 'Luxury Cars', 'Buses', 'Mixed'], required: true },
+      { key: 'vehicleCount', title: 'Number of Vehicles', type: 'text', required: true },
+    ] },
+    { name: 'other', label: 'Other', fields: [] },
   ],
-  decor: [
-    { key: 'decorStyle', title: 'Decor Style Focus', type: 'multiple', choices: ['Traditional', 'Modern', 'Floral', 'Theme-based'], required: true },
-    { key: 'setupLeadHours', title: 'Setup Lead Time (hours)', type: 'text', required: true },
-  ],
-  photography: [
-    { key: 'photoStyles', title: 'Photography Styles', type: 'checkbox', choices: ['Candid', 'Traditional', 'Cinematic', 'Drone'], required: true },
-    { key: 'deliveryDays', title: 'Photo Delivery Timeline (days)', type: 'text', required: true },
-  ],
-  videography: [
-    { key: 'videoStyles', title: 'Videography Styles', type: 'checkbox', choices: ['Cinematic', 'Traditional', 'Teaser'], required: true },
-    { key: 'deliveryDays', title: 'Video Delivery Timeline (days)', type: 'text', required: true },
-  ],
-  music: [
-    { key: 'performanceType', title: 'Performance Type', type: 'multiple', choices: ['DJ', 'Live Band', 'Singer', 'Instrumental'], required: true },
-    { key: 'teamSize', title: 'Team Size', type: 'text', required: true },
-  ],
-  venue: [
-    { key: 'capacity', title: 'Venue Capacity', type: 'text', required: true },
-    { key: 'indoorOutdoor', title: 'Indoor / Outdoor', type: 'multiple', choices: ['Indoor', 'Outdoor', 'Both'], required: true },
-  ],
-  florist: [
-    { key: 'flowerSpecialty', title: 'Flower Specialty', type: 'text', required: true },
-    { key: 'bookingLeadDays', title: 'Preferred Booking Lead Time (days)', type: 'text', required: true },
-  ],
-  transportation: [
-    { key: 'fleetType', title: 'Fleet Type', type: 'multiple', choices: ['Cars', 'Luxury Cars', 'Buses', 'Mixed'], required: true },
-    { key: 'vehicleCount', title: 'Number of Vehicles', type: 'text', required: true },
-  ],
-  other: [],
 };
+
+function getSchema() {
+  try {
+    const res = UrlFetchApp.fetch(SCHEMA_URL, { muteHttpExceptions: true });
+    if (res.getResponseCode() >= 200 && res.getResponseCode() < 300) {
+      const parsed = JSON.parse(res.getContentText());
+      if (parsed && Array.isArray(parsed.categories) && parsed.categories.length > 0) {
+        return parsed;
+      }
+    }
+  } catch (e) {
+    Logger.log('Schema fetch failed, using fallback: %s', e.message);
+  }
+  return FALLBACK_SCHEMA;
+}
 
 function titleCase(value) {
   return String(value || '')
@@ -90,6 +108,13 @@ function ensureFieldItem(form, category, field) {
     return;
   }
 
+  if (field.type === 'paragraph') {
+    const existing = findItemByTitle(form, FormApp.ItemType.PARAGRAPH_TEXT, title);
+    const item = existing ? existing.asParagraphTextItem() : form.addParagraphTextItem().setTitle(title);
+    item.setRequired(!!field.required);
+    return;
+  }
+
   const existing = findItemByTitle(form, FormApp.ItemType.TEXT, title);
   const item = existing ? existing.asTextItem() : form.addTextItem().setTitle(title);
   item.setRequired(!!field.required);
@@ -98,23 +123,31 @@ function ensureFieldItem(form, category, field) {
 function setupDynamicCategoryForm() {
   const form = FormApp.getActiveForm();
   const categoryItem = getOrCreateCategoryItem(form);
-  const categories = Object.keys(CATEGORY_FIELD_CONFIG);
+  const schema = getSchema();
+  const categories = (schema.categories || []).map(function (c) {
+    return {
+      name: normalizeCategory(c.name || c.label),
+      label: c.label || titleCase(c.name),
+      fields: c.fields || [],
+    };
+  });
   const sectionMap = {};
 
-  categories.forEach(function (category) {
-    const sectionTitle = 'Category: ' + titleCase(category);
+  categories.forEach(function (categoryObj) {
+    const category = categoryObj.name;
+    const sectionTitle = 'Category: ' + categoryObj.label;
     var existingSection = findItemByTitle(form, FormApp.ItemType.PAGE_BREAK, sectionTitle);
     var section = existingSection ? existingSection.asPageBreakItem() : form.addPageBreakItem().setTitle(sectionTitle);
     section.setGoToPage(FormApp.PageNavigationType.SUBMIT);
     sectionMap[category] = section;
 
-    (CATEGORY_FIELD_CONFIG[category] || []).forEach(function (field) {
+    (categoryObj.fields || []).forEach(function (field) {
       ensureFieldItem(form, category, field);
     });
   });
 
-  const choices = categories.map(function (category) {
-    return categoryItem.createChoice(titleCase(category), sectionMap[category]);
+  const choices = categories.map(function (categoryObj) {
+    return categoryItem.createChoice(categoryObj.label, sectionMap[categoryObj.name]);
   });
   categoryItem.setChoices(choices);
 
@@ -127,7 +160,12 @@ function normalizeCategory(value) {
 
 function extractCategoryDetails(byTitle, category) {
   const details = {};
-  const config = CATEGORY_FIELD_CONFIG[category] || [];
+  const schema = getSchema();
+  const match = (schema.categories || []).find(function (c) {
+    const name = normalizeCategory(c.name || c.label);
+    return name === category;
+  });
+  const config = match ? match.fields || [] : [];
 
   config.forEach(function (field) {
     var key = '[' + category + '] ' + field.title;
