@@ -1,0 +1,4 @@
+curl -X POST "http://localhost:5000/api/webhooks/vendor-form" ^
+  -H "Content-Type: application/json" ^
+  -H "X-Webhook-Secret: 62ea71f51e90ba57fecdc81e50acb1196d729bab498efccb" ^
+  --data-binary @"C:\Users\wwwsa\OneDrive\Desktop\Event_Management\automation\vendor-webhook\sample-vendor-payload.json"

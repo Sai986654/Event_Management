@@ -127,3 +127,37 @@ exports.deleteVendor = asyncHandler(async (req, res) => {
 
   res.json({ message: 'Vendor removed from marketplace' });
 });
+
+// ── Google Form Vendor Sync ────────────────────────────────────────
+
+/**
+ * POST /api/admin/vendors/sync-google-forms
+ * Manually trigger vendor sync from Google Forms
+ * Admin only
+ */
+exports.syncVendorsFromGoogleForms = asyncHandler(async (req, res) => {
+  if (!process.env.GOOGLE_FORM_SHEET_ID) {
+    return res.status(400).json({
+      message: 'Google Forms integration not configured. Set GOOGLE_FORM_SHEET_ID in environment variables.',
+    });
+  }
+
+  try {
+    const { syncVendorsFromGoogleForm } = require('../services/vendorFormSyncService');
+    const { limit = 50 } = req.body;
+
+    const results = await syncVendorsFromGoogleForm({ limit });
+
+    res.json({
+      message: 'Vendor sync completed',
+      results,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error('[AdminController] Sync error:', error.message);
+    res.status(500).json({
+      message: 'Sync failed',
+      error: error.message,
+    });
+  }
+});

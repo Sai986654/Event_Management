@@ -27,6 +27,7 @@ const locationRoutes = require('./routes/locationRoutes');
 const inviteVideoRoutes = require('./routes/inviteVideoRoutes');
 const instantPhotoRoutes = require('./routes/instantPhotoRoutes');
 const chatRoutes = require('./routes/chatRoutes');
+const webhookRoutes = require('./routes/webhookRoutes');
 
 const app = express();
 const server = http.createServer(app);
@@ -95,6 +96,7 @@ app.use('/api/location', locationRoutes);
 app.use('/api/invite-videos', inviteVideoRoutes);
 app.use('/api/instant-photos', instantPhotoRoutes);
 app.use('/api/chat', chatRoutes);
+app.use('/api/webhooks', webhookRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

@@ -1,0 +1,13 @@
+{
+  "email": "demo.vendor@example.com",
+  "businessName": "Demo Catering Co",
+  "name": "Demo Owner",
+  "phone": "+91-90000-00000",
+  "category": "catering",
+  "city": "Mumbai",
+  "state": "Maharashtra",
+  "description": "End-to-end catering for weddings and corporate events.",
+  "website": "https://democatering.example",
+  "basePrice": 50000,
+  "priceType": "fixed"
+}

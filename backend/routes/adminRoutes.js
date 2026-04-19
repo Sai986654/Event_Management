@@ -10,6 +10,7 @@ const {
   deleteCategory,
   getAllVendors,
   deleteVendor,
+  syncVendorsFromGoogleForms,
 } = require('../controllers/adminController');
 
 router.use(protect);
@@ -55,5 +56,11 @@ router.delete('/categories/:id', deleteCategory);
 // Vendor management
 router.get('/vendors', getAllVendors);
 router.delete('/vendors/:id', deleteVendor);
+router.post(
+  '/vendors/sync-google-forms',
+  [body('limit').optional().isInt({ min: 1, max: 500 }).withMessage('Limit must be between 1-500')],
+  validate,
+  syncVendorsFromGoogleForms
+);
 
 module.exports = router;
