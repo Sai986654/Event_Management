@@ -154,6 +154,8 @@ process.on('SIGTERM', async () => {
   process.exit(0);
 });
 
-start();
+if (require.main === module) {
+  start();
+}
 
-module.exports = { app, server };
+module.exports = { app, server, start };

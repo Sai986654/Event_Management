@@ -1,8 +1,12 @@
 
 const request = require("supertest");
 const { app } = require("../server");
-const { prisma } = require("../config/db");
+const { prisma, connectDBWithRetry } = require("../config/db");
 require("dotenv").config();
+
+beforeAll(async () => {
+  await connectDBWithRetry();
+});
 
 describe("Webhook API", () => {
   const testVendor = {

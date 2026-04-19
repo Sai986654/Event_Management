@@ -1,5 +1,5 @@
 const request = require('supertest');
-const { prisma } = require('../config/db');
+const { prisma, connectDBWithRetry } = require('../config/db');
 const { app } = require('../server');
 
 let token;
@@ -13,8 +13,7 @@ let createdActivityId;
 let customerEventId;
 
 beforeAll(async () => {
-  // Wait for DB connection
-  await new Promise((resolve) => setTimeout(resolve, 3000));
+  await connectDBWithRetry();
 });
 
 afterAll(async () => {
