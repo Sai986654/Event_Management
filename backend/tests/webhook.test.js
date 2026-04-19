@@ -1,12 +1,12 @@
 
 const request = require("supertest");
-const { app } = require("../server");
+const { app, server } = require("../server");
 const { prisma, connectDBWithRetry } = require("../config/db");
 require("dotenv").config();
 
 beforeAll(async () => {
   await connectDBWithRetry();
-});
+}, 30000);
 
 describe("Webhook API", () => {
   const testVendor = {
@@ -36,6 +36,7 @@ describe("Webhook API", () => {
       console.error("Cleanup error:", err);
     } finally {
       await prisma.$disconnect();
+      await new Promise((resolve) => server.close(resolve));
     }
   });
 
