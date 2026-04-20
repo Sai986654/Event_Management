@@ -2,42 +2,83 @@ name: Keep Render Backend Awake
 
 on:
   schedule:
-    - cron: '*/10 * * * *'
+    - cron: '0 * * * *'
   workflow_dispatch:
 
+concurrency:
+  group: keep-render-awake
+  cancel-in-progress: false
 
 jobs:
   ping:
     runs-on: ubuntu-latest
-    timeout-minutes: 4
+    timeout-minutes: 58
     env:
       HEALTHCHECK_URL: ${{ vars.RENDER_BACKEND_HEALTHCHECK_URL }}
     steps:
-      - name: Validate health check URL
+      - name: Keep Render backend awake for 55 minutes
         shell: bash
         run: |
           if [ -z "$HEALTHCHECK_URL" ]; then
-            echo "RENDER_BACKEND_HEALTHCHECK_URL repo variable is not set."
+            echo "RENDER_BACKEND_HEALTHCHECK_URL repo variable is not set. Exiting."
+            echo "## ⚠️ Keep-Awake Skipped" >> "$GITHUB_STEP_SUMMARY"
+            echo "RENDER_BACKEND_HEALTHCHECK_URL repo variable is not set." >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
 
-      - name: Ping Render health endpoint until ready
-        shell: bash
-        run: |
-          echo "Pinging $HEALTHCHECK_URL"
+          echo "Starting keep-awake loop. Pinging every 10 minutes for 55 minutes."
 
-          for attempt in {1..12}; do
-            status_code=$(curl -sS -o /tmp/render-health.json -w "%{http_code}" --max-time 20 "$HEALTHCHECK_URL" || true)
-            echo "Attempt $attempt returned HTTP $status_code"
+          # Initialise Job Summary table
+          {
+            echo "## 🟢 Keep Render Backend Awake"
+            echo ""
+            echo "| # | Time (UTC) | HTTP | Status |"
+            echo "|---|-----------|------|--------|"
+          } >> "$GITHUB_STEP_SUMMARY"
 
+          ping_num=0
+          end_time=$((SECONDS + 3300))
+
+          while [ $SECONDS -lt $end_time ]; do
+            ping_num=$((ping_num + 1))
+            timestamp=$(date -u '+%H:%M:%S')
+            echo ""
+            echo "=== Ping #${ping_num} at ${timestamp} UTC ==="
+
+            for attempt in {1..6}; do
+              status_code=$(curl -sS -o /tmp/render-health.json -w "%{http_code}" --max-time 30 "$HEALTHCHECK_URL" || true)
+              echo "Attempt $attempt: HTTP $status_code"
+
+              if [ "$status_code" = "200" ]; then
+                cat /tmp/render-health.json
+                break
+              fi
+
+              if [ $attempt -lt 6 ]; then
+                sleep 15
+              fi
+            done
+
+            # Write result row to Job Summary
             if [ "$status_code" = "200" ]; then
-              cat /tmp/render-health.json
-              exit 0
+              status_icon="✅ Healthy"
+            else
+              status_icon="❌ Unhealthy"
+              echo "Warning: backend did not respond with 200 after 6 attempts."
+              cat /tmp/render-health.json || true
             fi
+            echo "| ${ping_num} | ${timestamp} | ${status_code} | ${status_icon} |" >> "$GITHUB_STEP_SUMMARY"
 
-            sleep 10
+            remaining=$((end_time - SECONDS))
+            if [ $remaining -gt 600 ]; then
+              echo "Sleeping 10 minutes until next ping..."
+              sleep 600
+            elif [ $remaining -gt 10 ]; then
+              echo "Final interval: sleeping ${remaining}s..."
+              sleep $remaining
+            fi
           done
 
-          echo "Backend did not become healthy in time."
-          cat /tmp/render-health.json || true
-          exit 1
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "_Cycle complete — ${ping_num} pings sent._" >> "$GITHUB_STEP_SUMMARY"
+          echo "Keep-awake cycle complete (${ping_num} pings)."
