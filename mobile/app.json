@@ -17,7 +17,7 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.vedika360.mobile",
+      "bundleIdentifier": "com.vedika360.myapp",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Allow Vedika 360 to access your location to show nearby vendors."
       }
@@ -27,12 +27,13 @@
         "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#0a4f7a"
       },
-      "package": "com.vedika360.mobile",
-      "versionCode": 1,
+      "package": "com.vedika360.myapp",
+      "versionCode": 2,
       "permissions": [
         "android.permission.RECORD_AUDIO",
         "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_FINE_LOCATION"
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.CAMERA"
       ]
     },
     "plugins": [
