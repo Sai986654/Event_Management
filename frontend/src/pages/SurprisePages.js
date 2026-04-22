@@ -255,67 +255,154 @@ const SurprisePages = () => {
                 ))}
               </Space>
 
-              <Row gutter={[16, 16]}>
-                {filteredTemplates.map(template => (
+const templateVisuals = {
+  // Each template gets a unique look based on its name/category
+  'Love Trap 💕':          { gradient: 'linear-gradient(135deg, #ff6b9d 0%, #c850c0 50%, #4158d0 100%)', emoji: '💘', accent: '#ff6b9d' },
+  'Fake Error Surprise 🖥️': { gradient: 'linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%)', emoji: '💀', accent: '#00ff88' },
+  'Memory Timeline 📸':    { gradient: 'linear-gradient(135deg, #ffecd2 0%, #fcb69f 50%, #ff9a9e 100%)', emoji: '📸', accent: '#fcb69f' },
+  'Unlock The Surprise 🔐': { gradient: 'linear-gradient(135deg, #f7971e 0%, #ffd200 100%)', emoji: '🔐', accent: '#f7971e' },
+  'Midnight Surprise 🌙':  { gradient: 'linear-gradient(135deg, #0c0c3a 0%, #1a0533 50%, #2d1b69 100%)', emoji: '🌙', accent: '#b388ff' },
+  "I'm Sorry 🥺":          { gradient: 'linear-gradient(135deg, #89f7fe 0%, #66a6ff 100%)', emoji: '🥺', accent: '#66a6ff' },
+  'Congratulations! 🏆':   { gradient: 'linear-gradient(135deg, #f5af19 0%, #f12711 100%)', emoji: '🏆', accent: '#f5af19' },
+  'Dare to Say Yes? 💋':   { gradient: 'linear-gradient(135deg, #f953c6 0%, #b91d73 100%)', emoji: '💋', accent: '#f953c6' },
+  'Prank & Reveal 🤡':     { gradient: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)', emoji: '🤡', accent: '#43e97b' },
+  'Letter From The Heart 💌': { gradient: 'linear-gradient(135deg, #fbc2eb 0%, #a6c1ee 100%)', emoji: '💌', accent: '#e8a4c8' },
+  'Treasure Hunt 🗺️':     { gradient: 'linear-gradient(135deg, #a1c4fd 0%, #c2e9fb 50%, #d4fc79 100%)', emoji: '🗺️', accent: '#6cb52d' },
+  'Friendship Bomb 🫶':    { gradient: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)', emoji: '🫶', accent: '#fa709a' },
+  'The Big Reveal 🎬':     { gradient: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)', emoji: '🎬', accent: '#e94560' },
+};
+const defaultVisual = { gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', emoji: '✨', accent: '#764ba2' };
+
+const getVisual = (template) => templateVisuals[template.name] || defaultVisual;
+
+const stepTypeIcons = {
+  intro: '🎭', trap_button: '🪤', message: '💬', fake_scenario: '🖥️',
+  photo_reveal: '📷', timeline: '📜', voice_message: '🎙️', quiz: '❓',
+  countdown: '⏳', final_reveal: '🎆',
+};
+
+              <Row gutter={[20, 20]}>
+                {filteredTemplates.map(template => {
+                  const vis = getVisual(template);
+                  const stepTypes = [...new Set((template.steps || []).map(s => s.type))];
+                  const isFree = template.tier === 'free';
+                  return (
                   <Col xs={24} sm={12} md={8} key={template.id}>
                     <Card
                       hoverable
-                      style={{ borderRadius: 12, overflow: 'hidden' }}
+                      style={{ borderRadius: 16, overflow: 'hidden', border: 'none', boxShadow: '0 4px 24px rgba(0,0,0,0.08)' }}
                       cover={
                         <div style={{
-                          height: 160,
-                          background: template.category === 'proposal'
-                            ? 'linear-gradient(135deg, #f093fb, #f5576c)'
-                            : template.category === 'birthday'
-                            ? 'linear-gradient(135deg, #4facfe, #00f2fe)'
-                            : template.category === 'anniversary'
-                            ? 'linear-gradient(135deg, #fa709a, #fee140)'
-                            : template.category === 'apology'
-                            ? 'linear-gradient(135deg, #a18cd1, #fbc2eb)'
-                            : 'linear-gradient(135deg, #84fab0, #8fd3f4)',
+                          height: 200,
+                          background: vis.gradient,
                           display: 'flex',
+                          flexDirection: 'column',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          fontSize: 48,
+                          position: 'relative',
+                          overflow: 'hidden',
                         }}>
-                          {template.category === 'proposal' ? '💍' :
-                           template.category === 'birthday' ? '🎂' :
-                           template.category === 'anniversary' ? '💕' :
-                           template.category === 'apology' ? '🥺' : '🎉'}
+                          {/* Decorative floating elements */}
+                          <div style={{ position: 'absolute', top: 12, right: 16, fontSize: 20, opacity: 0.4 }}>
+                            {vis.emoji}
+                          </div>
+                          <div style={{ position: 'absolute', bottom: 20, left: 20, fontSize: 14, opacity: 0.3 }}>
+                            {vis.emoji}
+                          </div>
+                          <div style={{ position: 'absolute', top: 30, left: 30, fontSize: 10, opacity: 0.2 }}>
+                            {vis.emoji}
+                          </div>
+
+                          {/* Main emoji */}
+                          <div style={{
+                            fontSize: 56,
+                            marginBottom: 8,
+                            filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.3))',
+                            animation: 'fadeInUp .5s ease-out',
+                          }}>
+                            {vis.emoji}
+                          </div>
+
+                          {/* Template name overlay */}
+                          <div style={{
+                            color: '#fff',
+                            fontWeight: 700,
+                            fontSize: 18,
+                            textShadow: '0 2px 12px rgba(0,0,0,0.4)',
+                            textAlign: 'center',
+                            padding: '0 20px',
+                          }}>
+                            {template.name}
+                          </div>
+
+                          {/* Tier badge */}
+                          <div style={{
+                            position: 'absolute',
+                            top: 12,
+                            left: 12,
+                            background: isFree ? 'rgba(82,196,26,0.9)' : template.tier === 'premium' ? 'rgba(250,173,20,0.9)' : 'rgba(24,144,255,0.9)',
+                            color: '#fff',
+                            padding: '2px 10px',
+                            borderRadius: 20,
+                            fontSize: 11,
+                            fontWeight: 600,
+                            backdropFilter: 'blur(4px)',
+                          }}>
+                            {isFree ? '✓ FREE' : template.tier === 'premium' ? '★ PREMIUM' : `₹${template.price}`}
+                          </div>
+
+                          {/* Step count pill */}
+                          <div style={{
+                            position: 'absolute',
+                            bottom: 10,
+                            right: 12,
+                            background: 'rgba(255,255,255,0.2)',
+                            color: '#fff',
+                            padding: '3px 10px',
+                            borderRadius: 12,
+                            fontSize: 11,
+                            backdropFilter: 'blur(6px)',
+                          }}>
+                            {template.steps?.length || 0} steps
+                          </div>
                         </div>
                       }
                       actions={[
                         <Button
-                          type="link"
-                          icon={<EyeOutlined />}
+                          type="primary"
+                          icon={<RocketOutlined />}
                           onClick={() => handleSelectTemplate(template)}
+                          style={{ background: vis.accent, border: 'none', fontWeight: 600 }}
                         >
-                          Use Template
+                          Use This Template
                         </Button>,
                       ]}
                     >
-                      <Card.Meta
-                        title={template.name}
-                        description={
-                          <>
-                            <Paragraph ellipsis={{ rows: 2 }} style={{ marginBottom: 8 }}>
-                              {template.description}
-                            </Paragraph>
-                            <Space>
-                              <Tag color={categoryConfig[template.category]?.color}>
-                                {categoryConfig[template.category]?.label}
-                              </Tag>
-                              <Tag color={tierConfig[template.tier]?.color}>
-                                {tierConfig[template.tier]?.label}
-                              </Tag>
-                              <Text type="secondary">{template.steps?.length || 0} steps</Text>
-                            </Space>
-                          </>
-                        }
-                      />
+                      <Paragraph ellipsis={{ rows: 2 }} style={{ marginBottom: 12, color: '#555', minHeight: 44 }}>
+                        {template.description}
+                      </Paragraph>
+
+                      {/* Step types preview */}
+                      <div style={{ marginBottom: 8 }}>
+                        <Text type="secondary" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>Includes:</Text>
+                        <div style={{ marginTop: 4, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                          {stepTypes.map(type => (
+                            <Tag key={type} style={{ borderRadius: 10, fontSize: 12, margin: 0 }}>
+                              {stepTypeIcons[type] || '✨'} {type.replace(/_/g, ' ')}
+                            </Tag>
+                          ))}
+                        </div>
+                      </div>
+
+                      <Space>
+                        <Tag color={categoryConfig[template.category]?.color}>
+                          {categoryConfig[template.category]?.icon} {categoryConfig[template.category]?.label}
+                        </Tag>
+                      </Space>
                     </Card>
                   </Col>
-                ))}
+                  );
+                })}
 
                 {filteredTemplates.length === 0 && (
                   <Col span={24}>
