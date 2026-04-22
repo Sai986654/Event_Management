@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import {
   Card, Row, Col, Button, Typography, Tag, Modal, Form, Input, Select,
-  Steps, Upload, message, Tabs, Space, Tooltip, Badge, Empty, Spin,
-  Popconfirm, Statistic, Divider, Switch, DatePicker, Alert,
+  Steps, message, Tabs, Space, Tooltip, Badge, Empty, Spin,
+  Popconfirm, Statistic, Divider, DatePicker, Alert,
 } from 'antd';
 import {
   PlusOutlined, HeartOutlined, GiftOutlined, SmileOutlined,
   DeleteOutlined, EditOutlined, EyeOutlined, CopyOutlined,
   LinkOutlined, BarChartOutlined, RocketOutlined, ThunderboltOutlined,
-  ClockCircleOutlined, LockOutlined, ShareAltOutlined,
+  ClockCircleOutlined,
 } from '@ant-design/icons';
 import { surpriseService } from '../services/surpriseService';
 
