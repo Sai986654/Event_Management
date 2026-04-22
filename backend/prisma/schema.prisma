@@ -120,6 +120,7 @@ model User {
   instantPhotos InstantPhoto[]
   chatThreadsStarted ChatThread[] @relation("ThreadCreator")
   chatMessages       ChatMessage[]
+  surprisePages      SurprisePage[]
 
   @@map("users")
 }
@@ -544,6 +545,109 @@ model InstantPhoto {
 
   @@index([eventId, createdAt(sort: Desc)])
   @@map("instant_photos")
+}
+
+// ── Interactive Surprise Pages ───────────────────────────────────────
+
+enum SurpriseCategory {
+  proposal
+  birthday
+  anniversary
+  apology
+  congratulations
+  other
+}
+
+enum SurpriseTier {
+  free
+  basic
+  premium
+  ultimate
+}
+
+enum SurprisePageStatus {
+  draft
+  active
+  expired
+  disabled
+}
+
+model SurpriseTemplate {
+  id           Int               @id @default(autoincrement())
+  name         String            @db.VarChar(120)
+  description  String            @db.Text
+  category     SurpriseCategory
+  previewImage String?           @map("preview_image") @db.VarChar(500)
+  steps        Json              @default("[]")  // array of step configs
+  defaultMusic String?           @map("default_music") @db.VarChar(500)
+  tier         SurpriseTier      @default(free)
+  price        Decimal           @default(0) @db.Decimal(10, 2)
+  isActive     Boolean           @default(true) @map("is_active")
+  sortOrder    Int               @default(0) @map("sort_order")
+  createdAt    DateTime          @default(now()) @map("created_at")
+  updatedAt    DateTime          @updatedAt @map("updated_at")
+
+  pages SurprisePage[]
+
+  @@index([category, isActive])
+  @@map("surprise_templates")
+}
+
+model SurprisePage {
+  id             Int               @id @default(autoincrement())
+  userId         Int               @map("user_id")
+  templateId     Int?              @map("template_id")
+  title          String            @db.VarChar(200)
+  slug           String            @unique
+  category       SurpriseCategory  @default(proposal)
+  recipientName  String            @map("recipient_name") @db.VarChar(120)
+  senderName     String            @map("sender_name") @db.VarChar(120)
+  steps          Json              @default("[]")  // customized step configs
+  photos         Json              @default("[]")  // array of photo URLs
+  musicUrl       String?           @map("music_url") @db.VarChar(500)
+  videoUrl       String?           @map("video_url") @db.VarChar(500)
+  voiceMessageUrl String?          @map("voice_message_url") @db.VarChar(500)
+  finalMessage   String?           @map("final_message") @db.Text
+  theme          Json              @default("{}")  // colors, fonts, bg
+  scheduledAt    DateTime?         @map("scheduled_at")
+  expiresAt      DateTime?         @map("expires_at")
+  status         SurprisePageStatus @default(draft)
+  tier           SurpriseTier      @default(free)
+  password       String?           @db.VarChar(100) // optional access password
+  price          Decimal           @default(0) @db.Decimal(10, 2)
+  isPaid         Boolean           @default(false) @map("is_paid")
+  deployTarget   String            @default("internal") @map("deploy_target") @db.VarChar(20) // netlify | r2 | internal
+  deployedUrl    String?           @map("deployed_url") @db.VarChar(500)
+  deploySiteId   String?           @map("deploy_site_id") @db.VarChar(200) // netlify site id or r2 key
+  deployedAt     DateTime?         @map("deployed_at")
+  viewCount      Int               @default(0) @map("view_count")
+  completedCount Int               @default(0) @map("completed_count")
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @updatedAt @map("updated_at")
+
+  user     User              @relation(fields: [userId], references: [id])
+  template SurpriseTemplate? @relation(fields: [templateId], references: [id])
+  interactions SurpriseInteraction[]
+
+  @@index([userId, status])
+  @@index([slug])
+  @@map("surprise_pages")
+}
+
+model SurpriseInteraction {
+  id              Int      @id @default(autoincrement())
+  surprisePageId  Int      @map("surprise_page_id")
+  sessionId       String   @map("session_id") @db.VarChar(100)
+  stepReached     Int      @default(0) @map("step_reached")
+  completed       Boolean  @default(false)
+  reaction        String?  @db.VarChar(50) // e.g. "loved_it", "cried", "laughed"
+  deviceInfo      String?  @map("device_info") @db.VarChar(200)
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  page SurprisePage @relation(fields: [surprisePageId], references: [id], onDelete: Cascade)
+
+  @@index([surprisePageId, createdAt(sort: Desc)])
+  @@map("surprise_interactions")
 }
 
 // ── Live Chat ──────────────────────────────────────────────

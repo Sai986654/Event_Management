@@ -72,6 +72,7 @@ const Header = () => {
           <Link to="/notifications">Alerts</Link>
           <Link to="/vendors">Vendors</Link>
           <Link to="/bookings">Bookings</Link>
+          <Link to="/surprises">Surprises ✨</Link>
         </>
       );
     }
@@ -83,6 +84,7 @@ const Header = () => {
           <Link to="/notifications">Alerts</Link>
           <Link to="/vendors">Vendors</Link>
           <Link to="/bookings">My Bookings</Link>
+          <Link to="/surprises">Surprises ✨</Link>
         </>
       );
     }
@@ -93,6 +95,7 @@ const Header = () => {
           <Link to="/dashboard">Dashboard</Link>
           <Link to="/notifications">Alerts</Link>
           <Link to="/bookings">My Bookings</Link>
+          <Link to="/surprises">Surprises ✨</Link>
         </>
       );
     }

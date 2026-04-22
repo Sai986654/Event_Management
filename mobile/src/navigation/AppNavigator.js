@@ -32,6 +32,8 @@ import GuestManagementScreen from '../screens/GuestManagementScreen';
 import BudgetDashboardScreen from '../screens/BudgetDashboardScreen';
 import ChatListScreen from '../screens/ChatListScreen';
 import ChatScreen from '../screens/ChatScreen';
+import SurprisePagesScreen from '../screens/SurprisePagesScreen';
+import SurpriseViewerScreen from '../screens/SurpriseViewerScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -82,6 +84,8 @@ const DashboardStack = () => (
     <Stack.Screen name="BudgetDashboard" component={BudgetDashboardScreen} options={{ title: 'Budget Dashboard' }} />
     <Stack.Screen name="ChatList" component={ChatListScreen} options={{ title: 'Support Chat' }} />
     <Stack.Screen name="ChatConversation" component={ChatScreen} options={({ route }) => ({ title: route.params?.threadSubject || 'Chat' })} />
+    <Stack.Screen name="SurprisePages" component={SurprisePagesScreen} options={{ title: 'Surprise Pages ✨' }} />
+    <Stack.Screen name="SurpriseViewer" component={SurpriseViewerScreen} options={{ headerShown: false }} />
     <Stack.Screen
       name="PublicEvent"
       component={PublicEventScreen}

@@ -177,6 +177,12 @@ const EventsDashboard = ({ user, navigation }) => {
             onPress={() => navigation.navigate('AdminControl')}
           />
         )}
+        <ActionCard
+          icon="party-popper"
+          title="Surprise Pages ✨"
+          subtitle="Create viral interactive surprise experiences"
+          onPress={() => navigation.navigate('SurprisePages')}
+        />
         <View style={{ height: 90 }} />
       </ScrollView>
 

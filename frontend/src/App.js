@@ -30,6 +30,8 @@ import NotificationsPage from './pages/NotificationsPage';
 import Profile from './pages/Profile';
 import PhotoBooth from './pages/PhotoBooth';
 import LivePhotoWall from './pages/GuestPhotoDownload';
+import SurprisePages from './pages/SurprisePages';
+import SurpriseViewer from './pages/SurpriseViewer';
 
 import './App.css';
 
@@ -95,6 +97,9 @@ const AppInner = () => {
 
         {/* Public live photo wall (no auth required) */}
         <Route path="/live-photos/:eventId" element={<LivePhotoWall />} />
+
+        {/* Public surprise viewer (no auth — recipient views this) */}
+        <Route path="/surprise/:slug" element={<SurpriseViewer />} />
 
         {/* Protected Routes */}
         <Route
@@ -250,6 +255,17 @@ const AppInner = () => {
             <ProtectedRoute allowedRoles={['organizer', 'admin', 'vendor']}>
               <AppLayout>
                 <PhotoBooth />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/surprises"
+          element={
+            <ProtectedRoute>
+              <AppLayout>
+                <SurprisePages />
               </AppLayout>
             </ProtectedRoute>
           }

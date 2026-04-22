@@ -29,6 +29,7 @@ const instantPhotoRoutes = require('./routes/instantPhotoRoutes');
 const chatRoutes = require('./routes/chatRoutes');
 const webhookRoutes = require('./routes/webhookRoutes');
 const vendorFormSchemaRoutes = require('./routes/vendorFormSchemaRoutes');
+const surpriseRoutes = require('./routes/surpriseRoutes');
 
 const app = express();
 const server = http.createServer(app);
@@ -99,6 +100,7 @@ app.use('/api/instant-photos', instantPhotoRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/webhooks', webhookRoutes);
 app.use('/api/public', vendorFormSchemaRoutes);
+app.use('/api/surprises', surpriseRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
