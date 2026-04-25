@@ -293,6 +293,54 @@ const GuestManagementScreen = ({ route }) => {
     ]);
   };
 
+  const handleQuickAddGuests = async () => {
+    if (!quickAddText.trim()) {
+      Alert.alert('Validation', 'Paste guest names, emails, and phones (one per line or comma-separated)');
+      return;
+    }
+    try {
+      setQuickAdding(true);
+      const result = await guestService.quickAddGuests(eventId, quickAddText);
+      Alert.alert('Success', `Added ${result.count} guests`);
+      setQuickAddText('');
+      setShowQuickAddModal(false);
+      fetchGuests();
+    } catch (err) {
+      Alert.alert('Error', getErrorMessage(err));
+    } finally {
+      setQuickAdding(false);
+    }
+  };
+
+  const handleGenerateAndSendInvites = async () => {
+    try {
+      setSendingInvites(true);
+      const payload = {
+        sendVia: selectedSendChannel,
+        defaultLanguage: selectedLanguage,
+        defaultTone: selectedTone,
+        defaultTemplateKey: selectedTemplateKey,
+      };
+
+      if (selectedGuestIds.length) {
+        payload.guestIds = selectedGuestIds;
+      }
+
+      const result = await guestService.generateAndSendInvites(eventId, payload);
+      Alert.alert(
+        'Success',
+        `Generated ${result.generated} invites.\nSent to ${result.sent} guests via ${selectedSendChannel}.`
+      );
+      setShowSendModal(false);
+      setSelectedGuestIds([]);
+      fetchGuests();
+    } catch (err) {
+      Alert.alert('Error', getErrorMessage(err));
+    } finally {
+      setSendingInvites(false);
+    }
+  };
+
   const rsvpStats = {
     total: guests.length,
     confirmed: guests.filter((g) => g.rsvpStatus === 'accepted').length,
@@ -413,6 +461,18 @@ const GuestManagementScreen = ({ route }) => {
               {selectedGuestIds.length
                 ? `Generate Invites For Selected (${selectedGuestIds.length})`
                 : 'Generate Invites For All Guests'}
+            </Button>
+
+            <Button 
+              mode="contained-tonal" 
+              onPress={() => setShowSendModal(true)} 
+              loading={sendingInvites} 
+              disabled={sendingInvites || !guests.length}
+              style={{ marginTop: Spacing.md }}
+            >
+              {selectedGuestIds.length
+                ? `Generate & Send To Selected (${selectedGuestIds.length})`
+                : 'Generate & Send To All Guests'}
             </Button>
           </Card.Content>
         </Card>
@@ -556,6 +616,77 @@ const GuestManagementScreen = ({ route }) => {
             </Button>
           </View>
         </Modal>
+
+        {/* Quick Add Modal */}
+        <Modal
+          visible={showQuickAddModal}
+          onDismiss={() => setShowQuickAddModal(false)}
+          contentContainerStyle={styles.modal}
+        >
+          <Text variant="titleLarge" style={{ fontWeight: '800', marginBottom: Spacing.lg }}>Quick Add Guests</Text>
+          <Text style={{ color: Colors.textSecondary, marginBottom: Spacing.md, fontSize: 12 }}>
+            Paste names, emails, and phone numbers (one per line or comma-separated)
+          </Text>
+          <TextInput
+            label="Guest Data"
+            value={quickAddText}
+            onChangeText={setQuickAddText}
+            mode="outlined"
+            multiline
+            numberOfLines={8}
+            placeholder="John Doe john@email.com +91-9999999999"
+            style={[styles.input, { height: 200 }]}
+          />
+          <View style={styles.modalActions}>
+            <Button mode="text" onPress={() => setShowQuickAddModal(false)}>Cancel</Button>
+            <Button mode="contained" onPress={handleQuickAddGuests} loading={quickAdding} disabled={quickAdding}>
+              Add {quickAddText.split('\n').filter((l) => l.trim()).length} Guests
+            </Button>
+          </View>
+        </Modal>
+
+        {/* Generate & Send Modal */}
+        <Modal
+          visible={showSendModal}
+          onDismiss={() => setShowSendModal(false)}
+          contentContainerStyle={styles.modal}
+        >
+          <Text variant="titleLarge" style={{ fontWeight: '800', marginBottom: Spacing.lg }}>Generate & Send Invites</Text>
+          <Text style={{ color: Colors.textSecondary, marginBottom: Spacing.md, fontSize: 12 }}>
+            Send invite links to guests via email or WhatsApp (free, zero cost)
+          </Text>
+
+          <Text style={{ fontWeight: '700', color: Colors.textPrimary, marginBottom: Spacing.sm }}>Delivery Channel</Text>
+          <View style={styles.choiceChips}>
+            {['email', 'whatsapp', 'both'].map((channel) => (
+              <Chip
+                key={channel}
+                selected={selectedSendChannel === channel}
+                onPress={() => setSelectedSendChannel(channel)}
+                style={styles.choiceChip}
+              >
+                {channel === 'both' ? 'Email + WhatsApp' : channel.charAt(0).toUpperCase() + channel.slice(1)}
+              </Chip>
+            ))}
+          </View>
+
+          <Card style={{ marginVertical: Spacing.lg, backgroundColor: '#f0f4ff' }}>
+            <Card.Content>
+              <Text style={{ fontSize: 12, color: Colors.textSecondary }}>
+                ✓ Template: <Text style={{ fontWeight: '700', color: Colors.textPrimary }}>{selectedTemplate?.name}</Text>
+                {'\n'}✓ Language: <Text style={{ fontWeight: '700', color: Colors.textPrimary }}>{selectedLanguage === 'te' ? 'Telugu' : 'English'}</Text>
+                {'\n'}✓ Tone: <Text style={{ fontWeight: '700', color: Colors.textPrimary }}>{selectedTone}</Text>
+              </Text>
+            </Card.Content>
+          </Card>
+
+          <View style={styles.modalActions}>
+            <Button mode="text" onPress={() => setShowSendModal(false)}>Cancel</Button>
+            <Button mode="contained" onPress={handleGenerateAndSendInvites} loading={sendingInvites} disabled={sendingInvites}>
+              Generate & Send
+            </Button>
+          </View>
+        </Modal>
       </Portal>
 
       <FAB
@@ -565,8 +696,17 @@ const GuestManagementScreen = ({ route }) => {
         onPress={() => setShowAddModal(true)}
         label="Add Guest"
       />
+
+      <FAB
+        icon="lightning-bolt"
+        style={[styles.fab, { bottom: 80 }]}
+        color={Colors.textOnPrimary}
+        onPress={() => setShowQuickAddModal(true)}
+        label="Quick Add"
+      />
     </View>
   );
+};
 };
 
 const styles = StyleSheet.create({

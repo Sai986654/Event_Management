@@ -32,6 +32,15 @@ const validateTemplateKey = (field, label) =>
       return true;
     });
 
+const validateEventReference = (message = 'event ID required') =>
+  body().custom((value = {}) => {
+    const candidate = value.event ?? value.eventId;
+    if (!Number.isInteger(Number(candidate))) {
+      throw new Error(message);
+    }
+    return true;
+  });
+
 // Public RSVP endpoint
 router.put(
   '/:id/rsvp',
@@ -95,7 +104,7 @@ router.post(
   '/quick-add',
   protect,
   authorize('admin', 'organizer'),
-  [body('event').or(body('eventId')).isInt().withMessage('event ID required')],
+  [validateEventReference('event ID required')],
   validate,
   quickAddGuests
 );
@@ -105,7 +114,7 @@ router.post(
   protect,
   authorize('admin', 'organizer'),
   [
-    body('eventId').or(body('event')).isInt().withMessage('eventId required'),
+    validateEventReference('eventId required'),
     body('sendVia').optional().isIn(['email', 'whatsapp', 'both']).withMessage('sendVia must be email, whatsapp, or both'),
   ],
   validate,
