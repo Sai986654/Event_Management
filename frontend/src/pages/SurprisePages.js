@@ -191,6 +191,32 @@ const SurprisePages = () => {
     ? templates.filter(t => t.category === filterCategory)
     : templates;
 
+  const templateVisuals = {
+    // Each template gets a unique look based on its name/category
+    'Love Trap 💕': { gradient: 'linear-gradient(135deg, #ff6b9d 0%, #c850c0 50%, #4158d0 100%)', emoji: '💘', accent: '#ff6b9d' },
+    'Fake Error Surprise 🖥️': { gradient: 'linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%)', emoji: '💀', accent: '#00ff88' },
+    'Memory Timeline 📸': { gradient: 'linear-gradient(135deg, #ffecd2 0%, #fcb69f 50%, #ff9a9e 100%)', emoji: '📸', accent: '#fcb69f' },
+    'Unlock The Surprise 🔐': { gradient: 'linear-gradient(135deg, #f7971e 0%, #ffd200 100%)', emoji: '🔐', accent: '#f7971e' },
+    'Midnight Surprise 🌙': { gradient: 'linear-gradient(135deg, #0c0c3a 0%, #1a0533 50%, #2d1b69 100%)', emoji: '🌙', accent: '#b388ff' },
+    "I'm Sorry 🥺": { gradient: 'linear-gradient(135deg, #89f7fe 0%, #66a6ff 100%)', emoji: '🥺', accent: '#66a6ff' },
+    'Congratulations! 🏆': { gradient: 'linear-gradient(135deg, #f5af19 0%, #f12711 100%)', emoji: '🏆', accent: '#f5af19' },
+    'Dare to Say Yes? 💋': { gradient: 'linear-gradient(135deg, #f953c6 0%, #b91d73 100%)', emoji: '💋', accent: '#f953c6' },
+    'Prank & Reveal 🤡': { gradient: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)', emoji: '🤡', accent: '#43e97b' },
+    'Letter From The Heart 💌': { gradient: 'linear-gradient(135deg, #fbc2eb 0%, #a6c1ee 100%)', emoji: '💌', accent: '#e8a4c8' },
+    'Treasure Hunt 🗺️': { gradient: 'linear-gradient(135deg, #a1c4fd 0%, #c2e9fb 50%, #d4fc79 100%)', emoji: '🗺️', accent: '#6cb52d' },
+    'Friendship Bomb 🫶': { gradient: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)', emoji: '🫶', accent: '#fa709a' },
+    'The Big Reveal 🎬': { gradient: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)', emoji: '🎬', accent: '#e94560' },
+  };
+  const defaultVisual = { gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', emoji: '✨', accent: '#764ba2' };
+
+  const getVisual = (template) => templateVisuals[template.name] || defaultVisual;
+
+  const stepTypeIcons = {
+    intro: '🎭', trap_button: '🪤', message: '💬', fake_scenario: '🖥️',
+    photo_reveal: '📷', timeline: '📜', voice_message: '🎙️', quiz: '❓',
+    countdown: '⏳', final_reveal: '🎆',
+  };
+
   if (loading) {
     return (
       <div style={{ textAlign: 'center', padding: '100px 0' }}>
@@ -254,32 +280,6 @@ const SurprisePages = () => {
                   </Tag.CheckableTag>
                 ))}
               </Space>
-
-const templateVisuals = {
-  // Each template gets a unique look based on its name/category
-  'Love Trap 💕':          { gradient: 'linear-gradient(135deg, #ff6b9d 0%, #c850c0 50%, #4158d0 100%)', emoji: '💘', accent: '#ff6b9d' },
-  'Fake Error Surprise 🖥️': { gradient: 'linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%)', emoji: '💀', accent: '#00ff88' },
-  'Memory Timeline 📸':    { gradient: 'linear-gradient(135deg, #ffecd2 0%, #fcb69f 50%, #ff9a9e 100%)', emoji: '📸', accent: '#fcb69f' },
-  'Unlock The Surprise 🔐': { gradient: 'linear-gradient(135deg, #f7971e 0%, #ffd200 100%)', emoji: '🔐', accent: '#f7971e' },
-  'Midnight Surprise 🌙':  { gradient: 'linear-gradient(135deg, #0c0c3a 0%, #1a0533 50%, #2d1b69 100%)', emoji: '🌙', accent: '#b388ff' },
-  "I'm Sorry 🥺":          { gradient: 'linear-gradient(135deg, #89f7fe 0%, #66a6ff 100%)', emoji: '🥺', accent: '#66a6ff' },
-  'Congratulations! 🏆':   { gradient: 'linear-gradient(135deg, #f5af19 0%, #f12711 100%)', emoji: '🏆', accent: '#f5af19' },
-  'Dare to Say Yes? 💋':   { gradient: 'linear-gradient(135deg, #f953c6 0%, #b91d73 100%)', emoji: '💋', accent: '#f953c6' },
-  'Prank & Reveal 🤡':     { gradient: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)', emoji: '🤡', accent: '#43e97b' },
-  'Letter From The Heart 💌': { gradient: 'linear-gradient(135deg, #fbc2eb 0%, #a6c1ee 100%)', emoji: '💌', accent: '#e8a4c8' },
-  'Treasure Hunt 🗺️':     { gradient: 'linear-gradient(135deg, #a1c4fd 0%, #c2e9fb 50%, #d4fc79 100%)', emoji: '🗺️', accent: '#6cb52d' },
-  'Friendship Bomb 🫶':    { gradient: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)', emoji: '🫶', accent: '#fa709a' },
-  'The Big Reveal 🎬':     { gradient: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)', emoji: '🎬', accent: '#e94560' },
-};
-const defaultVisual = { gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', emoji: '✨', accent: '#764ba2' };
-
-const getVisual = (template) => templateVisuals[template.name] || defaultVisual;
-
-const stepTypeIcons = {
-  intro: '🎭', trap_button: '🪤', message: '💬', fake_scenario: '🖥️',
-  photo_reveal: '📷', timeline: '📜', voice_message: '🎙️', quiz: '❓',
-  countdown: '⏳', final_reveal: '🎆',
-};
 
               <Row gutter={[20, 20]}>
                 {filteredTemplates.map(template => {

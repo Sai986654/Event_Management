@@ -20,6 +20,117 @@
   margin-bottom: 16px;
 }
 
+.invite-generator-card {
+  margin-bottom: 16px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #fff7ed 0%, #f8fafc 100%);
+}
+
+.invite-generator-controls {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.invite-live-preview-wrap {
+  margin-top: 14px;
+}
+
+.invite-live-preview {
+  border: 2px solid #7c2d12;
+  border-radius: 14px;
+  padding: 12px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.16);
+}
+
+.invite-live-preview-inner {
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 10px;
+  padding: 14px;
+}
+
+.invite-live-preview-top {
+  font-size: 12px;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: #475569;
+  font-weight: 700;
+}
+
+.invite-live-preview-title {
+  margin-top: 4px;
+  font-size: 18px;
+  line-height: 1.2;
+  color: #111827;
+  font-weight: 700;
+}
+
+.invite-live-preview-meta {
+  margin-top: 4px;
+  color: #334155;
+  font-size: 12px;
+  text-transform: capitalize;
+}
+
+.invite-live-preview-salutation {
+  margin-top: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.invite-live-preview-body {
+  margin-top: 10px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #1f2937;
+}
+
+.invite-live-preview-footer {
+  margin-top: 10px;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.invite-template-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 240px;
+}
+
+.invite-template-thumb {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: 2px solid #7c2d12;
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+  flex-shrink: 0;
+}
+
+.invite-template-meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.invite-template-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1f2937;
+  line-height: 1.2;
+}
+
+.invite-template-desc {
+  font-size: 12px;
+  color: #6b7280;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .action-buttons {
   display: flex;
   gap: 8px;
@@ -32,6 +143,16 @@
 
   .guests-actions {
     flex-direction: column;
+  }
+
+  .invite-generator-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .invite-generator-controls .ant-select,
+  .invite-generator-controls button {
+    width: 100%;
   }
 
   .guests-actions button {

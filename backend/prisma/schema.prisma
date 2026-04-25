@@ -407,6 +407,16 @@ model Guest {
   name               String
   email              String?
   phone              String?
+  relationship       String?    @db.VarChar(80)
+  inviteTone         String?    @map("invite_tone") @db.VarChar(30)
+  inviteLanguage     String     @default("en") @map("invite_language") @db.VarChar(10)
+  inviteTemplateKey  String?    @map("invite_template_key") @db.VarChar(50)
+  customInviteMessage String?   @map("custom_invite_message") @db.Text
+  personalizedInviteMessage String? @map("personalized_invite_message") @db.Text
+  personalizedInvitePdfUrl String?  @map("personalized_invite_pdf_url") @db.VarChar(500)
+  personalizedInvitePdfKey String?  @map("personalized_invite_pdf_key") @db.VarChar(500)
+  inviteToken         String?   @unique @map("invite_token") @db.VarChar(64)
+  invitationGeneratedAt DateTime? @map("invitation_generated_at")
   rsvpStatus         RsvpStatus @default(pending) @map("rsvp_status")
   plusOnes           Int        @default(0) @map("plus_ones")
   dietaryPreferences String?    @map("dietary_preferences")
