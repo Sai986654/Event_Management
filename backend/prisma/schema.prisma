@@ -47,6 +47,21 @@ model ServiceCategory {
   @@map("service_categories")
 }
 
+model InviteTemplate {
+  id          Int      @id @default(autoincrement())
+  key         String   @unique @db.VarChar(50)
+  name        String   @db.VarChar(120)
+  description String?  @db.VarChar(280)
+  palette     Json     @default("{}")
+  isActive    Boolean  @default(true) @map("is_active")
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([isActive, sortOrder])
+  @@map("invite_templates")
+}
+
 enum PriceType {
   fixed
   per_person

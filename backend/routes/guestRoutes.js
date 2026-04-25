@@ -15,8 +15,20 @@ const {
   generatePersonalizedInviteForGuest,
   generatePersonalizedInvitesBulk,
 } = require('../controllers/guestController');
+const { getInviteTemplateKeys } = require('../services/personalizedInviteService');
 
-const INVITE_TEMPLATE_KEYS = ['royal-maroon', 'floral-cream', 'modern-indigo'];
+const validateTemplateKey = (field, label) =>
+  body(field)
+    .optional()
+    .custom(async (value) => {
+      const candidate = String(value || '').toLowerCase();
+      if (!candidate) return true;
+      const keys = await getInviteTemplateKeys();
+      if (!keys.includes(candidate)) {
+        throw new Error(`${label} is invalid`);
+      }
+      return true;
+    });
 
 // Public RSVP endpoint
 router.put(
@@ -39,8 +51,8 @@ router.post(
   [
     body('event').isInt().withMessage('Valid event ID is required'),
     body('name').trim().notEmpty().withMessage('Guest name is required'),
-    body('inviteTemplateKey').optional().isIn(INVITE_TEMPLATE_KEYS).withMessage('Invalid inviteTemplateKey'),
-    body('templateKey').optional().isIn(INVITE_TEMPLATE_KEYS).withMessage('Invalid templateKey'),
+    validateTemplateKey('inviteTemplateKey', 'inviteTemplateKey'),
+    validateTemplateKey('templateKey', 'templateKey'),
   ],
   validate,
   addGuest
@@ -56,8 +68,8 @@ router.post(
   [
     body('language').optional().isIn(['en', 'te']).withMessage('language must be one of en, te'),
     body('tone').optional().isIn(['formal', 'friendly', 'emotional']).withMessage('tone must be formal, friendly, or emotional'),
-    body('inviteTemplateKey').optional().isIn(INVITE_TEMPLATE_KEYS).withMessage('inviteTemplateKey is invalid'),
-    body('templateKey').optional().isIn(INVITE_TEMPLATE_KEYS).withMessage('templateKey is invalid'),
+    validateTemplateKey('inviteTemplateKey', 'inviteTemplateKey'),
+    validateTemplateKey('templateKey', 'templateKey'),
   ],
   validate,
   generatePersonalizedInviteForGuest
@@ -70,7 +82,7 @@ router.post(
     body('event').optional().isInt().withMessage('event must be an integer'),
     body('defaultLanguage').optional().isIn(['en', 'te']).withMessage('defaultLanguage must be one of en, te'),
     body('defaultTone').optional().isIn(['formal', 'friendly', 'emotional']).withMessage('defaultTone must be formal, friendly, or emotional'),
-    body('defaultTemplateKey').optional().isIn(INVITE_TEMPLATE_KEYS).withMessage('defaultTemplateKey is invalid'),
+    validateTemplateKey('defaultTemplateKey', 'defaultTemplateKey'),
   ],
   validate,
   generatePersonalizedInvitesBulk

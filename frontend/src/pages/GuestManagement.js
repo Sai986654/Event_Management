@@ -47,9 +47,9 @@ const GuestManagement = () => {
     null;
 
   const selectedGuests = guests.filter((guest) => selectedGuestIds.includes(guest.id));
-  const previewGuest = selectedGuests[0] || null;
+  const previewGuest = selectedGuests[0] || guests[0] || null;
   const extraSelectedCount = Math.max(0, selectedGuests.length - 1);
-  const previewGuestName = previewGuest?.name || 'Priya';
+  const previewGuestName = previewGuest?.name || 'Guest';
   const previewRelationship = previewGuest?.relationship || 'guest';
 
   const sampleCopy = {

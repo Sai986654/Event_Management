@@ -1,5 +1,5 @@
 import React, { useCallback, useRef, useState } from 'react';
-import { View, FlatList, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, TouchableOpacity, StyleSheet } from 'react-native';
 import { TextInput, Text } from 'react-native-paper';
 import { locationService } from '../services/locationService';
 import { Colors, Spacing, Radius } from '../theme';
@@ -59,17 +59,12 @@ const LocationPicker = ({ value, onChange, onLocationPick, label = 'Venue', plac
       />
       {suggestions.length > 0 && (
         <View style={styles.dropdown}>
-          <FlatList
-            data={suggestions}
-            keyExtractor={(item) => item.placeId}
-            keyboardShouldPersistTaps="handled"
-            renderItem={({ item }) => (
-              <TouchableOpacity style={styles.item} onPress={() => pick(item)} activeOpacity={0.7}>
-                <Text variant="bodyMedium" style={styles.mainText}>{item.mainText}</Text>
-                {item.secondaryText ? <Text variant="bodySmall" style={styles.secondaryText}>{item.secondaryText}</Text> : null}
-              </TouchableOpacity>
-            )}
-          />
+          {suggestions.map((item) => (
+            <TouchableOpacity key={item.placeId} style={styles.item} onPress={() => pick(item)} activeOpacity={0.7}>
+              <Text variant="bodyMedium" style={styles.mainText}>{item.mainText}</Text>
+              {item.secondaryText ? <Text variant="bodySmall" style={styles.secondaryText}>{item.secondaryText}</Text> : null}
+            </TouchableOpacity>
+          ))}
         </View>
       )}
     </View>

@@ -96,6 +96,88 @@ exports.deleteCategory = asyncHandler(async (req, res) => {
   res.json({ message: 'Category deleted' });
 });
 
+// ── Invite Template Management ───────────────────────────────────────
+
+const normalizeTemplateKey = (value = '') =>
+  String(value)
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+exports.getInviteTemplates = asyncHandler(async (_req, res) => {
+  const templates = await prisma.inviteTemplate.findMany({
+    orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+  });
+
+  res.json({ templates });
+});
+
+exports.createInviteTemplate = asyncHandler(async (req, res) => {
+  const key = normalizeTemplateKey(req.body.key || req.body.name);
+  if (!key) return res.status(400).json({ message: 'Template key is required' });
+
+  const existing = await prisma.inviteTemplate.findUnique({ where: { key } });
+  if (existing) return res.status(400).json({ message: 'Template key already exists' });
+
+  const maxSort = await prisma.inviteTemplate.aggregate({ _max: { sortOrder: true } });
+  const template = await prisma.inviteTemplate.create({
+    data: {
+      key,
+      name: String(req.body.name || key).trim(),
+      description: req.body.description ? String(req.body.description).trim() : null,
+      palette: req.body.palette && typeof req.body.palette === 'object' ? req.body.palette : {},
+      isActive: req.body.isActive !== undefined ? Boolean(req.body.isActive) : true,
+      sortOrder:
+        req.body.sortOrder !== undefined
+          ? Number(req.body.sortOrder)
+          : (maxSort._max.sortOrder || 0) + 1,
+    },
+  });
+
+  res.status(201).json({ template });
+});
+
+exports.updateInviteTemplate = asyncHandler(async (req, res) => {
+  const id = Number(req.params.id);
+  const existing = await prisma.inviteTemplate.findUnique({ where: { id } });
+  if (!existing) return res.status(404).json({ message: 'Invite template not found' });
+
+  const nextKey = req.body.key ? normalizeTemplateKey(req.body.key) : undefined;
+  if (nextKey && nextKey !== existing.key) {
+    const collision = await prisma.inviteTemplate.findUnique({ where: { key: nextKey } });
+    if (collision) return res.status(400).json({ message: 'Template key already exists' });
+  }
+
+  const updateData = {};
+  if (nextKey) updateData.key = nextKey;
+  if (req.body.name !== undefined) updateData.name = String(req.body.name).trim();
+  if (req.body.description !== undefined) {
+    updateData.description = req.body.description ? String(req.body.description).trim() : null;
+  }
+  if (req.body.palette !== undefined) {
+    updateData.palette = req.body.palette && typeof req.body.palette === 'object' ? req.body.palette : {};
+  }
+  if (req.body.isActive !== undefined) updateData.isActive = Boolean(req.body.isActive);
+  if (req.body.sortOrder !== undefined) updateData.sortOrder = Number(req.body.sortOrder);
+
+  const template = await prisma.inviteTemplate.update({
+    where: { id },
+    data: updateData,
+  });
+
+  res.json({ template });
+});
+
+exports.deleteInviteTemplate = asyncHandler(async (req, res) => {
+  const id = Number(req.params.id);
+  const template = await prisma.inviteTemplate.findUnique({ where: { id } });
+  if (!template) return res.status(404).json({ message: 'Invite template not found' });
+
+  await prisma.inviteTemplate.delete({ where: { id } });
+  res.json({ message: 'Invite template deleted' });
+});
+
 // ── Vendor Management ───────────────────────────────────────────────
 
 exports.getAllVendors = asyncHandler(async (req, res) => {

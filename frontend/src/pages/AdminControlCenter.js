@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Button, Card, Col, Form, Input, Modal, Popconfirm, Row, Select, Space, Table, Tabs, Tag, message } from 'antd';
-import { DeleteOutlined, PlusOutlined, AppstoreOutlined, ShopOutlined, TeamOutlined, UserAddOutlined } from '@ant-design/icons';
+import { DeleteOutlined, EditOutlined, PlusOutlined, AppstoreOutlined, ShopOutlined, TeamOutlined, UserAddOutlined } from '@ant-design/icons';
 import { adminService } from '../services/adminService';
 import { vendorService } from '../services/vendorService';
 import { getErrorMessage } from '../utils/helpers';
@@ -81,6 +81,87 @@ const AdminControlCenter = () => {
     }
   };
 
+  // ── Invite Template Management ────────────────────────────────────
+  const [inviteTemplates, setInviteTemplates] = useState([]);
+  const [loadingInviteTemplates, setLoadingInviteTemplates] = useState(false);
+  const [templateModalOpen, setTemplateModalOpen] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState(null);
+  const [savingTemplate, setSavingTemplate] = useState(false);
+  const [templateForm] = Form.useForm();
+
+  const loadInviteTemplates = useCallback(async () => {
+    setLoadingInviteTemplates(true);
+    try {
+      const res = await adminService.getInviteTemplates();
+      setInviteTemplates(res.templates || []);
+    } catch (err) {
+      message.error(getErrorMessage(err));
+    } finally {
+      setLoadingInviteTemplates(false);
+    }
+  }, []);
+
+  const openTemplateModal = (template = null) => {
+    setEditingTemplate(template);
+    setTemplateModalOpen(true);
+    templateForm.setFieldsValue({
+      name: template?.name || '',
+      key: template?.key || '',
+      description: template?.description || '',
+      sortOrder: template?.sortOrder ?? undefined,
+      isActive: template?.isActive ?? true,
+      paletteJson: JSON.stringify(template?.palette || {}, null, 2),
+    });
+  };
+
+  const saveTemplate = async (values) => {
+    let palette = {};
+    try {
+      palette = values.paletteJson ? JSON.parse(values.paletteJson) : {};
+    } catch (_error) {
+      message.error('Palette JSON is invalid');
+      return;
+    }
+
+    const payload = {
+      name: values.name,
+      key: values.key,
+      description: values.description || '',
+      sortOrder: values.sortOrder,
+      isActive: values.isActive,
+      palette,
+    };
+
+    setSavingTemplate(true);
+    try {
+      if (editingTemplate) {
+        await adminService.updateInviteTemplate(editingTemplate.id, payload);
+        message.success('Invite template updated');
+      } else {
+        await adminService.createInviteTemplate(payload);
+        message.success('Invite template created');
+      }
+      setTemplateModalOpen(false);
+      setEditingTemplate(null);
+      templateForm.resetFields();
+      await loadInviteTemplates();
+    } catch (err) {
+      message.error(getErrorMessage(err));
+    } finally {
+      setSavingTemplate(false);
+    }
+  };
+
+  const removeTemplate = async (id) => {
+    try {
+      await adminService.deleteInviteTemplate(id);
+      message.success('Invite template deleted');
+      await loadInviteTemplates();
+    } catch (err) {
+      message.error(getErrorMessage(err));
+    }
+  };
+
   // ── Vendor Management ──────────────────────────────────────────────
   const [allVendors, setAllVendors] = useState([]);
   const [loadingAllVendors, setLoadingAllVendors] = useState(false);
@@ -132,8 +213,9 @@ const AdminControlCenter = () => {
   useEffect(() => {
     loadVerificationQueue();
     loadCategories();
+    loadInviteTemplates();
     loadAllVendors();
-  }, [loadVerificationQueue, loadCategories, loadAllVendors]);
+  }, [loadVerificationQueue, loadCategories, loadInviteTemplates, loadAllVendors]);
 
   // ── Tab items ──────────────────────────────────────────────────────
   const tabItems = [
@@ -201,6 +283,61 @@ const AdminControlCenter = () => {
                   <Popconfirm title="Remove this vendor?" description="This will delete the vendor profile, all packages, and testimonials. This cannot be undone." onConfirm={() => removeVendor(r.id)} okText="Delete" okButtonProps={{ danger: true }}>
                     <Button size="small" danger icon={<DeleteOutlined />} loading={deletingVendorId === r.id} />
                   </Popconfirm>
+                ),
+              },
+            ]}
+          />
+        </Card>
+      ),
+    },
+    {
+      key: 'invite-templates',
+      label: <span><AppstoreOutlined /> Invite Templates</span>,
+      children: (
+        <Card
+          className="phase-card"
+          title="Invite Card Designs"
+          extra={<Button type="primary" icon={<PlusOutlined />} onClick={() => openTemplateModal()}>Add Template</Button>}
+        >
+          <Table
+            loading={loadingInviteTemplates}
+            rowKey="id"
+            dataSource={inviteTemplates}
+            pagination={false}
+            locale={{ emptyText: <div className="phase-empty">No invite templates yet.</div> }}
+            columns={[
+              { title: '#', dataIndex: 'sortOrder', width: 60 },
+              { title: 'Key', dataIndex: 'key', render: (v) => <code>{v}</code> },
+              { title: 'Name', dataIndex: 'name' },
+              { title: 'Description', dataIndex: 'description', ellipsis: true },
+              {
+                title: 'Preview',
+                render: (_, r) => (
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      width: 54,
+                      height: 20,
+                      borderRadius: 12,
+                      border: `1px solid ${r.palette?.frame || '#d9d9d9'}`,
+                      background: `linear-gradient(135deg, ${r.palette?.frame || '#999'} 0%, ${r.palette?.accent || '#ccc'} 100%)`,
+                    }}
+                  />
+                ),
+              },
+              { title: 'Active', dataIndex: 'isActive', render: (v) => <Tag color={v ? 'green' : 'red'}>{v ? 'Yes' : 'No'}</Tag> },
+              {
+                title: 'Actions',
+                width: 150,
+                render: (_, r) => (
+                  <Space>
+                    <Button size="small" icon={<EditOutlined />} onClick={() => openTemplateModal(r)}>
+                      Edit
+                    </Button>
+                    <Popconfirm title="Delete this invite template?" onConfirm={() => removeTemplate(r.id)} okText="Delete" okButtonProps={{ danger: true }}>
+                      <Button size="small" danger icon={<DeleteOutlined />} />
+                    </Popconfirm>
+                  </Space>
                 ),
               },
             ]}
@@ -314,6 +451,78 @@ const AdminControlCenter = () => {
           <Space>
             <Button type="primary" htmlType="submit" loading={savingCategory}>Add Category</Button>
             <Button onClick={() => { setCatModalOpen(false); catForm.resetFields(); }}>Cancel</Button>
+          </Space>
+        </Form>
+      </Modal>
+
+      <Modal
+        title={editingTemplate ? 'Edit Invite Template' : 'Add Invite Template'}
+        open={templateModalOpen}
+        onCancel={() => {
+          setTemplateModalOpen(false);
+          setEditingTemplate(null);
+          templateForm.resetFields();
+        }}
+        footer={null}
+        destroyOnClose
+        width={720}
+      >
+        <Form form={templateForm} layout="vertical" onFinish={saveTemplate} initialValues={{ isActive: true }}>
+          <Row gutter={12}>
+            <Col xs={24} md={12}>
+              <Form.Item name="name" label="Display Name" rules={[{ required: true, message: 'Name is required' }]}>
+                <Input placeholder="Royal Maroon" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
+              <Form.Item name="key" label="Template Key" rules={[{ required: true, message: 'Key is required' }]}>
+                <Input placeholder="royal-maroon" />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={12}>
+            <Col xs={24} md={12}>
+              <Form.Item name="sortOrder" label="Sort Order">
+                <Input type="number" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
+              <Form.Item name="isActive" label="Status">
+                <Select options={[{ value: true, label: 'Active' }, { value: false, label: 'Inactive' }]} />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Form.Item name="description" label="Description">
+            <Input />
+          </Form.Item>
+          <Form.Item
+            name="paletteJson"
+            label="Palette JSON"
+            rules={[
+              {
+                validator: async (_, value) => {
+                  if (!value) return;
+                  JSON.parse(value);
+                },
+              },
+            ]}
+            extra="Example: {\"background\":\"#fff7f2\",\"frame\":\"#7c2d12\",\"accent\":\"#9a3412\",\"title\":\"#4a1d0a\",\"body\":\"#1f2937\",\"subtle\":\"#6b7280\",\"link\":\"#9a3412\"}"
+          >
+            <Input.TextArea rows={8} />
+          </Form.Item>
+          <Space>
+            <Button type="primary" htmlType="submit" loading={savingTemplate}>
+              {editingTemplate ? 'Update Template' : 'Create Template'}
+            </Button>
+            <Button
+              onClick={() => {
+                setTemplateModalOpen(false);
+                setEditingTemplate(null);
+                templateForm.resetFields();
+              }}
+            >
+              Cancel
+            </Button>
           </Space>
         </Form>
       </Modal>

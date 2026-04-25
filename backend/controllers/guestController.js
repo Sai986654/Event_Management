@@ -184,7 +184,8 @@ exports.deleteGuest = asyncHandler(async (req, res) => {
 
 // GET /api/guests/invite-templates
 exports.getInviteTemplates = asyncHandler(async (_req, res) => {
-  res.json({ templates: listInviteTemplates() });
+  const templates = await listInviteTemplates();
+  res.json({ templates });
 });
 
 // GET /api/guests/:id/personalized-invite

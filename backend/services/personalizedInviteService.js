@@ -2,12 +2,12 @@ const crypto = require('crypto');
 const PDFDocument = require('pdfkit');
 const QRCode = require('qrcode');
 const { PutObjectCommand } = require('@aws-sdk/client-s3');
+const { prisma } = require('../config/db');
 const { r2Client, R2_BUCKET, R2_PUBLIC_URL } = require('../config/r2');
 
 const SUPPORTED_LANGUAGES = ['en', 'te'];
 const SUPPORTED_TONES = ['formal', 'friendly', 'emotional'];
-const DEFAULT_TEMPLATE_KEY = 'royal-maroon';
-const INVITE_TEMPLATES = [
+const DEFAULT_INVITE_TEMPLATES = [
   {
     key: 'royal-maroon',
     name: 'Royal Maroon',
@@ -52,8 +52,87 @@ const INVITE_TEMPLATES = [
   },
 ];
 
-function listInviteTemplates() {
-  return INVITE_TEMPLATES.map((template) => ({
+function normalizeTemplateConfig(raw, fallback) {
+  const key = String(raw?.key || fallback.key || '').trim().toLowerCase();
+  if (!key) return null;
+
+  return {
+    key,
+    name: String(raw?.name || fallback.name || key).trim(),
+    description: String(raw?.description || fallback.description || '').trim(),
+    palette: {
+      background: String(raw?.palette?.background || fallback.palette.background),
+      frame: String(raw?.palette?.frame || fallback.palette.frame),
+      accent: String(raw?.palette?.accent || fallback.palette.accent),
+      title: String(raw?.palette?.title || fallback.palette.title),
+      body: String(raw?.palette?.body || fallback.palette.body),
+      subtle: String(raw?.palette?.subtle || fallback.palette.subtle),
+      link: String(raw?.palette?.link || fallback.palette.link),
+    },
+  };
+}
+
+function loadInviteTemplatesFromEnv() {
+  const raw = process.env.INVITE_TEMPLATES_JSON;
+  if (!raw) return DEFAULT_INVITE_TEMPLATES;
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed) || !parsed.length) return DEFAULT_INVITE_TEMPLATES;
+
+    const templates = parsed
+      .map((item, index) => normalizeTemplateConfig(item, DEFAULT_INVITE_TEMPLATES[index % DEFAULT_INVITE_TEMPLATES.length]))
+      .filter(Boolean);
+
+    return templates.length ? templates : DEFAULT_INVITE_TEMPLATES;
+  } catch (_error) {
+    return DEFAULT_INVITE_TEMPLATES;
+  }
+}
+
+const ENV_INVITE_TEMPLATES = loadInviteTemplatesFromEnv();
+const DEFAULT_TEMPLATE_KEY = ENV_INVITE_TEMPLATES[0]?.key || 'royal-maroon';
+
+function normalizeDbTemplate(template, index = 0) {
+  const fallback = ENV_INVITE_TEMPLATES[index % ENV_INVITE_TEMPLATES.length] || ENV_INVITE_TEMPLATES[0];
+  return normalizeTemplateConfig(
+    {
+      key: template.key,
+      name: template.name,
+      description: template.description,
+      palette: template.palette || {},
+    },
+    fallback
+  );
+}
+
+async function getTemplateCatalog({ includeInactive = false } = {}) {
+  try {
+    const dbTemplates = await prisma.inviteTemplate.findMany({
+      where: includeInactive ? {} : { isActive: true },
+      orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+    });
+
+    if (dbTemplates.length) {
+      return dbTemplates
+        .map((template, index) => normalizeDbTemplate(template, index))
+        .filter(Boolean);
+    }
+  } catch (_error) {
+    // Fall back to env/default templates when DB table is unavailable.
+  }
+
+  return ENV_INVITE_TEMPLATES;
+}
+
+async function getInviteTemplateKeys() {
+  const templates = await getTemplateCatalog();
+  return templates.map((template) => template.key);
+}
+
+async function listInviteTemplates() {
+  const templates = await getTemplateCatalog();
+  return templates.map((template) => ({
     key: template.key,
     name: template.name,
     description: template.description,
@@ -66,16 +145,16 @@ function listInviteTemplates() {
   }));
 }
 
-function normalizeTemplateKey(templateKey) {
+function normalizeTemplateKey(templateKey, templates = ENV_INVITE_TEMPLATES) {
   const candidate = String(templateKey || DEFAULT_TEMPLATE_KEY).toLowerCase();
-  return INVITE_TEMPLATES.some((template) => template.key === candidate)
+  return templates.some((template) => template.key === candidate)
     ? candidate
     : DEFAULT_TEMPLATE_KEY;
 }
 
-function getTemplateByKey(templateKey) {
-  const normalized = normalizeTemplateKey(templateKey);
-  return INVITE_TEMPLATES.find((template) => template.key === normalized) || INVITE_TEMPLATES[0];
+function getTemplateByKey(templateKey, templates = ENV_INVITE_TEMPLATES) {
+  const normalized = normalizeTemplateKey(templateKey, templates);
+  return templates.find((template) => template.key === normalized) || templates[0] || ENV_INVITE_TEMPLATES[0];
 }
 
 function normalizeLanguage(language) {
@@ -265,10 +344,11 @@ async function uploadPdfToR2(pdfBuffer, key) {
 }
 
 async function generatePersonalizedInvite({ guest, event, clientBaseUrl, payload = {} }) {
+  const templates = await getTemplateCatalog();
   const language = normalizeLanguage(payload.language || guest.inviteLanguage);
   const tone = normalizeTone(payload.tone || guest.inviteTone);
-  const inviteTemplateKey = normalizeTemplateKey(payload.templateKey || guest.inviteTemplateKey);
-  const template = getTemplateByKey(inviteTemplateKey);
+  const inviteTemplateKey = normalizeTemplateKey(payload.templateKey || guest.inviteTemplateKey, templates);
+  const template = getTemplateByKey(inviteTemplateKey, templates);
   const relationship = normalizeRelationship(payload.relationship || guest.relationship);
   const customMessage = payload.customMessage || guest.customInviteMessage || '';
   const memoryNote = payload.memoryNote || '';
@@ -323,6 +403,7 @@ module.exports = {
   SUPPORTED_LANGUAGES,
   SUPPORTED_TONES,
   DEFAULT_TEMPLATE_KEY,
+  getInviteTemplateKeys,
   listInviteTemplates,
   normalizeLanguage,
   normalizeTone,

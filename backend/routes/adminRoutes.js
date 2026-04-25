@@ -8,6 +8,10 @@ const {
   getCategories,
   createCategory,
   deleteCategory,
+  getInviteTemplates,
+  createInviteTemplate,
+  updateInviteTemplate,
+  deleteInviteTemplate,
   getAllVendors,
   deleteVendor,
   syncVendorsFromGoogleForms,
@@ -52,6 +56,36 @@ router.post(
   createCategory
 );
 router.delete('/categories/:id', deleteCategory);
+
+// Invite template management
+router.get('/invite-templates', getInviteTemplates);
+router.post(
+  '/invite-templates',
+  [
+    body('name').trim().notEmpty().withMessage('Template name is required'),
+    body('key').optional().trim(),
+    body('description').optional().trim(),
+    body('palette').optional().isObject().withMessage('palette must be an object'),
+    body('sortOrder').optional().isInt().withMessage('sortOrder must be an integer'),
+    body('isActive').optional().isBoolean().withMessage('isActive must be boolean'),
+  ],
+  validate,
+  createInviteTemplate
+);
+router.patch(
+  '/invite-templates/:id',
+  [
+    body('name').optional().trim(),
+    body('key').optional().trim(),
+    body('description').optional().trim(),
+    body('palette').optional().isObject().withMessage('palette must be an object'),
+    body('sortOrder').optional().isInt().withMessage('sortOrder must be an integer'),
+    body('isActive').optional().isBoolean().withMessage('isActive must be boolean'),
+  ],
+  validate,
+  updateInviteTemplate
+);
+router.delete('/invite-templates/:id', deleteInviteTemplate);
 
 // Vendor management
 router.get('/vendors', getAllVendors);

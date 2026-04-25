@@ -170,8 +170,21 @@ const GuestManagementScreen = ({ route }) => {
   const selectedGuests = guests.filter((guest) => selectedGuestIds.includes(guest.id));
   const previewGuest = selectedGuests[0] || guests[0] || null;
   const extraSelectedCount = Math.max(0, selectedGuests.length - 1);
-  const previewGuestName = previewGuest?.name || 'Priya';
+  const previewGuestName = previewGuest?.name || 'Guest';
   const previewRelationship = previewGuest?.relationship || 'guest';
+  const sampleCopy = {
+    en: {
+      formal: 'It would be our honor to have your gracious presence at our wedding celebration.',
+      friendly: 'We are super excited to celebrate with you. Please join us and make it unforgettable.',
+      emotional: 'From our hearts, we would love to have you with us on our special day.',
+    },
+    te: {
+      formal: 'Mana vivaha vedukaku mee sannidhi maaku gauravam.',
+      friendly: 'Mana celebration ni kalisi santhoshanga jarupukundam, tappakunda randi.',
+      emotional: 'Mana special rojuna mee aashirvadam maaku chala mukhyam.',
+    },
+  };
+  const previewBody = sampleCopy[selectedLanguage]?.[selectedTone] || sampleCopy.en.friendly;
 
   if (loading) return <ActivityIndicator style={{ flex: 1 }} size="large" color={Colors.primary} />;
 
@@ -280,9 +293,7 @@ const GuestManagementScreen = ({ route }) => {
                   {selectedLanguage === 'te' ? `Priyamaina ${previewGuestName} garu` : `Dear ${previewGuestName}`}
                 </Text>
                 <Text style={styles.previewBody}>
-                  {selectedLanguage === 'te'
-                    ? 'Mana special rojuna mee aashirvadam maaku chala mukhyam.'
-                    : 'From our hearts, we would love to have you with us on our special day.'}
+                  {previewBody}
                 </Text>
                 {selectedGuestIds.length ? (
                   <Text style={styles.previewHint}>
