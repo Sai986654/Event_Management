@@ -215,6 +215,11 @@ const EventControlPanel = () => {
             Photo Booth
           </Button>
         </Link>
+        <Link to={`/events/${eventId}/guests`}>
+          <Button style={{ borderRadius: 8 }}>
+            Guests
+          </Button>
+        </Link>
       </div>
 
       {/* Live stats row */}

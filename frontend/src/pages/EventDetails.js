@@ -390,6 +390,11 @@ const EventDetails = () => {
                   <Button icon={<ControlOutlined />} type="primary">Control Panel</Button>
                 </Link>
               )}
+              {isOrgOrAdmin && (
+                <Link to={`/events/${eventId}/guests`}>
+                  <Button>Guests</Button>
+                </Link>
+              )}
               {(isCustomer || isAdmin) && (
                 <Button icon={<EditOutlined />}>Edit</Button>
               )}
