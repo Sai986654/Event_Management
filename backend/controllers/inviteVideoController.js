@@ -1,6 +1,13 @@
 const { prisma } = require('../config/db');
 const asyncHandler = require('../utils/asyncHandler');
-const { startInviteJobProcessing, uploadToR2 } = require('../services/inviteVideoService');
+const { startInviteJobProcessing, uploadToR2, buildInviteStorageKey } = require('../services/inviteVideoService');
+
+function fileExtension(file, fallback) {
+  const fromName = String(file?.originalname || '').split('.').pop() || '';
+  const fromType = String(file?.mimetype || '').split('/').pop() || '';
+  const ext = (fromName || fromType || fallback || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  return ext || fallback;
+}
 
 /**
  * POST /api/invite-videos
@@ -54,13 +61,21 @@ exports.createInviteJob = asyncHandler(async (req, res) => {
   }
 
   // ── Upload template images to R2 ─────────────────────────
-  const templatePrefix = `templates/${eventId}`;
+  const requestId = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+  const templatePrefix = `invites/events/event-${Number(eventId)}/req-${requestId}/template`;
   const imageKeys = [];
 
   for (let i = 0; i < images.length; i++) {
     const file = images[i];
-    const ext = (file.originalname || 'img.jpg').split('.').pop();
-    const key = `${templatePrefix}/images/${Date.now()}-${i}.${ext}`;
+    const ext = fileExtension(file, 'jpg');
+    const key = buildInviteStorageKey({
+      eventId: Number(eventId),
+      requestId,
+      mediaGroup: 'template-images',
+      mediaKind: 'image',
+      extension: ext,
+      index: i,
+    });
     await uploadToR2(file.buffer, key, file.mimetype);
     imageKeys.push(key);
   }
@@ -69,7 +84,13 @@ exports.createInviteJob = asyncHandler(async (req, res) => {
   let musicKey = null;
   const musicFile = req.files?.music?.[0];
   if (musicFile) {
-    musicKey = `${templatePrefix}/music.mp3`;
+    musicKey = buildInviteStorageKey({
+      eventId: Number(eventId),
+      requestId,
+      mediaGroup: 'template-music',
+      mediaKind: 'audio',
+      extension: fileExtension(musicFile, 'mp3'),
+    });
     await uploadToR2(musicFile.buffer, musicKey, musicFile.mimetype || 'audio/mpeg');
   }
 

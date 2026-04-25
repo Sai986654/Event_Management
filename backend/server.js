@@ -148,6 +148,24 @@ const start = async () => {
       console.warn('[InviteDrip] node-cron not installed — run: npm install node-cron');
     }
   }
+
+  if (String(process.env.INVITE_VIDEO_CLEANUP_ENABLED || 'true').toLowerCase() !== 'false') {
+    try {
+      const cron = require('node-cron');
+      const { cleanupExpiredInviteVideos } = require('./services/inviteVideoRetentionService');
+      const schedule = process.env.INVITE_VIDEO_CLEANUP_CRON || '15 4 * * *';
+      cron.schedule(schedule, () => {
+        cleanupExpiredInviteVideos()
+          .then((result) => {
+            console.log('[InviteVideoCleanup] done', result);
+          })
+          .catch((err) => console.error('[InviteVideoCleanup] cron', err?.message || err));
+      });
+      console.log(`[InviteVideoCleanup] cron: ${schedule} (set INVITE_VIDEO_CLEANUP_* env vars)`);
+    } catch (e) {
+      console.warn('[InviteVideoCleanup] node-cron not installed — run: npm install node-cron');
+    }
+  }
 };
 
 // Graceful shutdown

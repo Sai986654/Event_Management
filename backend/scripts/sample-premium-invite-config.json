@@ -1,0 +1,44 @@
+{
+  "theme": "romantic",
+  "renderProfile": "balanced",
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "transitionDuration": 0.8,
+  "transitionMode": "crossfade",
+  "overlayDir": "./assets/overlays",
+  "musicPath": "./assets/audio/background-track.mp3",
+  "fontFile": "./assets/fonts/PlayfairDisplay-Regular.ttf",
+  "outputPath": "./output/premium-invite.mp4",
+  "musicBeatTimes": [
+    2.4,
+    5.8,
+    9.1
+  ],
+  "scenes": [
+    {
+      "background": "./assets/scenes/scene-1.jpg",
+      "duration": 3.2,
+      "texts": [
+        { "value": "Save The Date", "start": 0.3, "duration": 1.8, "fontSize": 66, "color": "#F8E9CF" },
+        { "value": "Akhil & Sneha", "start": 1.1, "duration": 2.1, "fontSize": 86, "color": "white" }
+      ]
+    },
+    {
+      "background": "./assets/scenes/scene-2.jpg",
+      "duration": 3.4,
+      "texts": [
+        { "value": "Together With Their Families", "start": 0.5, "duration": 1.8, "fontSize": 44, "color": "#F7E5C7" },
+        { "value": "Invite You To Celebrate", "start": 1.2, "duration": 2.0, "fontSize": 58, "color": "white" }
+      ]
+    },
+    {
+      "background": "./assets/scenes/scene-3.mp4",
+      "duration": 3.1,
+      "texts": [
+        { "value": "12 December 2026", "start": 0.5, "duration": 2.0, "fontSize": 58, "color": "#FFE9C8" },
+        { "value": "Hyderabad", "start": 1.2, "duration": 1.8, "fontSize": 52, "color": "white" }
+      ]
+    }
+  ]
+}

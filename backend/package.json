@@ -10,6 +10,7 @@
     "vendor:webhook:setup": "node scripts/setup-vendor-webhook.js",
     "vendor:webhook:bootstrap": "node scripts/bootstrap-vendor-webhook.js",
     "vendor:webhook:apply-env": "node scripts/apply-vendor-webhook-env.js",
+    "invite:premium": "node scripts/generate-premium-invite-video.js",
     "dev": "nodemon server.js",
     "seed": "node seeds/seed.js",
     "test": "jest --forceExit --detectOpenHandles",

@@ -3,11 +3,65 @@ const { prisma } = require('../config/db');
 const { r2Client, R2_BUCKET, R2_PUBLIC_URL } = require('../config/r2');
 const { PutObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
 const { generateSpeech } = require('./ttsService');
-const { generateInviteVideo, writeTempFile, cleanupFiles, safeUnlink, preResizeImage } = require('./ffmpegService');
+const {
+  generateInviteVideo,
+  attachAudioToBaseInviteVideo,
+  writeTempFile,
+  cleanupFiles,
+  safeUnlink,
+  preResizeImage,
+} = require('./ffmpegService');
 const { messagingService } = require('./messagingService');
 const { inviteQueue } = require('./jobQueue');
 
 const MAX_RETRIES = 2;
+
+function timestampKeyPart(date = new Date()) {
+  return date.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+}
+
+function normalizeExt(ext, fallback = 'bin') {
+  const cleaned = String(ext || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  return cleaned || fallback;
+}
+
+function buildInviteStorageKey({
+  eventId,
+  jobId,
+  guestId,
+  guestName,
+  mediaGroup,
+  mediaKind,
+  extension,
+  index,
+  requestId,
+}) {
+  const ts = timestampKeyPart();
+  const eventPart = `event-${Number(eventId) || 0}`;
+  const jobPart = jobId ? `job-${Number(jobId)}` : null;
+  const reqPart = requestId ? `req-${String(requestId).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 32)}` : null;
+  const ext = normalizeExt(extension, mediaKind === 'video' ? 'mp4' : mediaKind === 'audio' ? 'mp3' : 'jpg');
+
+  const baseSegments = ['invites', 'events', eventPart];
+  if (jobPart) baseSegments.push('jobs', jobPart);
+  if (reqPart) baseSegments.push(reqPart);
+
+  if (mediaGroup === 'generated' && guestId) {
+    const guestSlug = sanitizeFilename(guestName || 'guest');
+    return `${baseSegments.join('/')}/generated/guest-${guestId}-${guestSlug}/${ts}-${mediaKind}.${ext}`;
+  }
+
+  if (mediaGroup === 'template-images') {
+    const idx = Number.isFinite(index) ? index : 0;
+    return `${baseSegments.join('/')}/template/images/${ts}-image-${idx}.${ext}`;
+  }
+
+  if (mediaGroup === 'template-music') {
+    return `${baseSegments.join('/')}/template/music/${ts}-music.${ext}`;
+  }
+
+  return `${baseSegments.join('/')}/${ts}-${mediaKind}.${ext}`;
+}
 
 /**
  * Upload a buffer to R2 and return the public URL + key.
@@ -109,6 +163,24 @@ async function processInviteJob(jobId, io) {
   let processed = 0;
   let failed = 0;
 
+  // Render one base visual timeline for the entire job, then only compose personalized audio per guest.
+  const baseTextTemplate = (job.voiceTemplate || 'You are cordially invited').replace(/\{name\}/gi, '').trim();
+  let baseVideoPath = null;
+  try {
+    const baseRender = await generateInviteVideo({
+      imagePaths: localImages,
+      musicBuffer: null,
+      overlayText: baseTextTemplate || 'You are invited',
+      renderProfile: process.env.FFMPEG_RENDER_PROFILE || 'memory_saver',
+    });
+    baseVideoPath = baseRender.videoPath;
+  } catch (err) {
+    cleanupFiles(localImages);
+    await failJob(jobId, `Failed to render base invite video: ${err.message}`);
+    emitProgress(io, job.eventId, jobId, { status: 'failed', error: err.message });
+    return;
+  }
+
   // Process each guest sequentially within this job (parallelism is at the job queue level)
   for (const guest of job.guestVideos) {
     const tempFiles = [];
@@ -124,18 +196,26 @@ async function processInviteJob(jobId, io) {
       const voiceText = template.replace(/\{name\}/gi, guest.guestName);
       const voiceBuffer = await generateSpeech(voiceText, job.voiceLang || 'en');
 
-      // 2. Generate video with FFmpeg
-      const { videoPath } = await generateInviteVideo({
-        imagePaths: localImages,
+      // 2. Reuse base visual and only compose personalized audio
+      const { videoPath } = await attachAudioToBaseInviteVideo({
+        baseVideoPath,
         voiceBuffer,
         musicBuffer,
-        overlayText: voiceText,
+        renderProfile: process.env.FFMPEG_RENDER_PROFILE || 'memory_saver',
       });
       tempFiles.push(videoPath);
 
       // 3. Upload finished video to R2
       const videoData = fs.readFileSync(videoPath);
-      const videoKey = `invites/${job.eventId}/${sanitizeFilename(guest.guestName)}.mp4`;
+      const videoKey = buildInviteStorageKey({
+        eventId: job.eventId,
+        jobId: job.id,
+        guestId: guest.id,
+        guestName: guest.guestName,
+        mediaGroup: 'generated',
+        mediaKind: 'video',
+        extension: 'mp4',
+      });
       const videoUrl = await uploadToR2(videoData, videoKey, 'video/mp4');
 
       // 4. Update guest record
@@ -196,6 +276,7 @@ async function processInviteJob(jobId, io) {
 
   // Clean up shared temp files (template images)
   cleanupFiles(localImages);
+  safeUnlink(baseVideoPath);
 
   // Retry pending guests (those that failed but have retries left)
   const pendingRetries = await prisma.inviteGuestVideo.findMany({
@@ -250,4 +331,4 @@ function sanitizeFilename(name) {
     .slice(0, 50) || 'guest';
 }
 
-module.exports = { startInviteJobProcessing, uploadToR2 };
+module.exports = { startInviteJobProcessing, uploadToR2, buildInviteStorageKey };
