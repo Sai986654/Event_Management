@@ -14,6 +14,8 @@ const {
   getPersonalizedInvite,
   generatePersonalizedInviteForGuest,
   generatePersonalizedInvitesBulk,
+  quickAddGuests,
+  generateAndSendInvites,
 } = require('../controllers/guestController');
 const { getInviteTemplateKeys } = require('../services/personalizedInviteService');
 
@@ -87,6 +89,29 @@ router.post(
   validate,
   generatePersonalizedInvitesBulk
 );
+
+// ── New simplified endpoints ────────────────────────────────────────────
+router.post(
+  '/quick-add',
+  protect,
+  authorize('admin', 'organizer'),
+  [body('event').or(body('eventId')).isInt().withMessage('event ID required')],
+  validate,
+  quickAddGuests
+);
+
+router.post(
+  '/personalized-invites/generate-and-send',
+  protect,
+  authorize('admin', 'organizer'),
+  [
+    body('eventId').or(body('event')).isInt().withMessage('eventId required'),
+    body('sendVia').optional().isIn(['email', 'whatsapp', 'both']).withMessage('sendVia must be email, whatsapp, or both'),
+  ],
+  validate,
+  generateAndSendInvites
+);
+
 router.post('/:id/checkin', authorize('admin', 'organizer'), checkInGuest);
 router.post('/scan', authorize('admin', 'organizer'), scanQR);
 router.delete('/:id', authorize('admin', 'organizer'), deleteGuest);

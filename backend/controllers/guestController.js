@@ -2,7 +2,7 @@ const QRCode = require('qrcode');
 const { prisma } = require('../config/db');
 const asyncHandler = require('../utils/asyncHandler');
 const { paginate } = require('../utils/pagination');
-const { sendEmail } = require('../services/notificationService');
+const { sendEmail, sendInviteLink } = require('../services/notificationService');
 const { generatePersonalizedInvite, listInviteTemplates } = require('../services/personalizedInviteService');
 
 const canManageEventGuests = (event, user) =>
@@ -372,6 +372,198 @@ exports.generatePersonalizedInvitesBulk = asyncHandler(async (req, res) => {
     eventId,
     total: guests.length,
     generated: successes.length,
+    failed: failures.length,
+    invites: successes,
+    failures,
+  });
+});
+
+// POST /api/guests/quick-add — Parse pasted text (names, emails, phones) and bulk add
+exports.quickAddGuests = asyncHandler(async (req, res) => {
+  const eventId = Number(req.body.event || req.body.eventId);
+  const rawText = String(req.body.text || req.body.paste || '').trim();
+
+  if (!eventId) return res.status(400).json({ message: 'eventId required' });
+  if (!rawText) return res.status(400).json({ message: 'text/paste required' });
+
+  const event = await prisma.event.findUnique({
+    where: { id: eventId },
+    select: { id: true, organizerId: true },
+  });
+
+  if (!event) return res.status(404).json({ message: 'Event not found' });
+  if (!canManageEventGuests(event, req.user)) {
+    return res.status(403).json({ message: 'Not authorized' });
+  }
+
+  // Parse lines or comma-separated entries
+  const lines = rawText
+    .split(/[\n,;]/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+
+  const guestList = lines.map((line) => {
+    const parts = line.split(/\s+/);
+    const name = parts.slice(0, -2).join(' ') || parts[0] || 'Guest';
+    const email = parts.some((p) => p.includes('@')) ? parts.find((p) => p.includes('@')) : null;
+    const phone = parts.find((p) => /^\+?[\d\-().\s]+$/.test(p) && p.length > 5) || null;
+
+    return {
+      name: String(name).trim(),
+      email: email ? String(email).toLowerCase() : null,
+      phone,
+      eventId,
+    };
+  });
+
+  if (!guestList.length) {
+    return res.status(400).json({ message: 'No valid guest entries found' });
+  }
+
+  const created = await prisma.$transaction(
+    guestList.map((g) =>
+      prisma.guest.create({
+        data: {
+          name: g.name,
+          email: g.email,
+          phone: g.phone,
+          eventId: g.eventId,
+          inviteLanguage: 'en',
+        },
+      })
+    )
+  );
+
+  // Generate QR codes
+  const withQr = await Promise.all(
+    created.map(async (guest) => {
+      const qrData = JSON.stringify({ guestId: guest.id, event: guest.eventId });
+      return prisma.guest.update({
+        where: { id: guest.id },
+        data: { qrCode: await QRCode.toDataURL(qrData) },
+      });
+    })
+  );
+
+  res.status(201).json({
+    message: `Added ${withQr.length} guests`,
+    count: withQr.length,
+    guests: withQr,
+  });
+});
+
+// POST /api/guests/personalized-invites/generate-and-send — Generate + auto-send via email or WhatsApp
+exports.generateAndSendInvites = asyncHandler(async (req, res) => {
+  const eventId = Number(req.body.eventId || req.body.event);
+  const sendVia = String(req.body.sendVia || 'email').toLowerCase(); // 'email' | 'whatsapp' | 'both'
+
+  if (!eventId) return res.status(400).json({ message: 'eventId required' });
+  if (!['email', 'whatsapp', 'both'].includes(sendVia)) {
+    return res.status(400).json({ message: 'sendVia must be email, whatsapp, or both' });
+  }
+
+  const event = await prisma.event.findUnique({
+    where: { id: eventId },
+    select: { id: true, title: true, date: true, venue: true, slug: true, organizerId: true },
+  });
+
+  if (!event) return res.status(404).json({ message: 'Event not found' });
+  if (!canManageEventGuests(event, req.user)) {
+    return res.status(403).json({ message: 'Not authorized' });
+  }
+
+  const guestIds = Array.isArray(req.body.guestIds)
+    ? req.body.guestIds.map((id) => Number(id)).filter(Number.isInteger)
+    : [];
+
+  const guests = await prisma.guest.findMany({
+    where: {
+      eventId,
+      ...(guestIds.length ? { id: { in: guestIds } } : {}),
+    },
+    orderBy: { name: 'asc' },
+  });
+
+  if (!guests.length) return res.status(404).json({ message: 'No guests found' });
+
+  const successes = [];
+  const failures = [];
+  const clientBaseUrl = resolveClientBaseUrl(req);
+
+  for (const guest of guests) {
+    try {
+      const generated = await generatePersonalizedInvite({
+        guest,
+        event,
+        clientBaseUrl,
+        payload: {
+          tone: req.body.defaultTone || 'friendly',
+          language: req.body.defaultLanguage || 'en',
+          templateKey: req.body.defaultTemplateKey || 'royal-maroon',
+        },
+      });
+
+      const updated = await prisma.guest.update({
+        where: { id: guest.id },
+        data: {
+          inviteTone: generated.inviteTone,
+          inviteLanguage: generated.inviteLanguage,
+          inviteTemplateKey: generated.inviteTemplateKey,
+          personalizedInviteMessage: generated.inviteMessage,
+          personalizedInvitePdfUrl: generated.personalizedInvitePdfUrl,
+          personalizedInvitePdfKey: generated.personalizedInvitePdfKey,
+          inviteToken: generated.inviteToken,
+          invitationGeneratedAt: new Date(),
+          qrCode: generated.qrCodeDataUrl,
+        },
+      });
+
+      // Send the invite link
+      let sendStatus = { email: false, whatsapp: false };
+      if ((sendVia === 'email' || sendVia === 'both') && guest.email) {
+        sendStatus.email = await sendInviteLink({
+          to: guest.email,
+          channel: 'email',
+          guestName: guest.name,
+          eventTitle: event.title,
+          inviteUrl: generated.inviteUrl,
+          inviteMessage: generated.inviteMessage,
+        });
+      }
+
+      if ((sendVia === 'whatsapp' || sendVia === 'both') && guest.phone) {
+        sendStatus.whatsapp = await sendInviteLink({
+          to: guest.phone,
+          channel: 'whatsapp',
+          guestName: guest.name,
+          eventTitle: event.title,
+          inviteUrl: generated.inviteUrl,
+          inviteMessage: generated.inviteMessage,
+        });
+      }
+
+      successes.push({
+        guestId: guest.id,
+        name: guest.name,
+        email: guest.email,
+        phone: guest.phone,
+        inviteUrl: generated.inviteUrl,
+        sent: sendStatus,
+      });
+    } catch (error) {
+      failures.push({
+        guestId: guest.id,
+        name: guest.name,
+        error: error.message,
+      });
+    }
+  }
+
+  res.json({
+    eventId,
+    total: guests.length,
+    generated: successes.length,
+    sent: successes.filter((s) => s.sent.email || s.sent.whatsapp).length,
     failed: failures.length,
     invites: successes,
     failures,

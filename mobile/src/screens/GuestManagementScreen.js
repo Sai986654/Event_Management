@@ -152,6 +152,12 @@ const GuestManagementScreen = ({ route }) => {
   const [selectedGuestIds, setSelectedGuestIds] = useState([]);
   const [bulkGenerating, setBulkGenerating] = useState(false);
   const [generatingGuestId, setGeneratingGuestId] = useState(null);
+  const [showQuickAddModal, setShowQuickAddModal] = useState(false);
+  const [quickAddText, setQuickAddText] = useState('');
+  const [quickAdding, setQuickAdding] = useState(false);
+  const [showSendModal, setShowSendModal] = useState(false);
+  const [selectedSendChannel, setSelectedSendChannel] = useState('email');
+  const [sendingInvites, setSendingInvites] = useState(false);
 
   const fetchGuests = useCallback(async () => {
     try {

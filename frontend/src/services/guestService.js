@@ -6,6 +6,14 @@ export const guestService = {
     return response.data;
   },
 
+  quickAddGuests: async (eventId, text) => {
+    const response = await api.post('/guests/quick-add', {
+      event: Number(eventId),
+      text,
+    });
+    return response.data;
+  },
+
   getEventGuests: async (eventId, params = {}) => {
     const response = await api.get('/guests', { params: { event: Number(eventId), ...params } });
     return response.data;
@@ -48,6 +56,14 @@ export const guestService = {
 
   generateBulkPersonalizedInvites: async (eventId, payload = {}) => {
     const response = await api.post('/guests/personalized-invites/generate-bulk', {
+      eventId: Number(eventId),
+      ...payload,
+    });
+    return response.data;
+  },
+
+  generateAndSendInvites: async (eventId, payload = {}) => {
+    const response = await api.post('/guests/personalized-invites/generate-and-send', {
       eventId: Number(eventId),
       ...payload,
     });

@@ -65,4 +65,40 @@ const sendWhatsApp = async ({ to, templateName, text }) => {
   return { sent: true, mode: 'configured', payload };
 };
 
-module.exports = { sendEmail, sendSMS, sendWhatsApp };
+/**
+ * Send a personalized invite link via email or WhatsApp (zero-cost delivery)
+ */
+const sendInviteLink = async ({ to, channel, guestName, eventTitle, inviteUrl, inviteMessage }) => {
+  if (channel === 'email' && to) {
+    const html = `
+      <h2>You're Invited!</h2>
+      <p>Dear ${guestName},</p>
+      <p>${inviteMessage}</p>
+      <p style="margin: 30px 0;">
+        <a href="${inviteUrl}" style="background-color: #667eea; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; display: inline-block; font-weight: 700;">
+          View Your Invitation
+        </a>
+      </p>
+      <p style="font-size: 12px; color: #666;">Or copy this link: <code>${inviteUrl}</code></p>
+      <p>Looking forward to celebrating with you!</p>
+    `;
+    return sendEmail({
+      to,
+      subject: `You're Invited to ${eventTitle}`,
+      html,
+    });
+  }
+
+  if (channel === 'whatsapp' && to) {
+    const message = `Hi ${guestName}! 🎉\n\nYou're invited to ${eventTitle}!\n\nView your personalized invitation:\n${inviteUrl}`;
+    return sendWhatsApp({
+      to,
+      templateName: 'invite_link',
+      text: message,
+    });
+  }
+
+  return false;
+};
+
+module.exports = { sendEmail, sendSMS, sendWhatsApp, sendInviteLink };
