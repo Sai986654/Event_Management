@@ -7,6 +7,135 @@ import { guestService } from '../services/guestService';
 import { getErrorMessage, getStatusColor } from '../utils/helpers';
 import { Colors, Spacing, Radius } from '../theme';
 
+function getPreviewPalette(template) {
+  return {
+    background: template?.preview?.background || Colors.surface,
+    frame: template?.preview?.frame || Colors.primary,
+    accent: template?.preview?.accent || Colors.accent,
+    header: template?.preview?.header || template?.preview?.frame || Colors.primary,
+    headerText: template?.preview?.headerText || Colors.textOnPrimary,
+    badge: template?.preview?.badge || Colors.surfaceVariant,
+  };
+}
+
+function TemplateMiniInvite({ template, selected, onPress }) {
+  const palette = getPreviewPalette(template);
+  const ornamentStyle = template?.ornamentStyle || 'traditional';
+  const ornamentChar = ornamentStyle === 'floral'
+    ? '●'
+    : ornamentStyle === 'geometric'
+      ? '◆'
+      : ornamentStyle === 'minimal'
+        ? '─'
+        : '✦';
+
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      style={[
+        styles.templateCard,
+        {
+          borderColor: selected ? palette.frame : Colors.border,
+          backgroundColor: palette.background,
+        },
+      ]}
+      activeOpacity={0.88}
+    >
+      <View style={[styles.templateCanvas, { backgroundColor: palette.background, borderColor: palette.frame }]}>
+        <View style={[styles.templateCanvasHeader, { backgroundColor: palette.header }]}> 
+          <Text style={[styles.templateCanvasBrand, { color: palette.headerText }]}>Vedika 360</Text>
+        </View>
+        <Text style={[styles.templateCanvasCorner, styles.templateCanvasCornerLeft, { color: palette.accent }]}>{ornamentChar}</Text>
+        <Text style={[styles.templateCanvasCorner, styles.templateCanvasCornerRight, { color: palette.accent }]}>{ornamentChar}</Text>
+        <View style={styles.templateCanvasBody}>
+          <View style={styles.templateCanvasDividerRow}>
+            <View style={[styles.templateCanvasDivider, { backgroundColor: palette.accent }]} />
+            <Text style={[styles.templateCanvasDividerIcon, { color: palette.accent }]}>{ornamentChar}</Text>
+            <View style={[styles.templateCanvasDivider, { backgroundColor: palette.accent }]} />
+          </View>
+          <Text numberOfLines={1} style={[styles.templateCanvasTitle, { color: palette.frame }]}>{template?.name || 'Template'}</Text>
+          <View style={[styles.templateCanvasBadge, { backgroundColor: palette.badge, borderColor: palette.accent }]}>
+            <Text numberOfLines={1} style={[styles.templateCanvasBadgeText, { color: palette.frame }]}>Wedding Celebration</Text>
+          </View>
+          <View style={styles.templateCanvasLineGroup}>
+            <View style={[styles.templateCanvasLine, { backgroundColor: palette.accent, width: '78%' }]} />
+            <View style={[styles.templateCanvasLine, { backgroundColor: palette.accent, width: '66%' }]} />
+            <View style={[styles.templateCanvasLine, { backgroundColor: palette.accent, width: '58%' }]} />
+          </View>
+        </View>
+        <View style={[styles.templateCanvasFooter, { backgroundColor: palette.header }]}> 
+          <Text style={[styles.templateCanvasFooterDots, { color: palette.headerText }]}>• • •</Text>
+        </View>
+      </View>
+      <Text style={styles.templateName}>{template?.name}</Text>
+      <Text numberOfLines={2} style={styles.templateDescription}>{template?.description}</Text>
+    </TouchableOpacity>
+  );
+}
+
+function InviteLivePreview({ template, language, tone, guestName, relationship, previewBody, selectedGuestIds, extraSelectedCount }) {
+  const palette = getPreviewPalette(template);
+  const ornamentStyle = template?.ornamentStyle || 'traditional';
+  const ornamentChar = ornamentStyle === 'floral'
+    ? '●'
+    : ornamentStyle === 'geometric'
+      ? '◆'
+      : ornamentStyle === 'minimal'
+        ? '─'
+        : '✦';
+
+  return (
+    <View style={[styles.previewCard, { backgroundColor: palette.background, borderColor: palette.frame }]}> 
+      <View style={[styles.previewHeaderBand, { backgroundColor: palette.header }]}> 
+        <Text style={[styles.previewHeaderBrand, { color: palette.headerText }]}>Vedika 360</Text>
+        <Text style={[styles.previewHeaderSub, { color: palette.headerText }]}>Personalized Wedding Invitation</Text>
+      </View>
+
+      <View style={styles.previewInnerFrame}>
+        <Text style={[styles.previewOrnament, { color: palette.accent }]}>{ornamentChar}  {ornamentChar}  {ornamentChar}</Text>
+        <Text style={[styles.previewTitle, { color: palette.frame }]}>{template?.name || 'Template preview'}</Text>
+        <Text style={[styles.previewMeta, { color: Colors.textSecondary }]}>
+          {language === 'te' ? 'Telugu' : 'English'} • {tone} • {relationship}
+        </Text>
+
+        <View style={styles.previewDividerRow}>
+          <View style={[styles.previewDivider, { backgroundColor: palette.accent }]} />
+          <Text style={[styles.previewDividerIcon, { color: palette.accent }]}>{ornamentChar}</Text>
+          <View style={[styles.previewDivider, { backgroundColor: palette.accent }]} />
+        </View>
+
+        <View style={[styles.previewBadge, { backgroundColor: palette.badge, borderColor: palette.accent }]}> 
+          <Text style={[styles.previewBadgeText, { color: palette.frame }]}>Saturday • 7:00 PM • Wedding Venue</Text>
+        </View>
+
+        <Text style={[styles.previewSalutation, { color: palette.frame }]}>
+          {language === 'te' ? `Priyamaina ${guestName} garu` : `Dear ${guestName}`}
+        </Text>
+        <Text style={[styles.previewBody, { color: Colors.textPrimary }]}>{previewBody}</Text>
+
+        <View style={styles.previewDetailBlock}>
+          <Text style={[styles.previewDetailLabel, { color: palette.frame }]}>Guest</Text>
+          <Text style={styles.previewDetailValue}>{guestName}</Text>
+          <Text style={[styles.previewDetailLabel, { color: palette.frame, marginTop: 8 }]}>Dress Code</Text>
+          <Text style={styles.previewDetailValue}>Festive / Traditional</Text>
+        </View>
+
+        {selectedGuestIds.length ? (
+          <Text style={styles.previewHint}>
+            Selected: {guestName}{extraSelectedCount > 0 ? ` +${extraSelectedCount} more` : ''}
+          </Text>
+        ) : (
+          <Text style={styles.previewHint}>Tip: tap guest cards to target selected guests only.</Text>
+        )}
+      </View>
+
+      <View style={[styles.previewFooterBand, { backgroundColor: palette.header }]}> 
+        <Text style={[styles.previewFooterText, { color: palette.headerText }]}>RSVP via QR / Invite Link</Text>
+      </View>
+    </View>
+  );
+}
+
 const GuestManagementScreen = ({ route }) => {
   const { eventId } = route.params;
   const [guests, setGuests] = useState([]);
@@ -234,26 +363,12 @@ const GuestManagementScreen = ({ route }) => {
                 {inviteTemplates.map((template) => {
                   const selected = selectedTemplateKey === template.key;
                   return (
-                    <TouchableOpacity
+                    <TemplateMiniInvite
                       key={template.key}
+                      template={template}
+                      selected={selected}
                       onPress={() => setSelectedTemplateKey(template.key)}
-                      style={[
-                        styles.templateCard,
-                        {
-                          borderColor: selected ? (template.preview?.frame || Colors.primary) : Colors.border,
-                          backgroundColor: selected ? (template.preview?.background || '#fff') : Colors.surface,
-                        },
-                      ]}
-                    >
-                      <View
-                        style={[
-                          styles.templateThumb,
-                          { backgroundColor: template.preview?.accent || Colors.primary },
-                        ]}
-                      />
-                      <Text style={styles.templateName}>{template.name}</Text>
-                      <Text numberOfLines={2} style={styles.templateDescription}>{template.description}</Text>
-                    </TouchableOpacity>
+                    />
                   );
                 })}
               </ScrollView>
@@ -277,33 +392,16 @@ const GuestManagementScreen = ({ route }) => {
                 ))}
               </View>
             </View>
-
-            <Card
-              style={[
-                styles.previewCard,
-                { backgroundColor: selectedTemplate?.preview?.background || Colors.surface },
-              ]}
-            >
-              <Card.Content>
-                <Text style={styles.previewTitle}>{selectedTemplate?.name || 'Template preview'}</Text>
-                <Text style={styles.previewMeta}>
-                  {selectedLanguage === 'te' ? 'Telugu' : 'English'} • {selectedTone} • {previewRelationship}
-                </Text>
-                <Text style={styles.previewSalutation}>
-                  {selectedLanguage === 'te' ? `Priyamaina ${previewGuestName} garu` : `Dear ${previewGuestName}`}
-                </Text>
-                <Text style={styles.previewBody}>
-                  {previewBody}
-                </Text>
-                {selectedGuestIds.length ? (
-                  <Text style={styles.previewHint}>
-                    Selected: {previewGuestName}{extraSelectedCount > 0 ? ` +${extraSelectedCount} more` : ''}
-                  </Text>
-                ) : (
-                  <Text style={styles.previewHint}>Tip: tap guest cards to target selected guests only.</Text>
-                )}
-              </Card.Content>
-            </Card>
+            <InviteLivePreview
+              template={selectedTemplate}
+              language={selectedLanguage}
+              tone={selectedTone}
+              guestName={previewGuestName}
+              relationship={previewRelationship}
+              previewBody={previewBody}
+              selectedGuestIds={selectedGuestIds}
+              extraSelectedCount={extraSelectedCount}
+            />
 
             <Button mode="contained" onPress={handleGenerateAllInvites} loading={bulkGenerating} disabled={bulkGenerating || !guests.length}>
               {selectedGuestIds.length
@@ -508,7 +606,60 @@ const styles = StyleSheet.create({
     padding: Spacing.md,
     marginRight: Spacing.sm,
   },
-  templateThumb: { width: '100%', height: 48, borderRadius: Radius.md, marginBottom: Spacing.sm },
+  templateCanvas: {
+    width: '100%',
+    height: 150,
+    borderRadius: Radius.md,
+    borderWidth: 1.5,
+    overflow: 'hidden',
+    marginBottom: Spacing.sm,
+  },
+  templateCanvasHeader: {
+    height: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  templateCanvasBrand: { fontSize: 10, fontWeight: '800' },
+  templateCanvasCorner: {
+    position: 'absolute',
+    top: 34,
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  templateCanvasCornerLeft: { left: 10 },
+  templateCanvasCornerRight: { right: 10 },
+  templateCanvasBody: {
+    flex: 1,
+    paddingHorizontal: 10,
+    paddingTop: 16,
+    alignItems: 'center',
+  },
+  templateCanvasDividerRow: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  templateCanvasDivider: { height: 1, flex: 1, opacity: 0.65 },
+  templateCanvasDividerIcon: { marginHorizontal: 6, fontSize: 10, fontWeight: '800' },
+  templateCanvasTitle: { fontSize: 12, fontWeight: '800', textAlign: 'center' },
+  templateCanvasBadge: {
+    marginTop: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: Radius.full,
+    borderWidth: 1,
+  },
+  templateCanvasBadgeText: { fontSize: 9, fontWeight: '700' },
+  templateCanvasLineGroup: { width: '100%', alignItems: 'center', marginTop: 12, gap: 6 },
+  templateCanvasLine: { height: 3, borderRadius: Radius.full, opacity: 0.35 },
+  templateCanvasFooter: {
+    height: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  templateCanvasFooterDots: { fontSize: 9, fontWeight: '800', letterSpacing: 1 },
   templateName: { fontWeight: '700', color: Colors.textPrimary, marginBottom: 2 },
   templateDescription: { fontSize: 12, color: Colors.textSecondary },
   choiceRow: { marginTop: Spacing.sm },
@@ -519,12 +670,64 @@ const styles = StyleSheet.create({
     marginVertical: Spacing.sm,
     borderRadius: Radius.lg,
     backgroundColor: Colors.surface,
+    borderWidth: 1.5,
+    overflow: 'hidden',
   },
-  previewTitle: { fontWeight: '800', color: Colors.textPrimary },
-  previewMeta: { marginTop: 2, color: Colors.textSecondary, textTransform: 'capitalize' },
-  previewSalutation: { marginTop: 8, color: Colors.textPrimary, fontWeight: '700' },
-  previewBody: { marginTop: 8, color: Colors.textPrimary, lineHeight: 20 },
-  previewHint: { marginTop: 8, color: Colors.textSecondary, fontSize: 12 },
+  previewHeaderBand: {
+    paddingTop: 12,
+    paddingBottom: 10,
+    paddingHorizontal: Spacing.lg,
+    alignItems: 'center',
+  },
+  previewHeaderBrand: { fontSize: 15, fontWeight: '800' },
+  previewHeaderSub: { fontSize: 10, marginTop: 2, opacity: 0.95 },
+  previewInnerFrame: {
+    margin: Spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+  },
+  previewOrnament: {
+    textAlign: 'center',
+    fontSize: 11,
+    fontWeight: '800',
+    marginBottom: 8,
+  },
+  previewDividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 12,
+  },
+  previewDivider: { flex: 1, height: 1, opacity: 0.55 },
+  previewDividerIcon: { marginHorizontal: 8, fontSize: 11, fontWeight: '800' },
+  previewBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    marginBottom: 12,
+  },
+  previewBadgeText: { textAlign: 'center', fontSize: 12, fontWeight: '700' },
+  previewDetailBlock: {
+    marginTop: 12,
+    padding: Spacing.md,
+    borderRadius: Radius.md,
+    backgroundColor: '#ffffffaa',
+  },
+  previewDetailLabel: { fontSize: 11, fontWeight: '800', textTransform: 'uppercase' },
+  previewDetailValue: { marginTop: 2, color: Colors.textPrimary, fontSize: 13 },
+  previewFooterBand: {
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  previewFooterText: { fontSize: 10, fontWeight: '700', letterSpacing: 0.4 },
+  previewTitle: { fontWeight: '800', color: Colors.textPrimary, textAlign: 'center', fontSize: 18 },
+  previewMeta: { marginTop: 4, color: Colors.textSecondary, textTransform: 'capitalize', textAlign: 'center' },
+  previewSalutation: { marginTop: 4, color: Colors.textPrimary, fontWeight: '700', fontSize: 15 },
+  previewBody: { marginTop: 8, color: Colors.textPrimary, lineHeight: 22, fontSize: 14 },
+  previewHint: { marginTop: 10, color: Colors.textSecondary, fontSize: 12, textAlign: 'center' },
   sectionTitle: {
     fontWeight: '800',
     marginHorizontal: Spacing.lg,
