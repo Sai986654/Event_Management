@@ -1,4 +1,4 @@
-package com.vedika360
+package com.vedika360.myapp
 
 import android.os.Build
 import android.os.Bundle
