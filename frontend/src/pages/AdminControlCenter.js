@@ -506,7 +506,7 @@ const AdminControlCenter = () => {
                 },
               },
             ]}
-            extra="Example: {\"background\":\"#fff7f2\",\"frame\":\"#7c2d12\",\"accent\":\"#9a3412\",\"title\":\"#4a1d0a\",\"body\":\"#1f2937\",\"subtle\":\"#6b7280\",\"link\":\"#9a3412\"}"
+            extra={'Example: {"background":"#fff7f2","frame":"#7c2d12","accent":"#9a3412","title":"#4a1d0a","body":"#1f2937","subtle":"#6b7280","link":"#9a3412"}'}
           >
             <Input.TextArea rows={8} />
           </Form.Item>
