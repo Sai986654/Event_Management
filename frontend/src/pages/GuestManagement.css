@@ -136,6 +136,27 @@
   gap: 8px;
 }
 
+.guest-modal-section {
+  margin-bottom: 16px;
+}
+
+.guest-modal-summary {
+  margin-top: 12px;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.guest-send-summary-card {
+  margin-top: 16px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #eff6ff 0%, #fff7ed 100%);
+  border: 1px solid #dbeafe;
+  color: #1f2937;
+  display: grid;
+  gap: 6px;
+}
+
 @media (max-width: 768px) {
   .guest-management-container {
     padding: 12px;

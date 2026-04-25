@@ -707,7 +707,6 @@ const GuestManagementScreen = ({ route }) => {
     </View>
   );
 };
-};
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },

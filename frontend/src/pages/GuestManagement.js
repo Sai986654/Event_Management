@@ -19,7 +19,13 @@ const GuestManagement = () => {
   const [selectedGuestIds, setSelectedGuestIds] = useState([]);
   const [generatingGuestId, setGeneratingGuestId] = useState(null);
   const [bulkGenerating, setBulkGenerating] = useState(false);
+  const [quickAdding, setQuickAdding] = useState(false);
+  const [sendingInvites, setSendingInvites] = useState(false);
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [isQuickAddModalVisible, setIsQuickAddModalVisible] = useState(false);
+  const [isSendModalVisible, setIsSendModalVisible] = useState(false);
+  const [quickAddText, setQuickAddText] = useState('');
+  const [selectedSendChannel, setSelectedSendChannel] = useState('email');
   const [form] = Form.useForm();
 
   const renderTemplateOption = (template) => {
@@ -149,6 +155,27 @@ const GuestManagement = () => {
     }
   };
 
+  const handleQuickAddGuests = async () => {
+    const trimmedText = quickAddText.trim();
+    if (!trimmedText) {
+      message.warning('Paste guest details before importing');
+      return;
+    }
+
+    try {
+      setQuickAdding(true);
+      const result = await guestService.quickAddGuests(eventId, trimmedText);
+      message.success(`Added ${result.count || 0} guest(s)`);
+      setQuickAddText('');
+      setIsQuickAddModalVisible(false);
+      fetchGuests();
+    } catch (error) {
+      message.error(getErrorMessage(error));
+    } finally {
+      setQuickAdding(false);
+    }
+  };
+
   const handleDeleteGuest = (guestId) => {
     Modal.confirm({
       title: 'Delete Guest',
@@ -223,6 +250,33 @@ const GuestManagement = () => {
       message.error(getErrorMessage(error));
     } finally {
       setBulkGenerating(false);
+    }
+  };
+
+  const handleGenerateAndSendInvites = async () => {
+    try {
+      setSendingInvites(true);
+      const payload = {
+        sendVia: selectedSendChannel,
+        defaultLanguage: selectedLanguage,
+        defaultTone: selectedTone,
+        defaultTemplateKey: selectedTemplateKey,
+      };
+
+      if (selectedGuestIds.length) {
+        payload.guestIds = selectedGuestIds;
+      }
+
+      const result = await guestService.generateAndSendInvites(eventId, payload);
+      const successCount = Array.isArray(result.successes) ? result.successes.length : 0;
+      const failureCount = Array.isArray(result.failures) ? result.failures.length : 0;
+      message.success(`Processed ${successCount} guest(s)${failureCount ? `, ${failureCount} failed` : ''}`);
+      setIsSendModalVisible(false);
+      fetchGuests();
+    } catch (error) {
+      message.error(getErrorMessage(error));
+    } finally {
+      setSendingInvites(false);
     }
   };
 
@@ -330,6 +384,9 @@ const GuestManagement = () => {
             <Button type="primary" icon={<PlusOutlined />} onClick={() => setIsModalVisible(true)}>
               Add Guest
             </Button>
+            <Button onClick={() => setIsQuickAddModalVisible(true)}>
+              Quick Add
+            </Button>
             <Upload beforeUpload={handleBulkImport} maxCount={1} accept=".csv">
               <Button icon={<UploadOutlined />}>
                 Bulk Import (CSV)
@@ -377,6 +434,11 @@ const GuestManagement = () => {
                 {selectedGuestIds.length
                   ? `Generate for Selected (${selectedGuestIds.length})`
                   : 'Generate for All Guests'}
+              </Button>
+              <Button onClick={() => setIsSendModalVisible(true)} disabled={!guests.length} loading={sendingInvites}>
+                {selectedGuestIds.length
+                  ? `Generate & Send (${selectedGuestIds.length})`
+                  : 'Generate & Send'}
               </Button>
             </div>
 
@@ -459,6 +521,68 @@ const GuestManagement = () => {
               Add Guest
             </Button>
           </Form>
+        </Modal>
+
+        <Modal
+          title="Quick Add Guests"
+          visible={isQuickAddModalVisible}
+          onCancel={() => {
+            setIsQuickAddModalVisible(false);
+            setQuickAddText('');
+          }}
+          onOk={handleQuickAddGuests}
+          okText={quickAdding ? 'Adding...' : 'Add Guests'}
+          okButtonProps={{ loading: quickAdding }}
+        >
+          <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
+            Paste names, emails, and phone numbers. Use one guest per line or a comma-separated list.
+          </Typography.Paragraph>
+          <Input.TextArea
+            rows={8}
+            value={quickAddText}
+            onChange={(event) => setQuickAddText(event.target.value)}
+            placeholder="John Doe john@example.com +91-9999999999"
+          />
+          <div className="guest-modal-summary">
+            {quickAddText
+              .split('\n')
+              .map((line) => line.trim())
+              .filter(Boolean).length} line(s) detected
+          </div>
+        </Modal>
+
+        <Modal
+          title="Generate & Send Invites"
+          visible={isSendModalVisible}
+          onCancel={() => setIsSendModalVisible(false)}
+          onOk={handleGenerateAndSendInvites}
+          okText={sendingInvites ? 'Sending...' : 'Generate & Send'}
+          okButtonProps={{ loading: sendingInvites, disabled: !guests.length }}
+        >
+          <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
+            Generate personalized invite links and deliver them by email, WhatsApp, or both.
+          </Typography.Paragraph>
+
+          <div className="guest-modal-section">
+            <Typography.Text strong>Channel</Typography.Text>
+            <Select
+              value={selectedSendChannel}
+              onChange={setSelectedSendChannel}
+              style={{ width: '100%', marginTop: 8 }}
+              options={[
+                { value: 'email', label: 'Email' },
+                { value: 'whatsapp', label: 'WhatsApp' },
+                { value: 'both', label: 'Email + WhatsApp' },
+              ]}
+            />
+          </div>
+
+          <div className="guest-send-summary-card">
+            <div><strong>Template:</strong> {selectedTemplate?.name || 'Not selected'}</div>
+            <div><strong>Language:</strong> {selectedLanguage === 'te' ? 'Telugu' : 'English'}</div>
+            <div><strong>Tone:</strong> {selectedTone}</div>
+            <div><strong>Recipients:</strong> {selectedGuestIds.length || guests.length}</div>
+          </div>
         </Modal>
       </Spin>
     </div>
