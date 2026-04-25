@@ -29,6 +29,17 @@ else
 	npx prisma migrate resolve --rolled-back 20260419120000_raw_material_items 2>/dev/null || true
 fi
 
+echo "[deploy] checking failed migration recovery for 20260419130000_vendor_lat_lng..."
+VENDOR_LAT_LNG_STATE=$(node -e "const { Client } = require('pg'); (async () => { try { const client = new Client({ connectionString: process.env.DIRECT_URL || process.env.DATABASE_URL }); await client.connect(); const result = await client.query(\"SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name='vendors' AND column_name IN ('latitude','longitude')\"); const names = new Set((result.rows || []).map((r) => r.column_name)); const hasLat = names.has('latitude'); const hasLng = names.has('longitude'); if (hasLat && hasLng) { process.stdout.write('applied'); await client.end(); return; } if (!hasLat && !hasLng) { process.stdout.write('rolled-back'); await client.end(); return; } if (!hasLat) { await client.query(\"ALTER TABLE \\\"vendors\\\" ADD COLUMN \\\"latitude\\\" DOUBLE PRECISION\"); } if (!hasLng) { await client.query(\"ALTER TABLE \\\"vendors\\\" ADD COLUMN \\\"longitude\\\" DOUBLE PRECISION\"); } process.stdout.write('applied'); await client.end(); } catch (_error) { process.stdout.write('rolled-back'); } })();" 2>/dev/null || echo "rolled-back")
+
+if [ "$VENDOR_LAT_LNG_STATE" = "applied" ]; then
+	echo "[deploy] vendor latitude/longitude present, resolving migration as applied"
+	npx prisma migrate resolve --applied 20260419130000_vendor_lat_lng 2>/dev/null || true
+else
+	echo "[deploy] vendor latitude/longitude missing, resolving failed state as rolled back"
+	npx prisma migrate resolve --rolled-back 20260419130000_vendor_lat_lng 2>/dev/null || true
+fi
+
 echo "[deploy] prisma migrate deploy"
 # Note: 20260419120000_raw_material_items will be applied by migrate deploy below
 npx prisma migrate deploy
