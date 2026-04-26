@@ -119,8 +119,10 @@ function escapeXml(s) {
 /* ── ElevenLabs TTS — with deduplication cache ───────────────── */
 
 async function elevenLabsGenerate(text) {
-  const apiKey = process.env.ELEVENLABS_API_KEY;
-  const voiceId = process.env.ELEVENLABS_VOICE_ID || '21m00Tcm4TlvDq8ikWAM'; // Rachel
+  const apiKey = String(process.env.ELEVENLABS_API_KEY || '').trim();
+  const voiceId = String(process.env.ELEVENLABS_VOICE_ID || '21m00Tcm4TlvDq8ikWAM').trim(); // Rachel
+  const modelId = String(process.env.ELEVENLABS_MODEL_ID || 'eleven_multilingual_v2').trim();
+  const outputFormat = String(process.env.ELEVENLABS_OUTPUT_FORMAT || 'mp3_44100_128').trim();
 
   if (!apiKey) throw new Error('ELEVENLABS_API_KEY is required');
 
@@ -140,19 +142,21 @@ async function elevenLabsGenerate(text) {
 
   const body = JSON.stringify({
     text: sanitized,
-    model_id: 'eleven_multilingual_v2',
+    model_id: modelId,
     voice_settings: { stability: 0.5, similarity_boost: 0.75 },
   });
 
   const buffer = await new Promise((resolve, reject) => {
     const req = https.request(
-      `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
+      `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=${encodeURIComponent(outputFormat)}`,
       {
         method: 'POST',
         headers: {
           'xi-api-key': apiKey,
+          Authorization: `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
           Accept: 'audio/mpeg',
+          'User-Agent': 'Vedika 360-TTS',
         },
       },
       (res) => {
