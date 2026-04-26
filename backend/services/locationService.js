@@ -148,8 +148,94 @@ const geocode = async (city, state) => {
   }
 };
 
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const parseCityStateFromAddress = (formattedAddress = '') => {
+  const parts = String(formattedAddress)
+    .split(',')
+    .map((p) => p.trim())
+    .filter(Boolean);
+
+  if (parts.length < 2) {
+    return { city: '', state: '' };
+  }
+
+  const city = parts[parts.length - 3] || parts[parts.length - 2] || '';
+  const stateRaw = parts[parts.length - 2] || '';
+  const state = String(stateRaw).replace(/\b\d{5,6}\b/g, '').trim();
+
+  return { city, state };
+};
+
+/**
+ * Search business listings from Google Places Text Search API.
+ */
+const searchBusinesses = async ({ query, lat, lng, radiusMeters = 15000, type, maxResults = 60 }) => {
+  const q = String(query || '').trim();
+  if (!q) return { places: [], source: 'missing-query' };
+
+  const apiKey = mapsKey();
+  if (!apiKey) return { places: [], source: 'no-key' };
+
+  const limit = Math.max(1, Math.min(200, Number(maxResults) || 60));
+  const places = [];
+  let nextPageToken = '';
+  let pages = 0;
+
+  while (places.length < limit && pages < 3) {
+    const params = new URLSearchParams({
+      key: apiKey,
+      query: q,
+    });
+
+    if (type) params.set('type', String(type).trim());
+
+    const latNum = Number(lat);
+    const lngNum = Number(lng);
+    if (Number.isFinite(latNum) && Number.isFinite(lngNum)) {
+      params.set('location', `${latNum},${lngNum}`);
+      params.set('radius', String(Math.max(1000, Math.min(50000, Number(radiusMeters) || 15000))));
+    }
+
+    if (nextPageToken) {
+      params.set('pagetoken', nextPageToken);
+      // Google requires short delay before pagetoken becomes valid.
+      await wait(2000);
+    }
+
+    const response = await fetch(`https://maps.googleapis.com/maps/api/place/textsearch/json?${params.toString()}`);
+    const body = await response.json();
+    const results = Array.isArray(body?.results) ? body.results : [];
+
+    for (const item of results) {
+      if (places.length >= limit) break;
+      const parsed = parseCityStateFromAddress(item.formatted_address || '');
+      places.push({
+        placeId: item.place_id || '',
+        name: item.name || '',
+        formattedAddress: item.formatted_address || '',
+        city: parsed.city,
+        state: parsed.state,
+        lat: Number(item.geometry?.location?.lat || 0),
+        lng: Number(item.geometry?.location?.lng || 0),
+        rating: Number(item.rating || 0),
+        totalRatings: Number(item.user_ratings_total || 0),
+        businessStatus: item.business_status || '',
+        types: Array.isArray(item.types) ? item.types : [],
+      });
+    }
+
+    nextPageToken = String(body?.next_page_token || '').trim();
+    if (!nextPageToken) break;
+    pages += 1;
+  }
+
+  return { places, source: 'maps-textsearch' };
+};
+
 module.exports = {
   autocomplete,
   placeDetails,
   geocode,
+  searchBusinesses,
 };

@@ -15,6 +15,7 @@ const {
   getAllVendors,
   deleteVendor,
   syncVendorsFromGoogleForms,
+  syncVendorsFromGooglePlaces,
 } = require('../controllers/adminController');
 
 router.use(protect);
@@ -92,9 +93,34 @@ router.get('/vendors', getAllVendors);
 router.delete('/vendors/:id', deleteVendor);
 router.post(
   '/vendors/sync-google-forms',
-  [body('limit').optional().isInt({ min: 1, max: 500 }).withMessage('Limit must be between 1-500')],
+  [
+    body('limit').optional().isInt({ min: 1, max: 5000 }).withMessage('Limit must be between 1-5000'),
+    body('spreadsheetId').optional().trim().notEmpty().withMessage('spreadsheetId cannot be empty'),
+    body('range').optional().trim().notEmpty().withMessage('range cannot be empty'),
+    body('defaultPassword').optional().isLength({ min: 6 }).withMessage('defaultPassword must be at least 6 characters'),
+    body('includeCredentialsInResponse').optional().isBoolean().withMessage('includeCredentialsInResponse must be boolean'),
+  ],
   validate,
   syncVendorsFromGoogleForms
+);
+
+router.post(
+  '/vendors/sync-google-places',
+  [
+    body('query').optional().trim(),
+    body('city').optional().trim(),
+    body('state').optional().trim(),
+    body('lat').optional().isFloat({ min: -90, max: 90 }).withMessage('lat must be between -90 and 90'),
+    body('lng').optional().isFloat({ min: -180, max: 180 }).withMessage('lng must be between -180 and 180'),
+    body('radiusMeters').optional().isInt({ min: 1000, max: 50000 }).withMessage('radiusMeters must be between 1000 and 50000'),
+    body('type').optional().trim(),
+    body('limit').optional().isInt({ min: 1, max: 200 }).withMessage('Limit must be between 1-200'),
+    body('defaultPassword').optional().isLength({ min: 6 }).withMessage('defaultPassword must be at least 6 characters'),
+    body('includeCredentialsInResponse').optional().isBoolean().withMessage('includeCredentialsInResponse must be boolean'),
+    body('forceCategory').optional().isIn(['catering', 'decor', 'photography', 'videography', 'music', 'venue', 'florist', 'transportation', 'other']).withMessage('Invalid forceCategory'),
+  ],
+  validate,
+  syncVendorsFromGooglePlaces
 );
 
 module.exports = router;

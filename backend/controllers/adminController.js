@@ -218,17 +218,29 @@ exports.deleteVendor = asyncHandler(async (req, res) => {
  * Admin only
  */
 exports.syncVendorsFromGoogleForms = asyncHandler(async (req, res) => {
-  if (!process.env.GOOGLE_FORM_SHEET_ID) {
+  if (!process.env.GOOGLE_FORM_SHEET_ID && !req.body?.spreadsheetId) {
     return res.status(400).json({
-      message: 'Google Forms integration not configured. Set GOOGLE_FORM_SHEET_ID in environment variables.',
+      message: 'Google Forms integration not configured. Set GOOGLE_FORM_SHEET_ID or pass spreadsheetId in request body.',
     });
   }
 
   try {
     const { syncVendorsFromGoogleForm } = require('../services/vendorFormSyncService');
-    const { limit = 50 } = req.body;
+    const {
+      limit = 50,
+      spreadsheetId,
+      range,
+      defaultPassword,
+      includeCredentialsInResponse = false,
+    } = req.body;
 
-    const results = await syncVendorsFromGoogleForm({ limit });
+    const results = await syncVendorsFromGoogleForm({
+      limit,
+      ...(spreadsheetId ? { spreadsheetId } : {}),
+      ...(range ? { range } : {}),
+      ...(defaultPassword ? { defaultPassword } : {}),
+      includeCredentials: includeCredentialsInResponse,
+    });
 
     res.json({
       message: 'Vendor sync completed',
@@ -239,6 +251,61 @@ exports.syncVendorsFromGoogleForms = asyncHandler(async (req, res) => {
     console.error('[AdminController] Sync error:', error.message);
     res.status(500).json({
       message: 'Sync failed',
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * POST /api/admin/vendors/sync-google-places
+ * Discover businesses from Google Places and onboard them as vendors.
+ */
+exports.syncVendorsFromGooglePlaces = asyncHandler(async (req, res) => {
+  if (!process.env.GOOGLE_MAPS_API_KEY) {
+    return res.status(400).json({
+      message: 'Google Places integration not configured. Set GOOGLE_MAPS_API_KEY in environment variables.',
+    });
+  }
+
+  try {
+    const { syncVendorsFromGooglePlaces } = require('../services/vendorPlacesSyncService');
+    const {
+      query,
+      city,
+      state,
+      lat,
+      lng,
+      radiusMeters = 15000,
+      type,
+      limit = 100,
+      defaultPassword,
+      includeCredentialsInResponse = false,
+      forceCategory,
+    } = req.body;
+
+    const results = await syncVendorsFromGooglePlaces({
+      query,
+      city,
+      state,
+      lat,
+      lng,
+      radiusMeters,
+      type,
+      limit,
+      ...(defaultPassword ? { defaultPassword } : {}),
+      includeCredentials: includeCredentialsInResponse,
+      forceCategory,
+    });
+
+    res.json({
+      message: 'Google Places vendor sync completed',
+      results,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error('[AdminController] Google Places sync error:', error.message);
+    res.status(500).json({
+      message: 'Google Places sync failed',
       error: error.message,
     });
   }

@@ -35,4 +35,24 @@ export const authService = {
     localStorage.setItem('user', JSON.stringify(response.data.user));
     return response.data;
   },
+
+  uploadAvatar: async (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.post('/auth/profile/avatar', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    localStorage.setItem('user', JSON.stringify(response.data.user));
+    return response.data;
+  },
+
+  changePassword: async (payload) => {
+    const response = await api.put('/auth/password', payload);
+    return response.data;
+  },
+
+  deleteAccount: async (payload) => {
+    const response = await api.delete('/auth/account', { data: payload });
+    return response.data;
+  },
 };

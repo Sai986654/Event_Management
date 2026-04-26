@@ -34,6 +34,11 @@ const AdminControlScreen = () => {
   const [allVendors, setAllVendors] = useState([]);
   const [loadingAllVendors, setLoadingAllVendors] = useState(false);
   const [deletingVendorId, setDeletingVendorId] = useState(null);
+  const [syncingForms, setSyncingForms] = useState(false);
+  const [syncingPlaces, setSyncingPlaces] = useState(false);
+  const [formsSyncForm, setFormsSyncForm] = useState({ limit: '100', spreadsheetId: '', range: '', defaultPassword: '' });
+  const [placesSyncForm, setPlacesSyncForm] = useState({ query: '', limit: '50', radiusMeters: '15000', type: '', forceCategory: '', defaultPassword: '' });
+  const [lastSyncResult, setLastSyncResult] = useState(null);
 
   // ── Create User ─────────────────────────────────────────────────
   const [creating, setCreating] = useState(false);
@@ -157,6 +162,54 @@ const AdminControlScreen = () => {
         },
       },
     ]);
+  };
+
+  const syncFromForms = async () => {
+    try {
+      setSyncingForms(true);
+      const payload = {
+        limit: Number(formsSyncForm.limit) || 100,
+        includeCredentialsInResponse: true,
+        ...(formsSyncForm.spreadsheetId.trim() ? { spreadsheetId: formsSyncForm.spreadsheetId.trim() } : {}),
+        ...(formsSyncForm.range.trim() ? { range: formsSyncForm.range.trim() } : {}),
+        ...(formsSyncForm.defaultPassword.trim() ? { defaultPassword: formsSyncForm.defaultPassword.trim() } : {}),
+      };
+      const res = await adminService.syncGoogleFormVendors(payload);
+      setLastSyncResult({ source: 'Google Forms', ...res.results });
+      setMessage('Google Form vendor sync completed'); setMessageType('success');
+      await Promise.all([loadVerificationQueue(), loadAllVendors()]);
+    } catch (err) {
+      setMessage(getErrorMessage(err)); setMessageType('error');
+    } finally {
+      setSyncingForms(false);
+    }
+  };
+
+  const syncFromPlaces = async () => {
+    if (!placesSyncForm.query.trim()) {
+      Alert.alert('Validation', 'Search query is required for Google Places onboarding');
+      return;
+    }
+    try {
+      setSyncingPlaces(true);
+      const payload = {
+        query: placesSyncForm.query.trim(),
+        limit: Number(placesSyncForm.limit) || 50,
+        radiusMeters: Number(placesSyncForm.radiusMeters) || 15000,
+        includeCredentialsInResponse: true,
+        ...(placesSyncForm.type.trim() ? { type: placesSyncForm.type.trim() } : {}),
+        ...(placesSyncForm.forceCategory.trim() ? { forceCategory: placesSyncForm.forceCategory.trim() } : {}),
+        ...(placesSyncForm.defaultPassword.trim() ? { defaultPassword: placesSyncForm.defaultPassword.trim() } : {}),
+      };
+      const res = await adminService.syncGooglePlacesVendors(payload);
+      setLastSyncResult({ source: 'Google Places', ...res.results });
+      setMessage('Google Places vendor sync completed'); setMessageType('success');
+      await Promise.all([loadVerificationQueue(), loadAllVendors()]);
+    } catch (err) {
+      setMessage(getErrorMessage(err)); setMessageType('error');
+    } finally {
+      setSyncingPlaces(false);
+    }
   };
 
   // ── Create User ─────────────────────────────────────────────────
@@ -308,6 +361,56 @@ const AdminControlScreen = () => {
     </View>
   );
 
+  const renderOnboarding = () => (
+    <View>
+      <Text variant="titleMedium" style={styles.sectionTitle}>Bulk Vendor Onboarding</Text>
+
+      <Card style={styles.itemCard}>
+        <Card.Content>
+          <Text variant="titleSmall" style={{ fontWeight: '700', marginBottom: Spacing.md }}>Import From Google Forms</Text>
+          <TextInput label="Rows To Process" mode="outlined" value={formsSyncForm.limit} onChangeText={(v) => setFormsSyncForm((p) => ({ ...p, limit: v.replace(/[^0-9]/g, '') }))} keyboardType="number-pad" style={styles.input} outlineStyle={styles.outline} />
+          <TextInput label="Spreadsheet ID" mode="outlined" value={formsSyncForm.spreadsheetId} onChangeText={(v) => setFormsSyncForm((p) => ({ ...p, spreadsheetId: v }))} style={styles.input} outlineStyle={styles.outline} />
+          <TextInput label="Sheet Range" mode="outlined" value={formsSyncForm.range} onChangeText={(v) => setFormsSyncForm((p) => ({ ...p, range: v }))} placeholder="Form Responses 1!A1:ZZ1000" style={styles.input} outlineStyle={styles.outline} />
+          <TextInput label="Default Vendor Password" mode="outlined" value={formsSyncForm.defaultPassword} onChangeText={(v) => setFormsSyncForm((p) => ({ ...p, defaultPassword: v }))} secureTextEntry style={styles.input} outlineStyle={styles.outline} />
+          <Button mode="contained" loading={syncingForms} disabled={syncingForms} onPress={syncFromForms} style={styles.btn}>Start Form Onboarding</Button>
+        </Card.Content>
+      </Card>
+
+      <Card style={styles.itemCard}>
+        <Card.Content>
+          <Text variant="titleSmall" style={{ fontWeight: '700', marginBottom: Spacing.md }}>Import From Google Places</Text>
+          <TextInput label="Search Query" mode="outlined" value={placesSyncForm.query} onChangeText={(v) => setPlacesSyncForm((p) => ({ ...p, query: v }))} placeholder="wedding caterers in Hyderabad" style={styles.input} outlineStyle={styles.outline} />
+          <TextInput label="Max Listings" mode="outlined" value={placesSyncForm.limit} onChangeText={(v) => setPlacesSyncForm((p) => ({ ...p, limit: v.replace(/[^0-9]/g, '') }))} keyboardType="number-pad" style={styles.input} outlineStyle={styles.outline} />
+          <TextInput label="Radius (meters)" mode="outlined" value={placesSyncForm.radiusMeters} onChangeText={(v) => setPlacesSyncForm((p) => ({ ...p, radiusMeters: v.replace(/[^0-9]/g, '') }))} keyboardType="number-pad" style={styles.input} outlineStyle={styles.outline} />
+          <TextInput label="Google Place Type" mode="outlined" value={placesSyncForm.type} onChangeText={(v) => setPlacesSyncForm((p) => ({ ...p, type: v }))} placeholder="caterer, florist, lodging" style={styles.input} outlineStyle={styles.outline} />
+          <TextInput label="Force Marketplace Category" mode="outlined" value={placesSyncForm.forceCategory} onChangeText={(v) => setPlacesSyncForm((p) => ({ ...p, forceCategory: v }))} placeholder="catering, venue, florist..." style={styles.input} outlineStyle={styles.outline} />
+          <TextInput label="Default Vendor Password" mode="outlined" value={placesSyncForm.defaultPassword} onChangeText={(v) => setPlacesSyncForm((p) => ({ ...p, defaultPassword: v }))} secureTextEntry style={styles.input} outlineStyle={styles.outline} />
+          <Button mode="contained" loading={syncingPlaces} disabled={syncingPlaces} onPress={syncFromPlaces} style={styles.btn}>Start Places Onboarding</Button>
+        </Card.Content>
+      </Card>
+
+      <Card style={styles.itemCard}>
+        <Card.Content>
+          <Text variant="titleSmall" style={{ fontWeight: '700', marginBottom: Spacing.sm }}>Latest Onboarding Run</Text>
+          {lastSyncResult ? (
+            <>
+              <Text style={{ color: Colors.textSecondary, marginBottom: Spacing.sm }}>
+                {lastSyncResult.source} • Processed {lastSyncResult.processed || 0} • Created {lastSyncResult.created || 0} • Skipped {lastSyncResult.skipped || 0} • Failed {lastSyncResult.failed || 0}
+              </Text>
+              {Array.isArray(lastSyncResult.credentials) && lastSyncResult.credentials.length > 0 ? (
+                <Text style={styles.codeBlock}>{lastSyncResult.credentials.map((item) => `${item.email} | ${item.password}`).join('\n')}</Text>
+              ) : (
+                <Text style={styles.emptyText}>No credentials returned in the latest run.</Text>
+              )}
+            </>
+          ) : (
+            <Text style={styles.emptyText}>Open this tab to trigger bulk onboarding from mobile.</Text>
+          )}
+        </Card.Content>
+      </Card>
+    </View>
+  );
+
   return (
     <ScrollView
       style={styles.container}
@@ -328,6 +431,7 @@ const AdminControlScreen = () => {
           { value: 'categories', label: 'Categories' },
           { value: 'vendors', label: 'Vendors' },
           { value: 'verification', label: 'Verification' },
+          { value: 'onboarding', label: 'Onboarding' },
           { value: 'users', label: 'Create User' },
         ].map((tab) => (
           <Chip
@@ -348,6 +452,7 @@ const AdminControlScreen = () => {
           {activeTab === 'categories' && renderCategories()}
           {activeTab === 'vendors' && renderVendorManagement()}
           {activeTab === 'verification' && renderVerificationQueue()}
+          {activeTab === 'onboarding' && renderOnboarding()}
           {activeTab === 'users' && renderCreateUser()}
         </Card.Content>
       </Card>
@@ -434,6 +539,14 @@ const styles = StyleSheet.create({
   btn: { marginTop: Spacing.sm, backgroundColor: Colors.primary, borderRadius: Radius.sm },
   msgError: { color: Colors.danger, marginTop: Spacing.sm, fontSize: 13 },
   msgSuccess: { color: Colors.success, marginTop: Spacing.sm, fontSize: 13 },
+  codeBlock: {
+    backgroundColor: '#0f172a',
+    color: '#e2e8f0',
+    padding: Spacing.md,
+    borderRadius: Radius.sm,
+    fontSize: 12,
+    lineHeight: 18,
+  },
   modal: { backgroundColor: Colors.surface, margin: Spacing.lg, padding: Spacing.xl, borderRadius: Radius.lg },
   modalActions: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: Spacing.md },
 });

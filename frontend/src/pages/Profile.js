@@ -1,11 +1,12 @@
 import React, { useContext, useEffect, useRef, useState } from 'react';
-import { Button, Card, Col, Divider, Form, Input, Row, Select, Tag, message } from 'antd';
-import { FacebookOutlined, InstagramOutlined, MailOutlined, PhoneOutlined, TwitterOutlined, UserOutlined, YoutubeOutlined } from '@ant-design/icons';
+import { Avatar, Button, Card, Col, Divider, Form, Input, Popconfirm, Row, Select, Tag, Upload, message } from 'antd';
+import { CameraOutlined, DeleteOutlined, FacebookOutlined, InstagramOutlined, LockOutlined, MailOutlined, PhoneOutlined, TwitterOutlined, UploadOutlined, UserOutlined, YoutubeOutlined } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { authService } from '../services/authService';
 import { vendorService } from '../services/vendorService';
 import { adminService } from '../services/adminService';
-import { getErrorMessage } from '../utils/helpers';
+import { getErrorMessage, getInitials } from '../utils/helpers';
 import './PhaseFlows.css';
 
 const FALLBACK_CATEGORIES = ['catering', 'decor', 'photography', 'videography', 'music', 'venue', 'florist', 'transportation', 'other'];
@@ -14,12 +15,18 @@ const USER_FIELDS = ['name', 'phone'];
 const VENDOR_FIELDS = ['businessName', 'category', 'description', 'city', 'state', 'contactPhone', 'contactEmail', 'website', 'facebook', 'instagram', 'twitter', 'youtube'];
 
 const Profile = () => {
-  const { user, setUser } = useContext(AuthContext);
+  const { user, setUser, logout } = useContext(AuthContext);
+  const navigate = useNavigate();
   const [userForm] = Form.useForm();
   const [vendorForm] = Form.useForm();
+  const [passwordForm] = Form.useForm();
+  const [deleteForm] = Form.useForm();
   const [loading, setLoading] = useState(true);
   const [savingUser, setSavingUser] = useState(false);
   const [savingVendor, setSavingVendor] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
   const [vendor, setVendor] = useState(null);
   const [categories, setCategories] = useState(FALLBACK_CATEGORIES);
   const [userDirty, setUserDirty] = useState(false);
@@ -42,6 +49,7 @@ const Profile = () => {
       // Load fresh user profile
       const profileRes = await authService.getProfile();
       const u = profileRes.user || profileRes;
+      if (setUser) setUser(u);
       userForm.setFieldsValue({ name: u.name || '', phone: u.phone || '' });
       savedUserRef.current = { name: u.name || '', phone: u.phone || '' };
 
@@ -138,6 +146,49 @@ const Profile = () => {
     }
   };
 
+  const uploadAvatar = async (file) => {
+    setUploadingAvatar(true);
+    try {
+      const res = await authService.uploadAvatar(file);
+      if (res.user && setUser) setUser(res.user);
+      message.success('Profile picture updated');
+    } catch (err) {
+      message.error(getErrorMessage(err));
+    } finally {
+      setUploadingAvatar(false);
+    }
+    return false;
+  };
+
+  const onChangePassword = async (values) => {
+    setChangingPassword(true);
+    try {
+      await authService.changePassword(values);
+      passwordForm.resetFields();
+      message.success('Password changed successfully');
+    } catch (err) {
+      message.error(getErrorMessage(err));
+    } finally {
+      setChangingPassword(false);
+    }
+  };
+
+  const onDeleteAccount = async () => {
+    try {
+      const values = await deleteForm.validateFields();
+      setDeletingAccount(true);
+      await authService.deleteAccount(values);
+      message.success('Account deleted');
+      logout();
+      navigate('/login');
+    } catch (err) {
+      if (err?.errorFields) return;
+      message.error(getErrorMessage(err));
+    } finally {
+      setDeletingAccount(false);
+    }
+  };
+
   const statusColor = { approved: 'green', pending: 'orange', rejected: 'red' }[vendor?.verificationStatus] || 'default';
 
   return (
@@ -157,6 +208,20 @@ const Profile = () => {
         {/* Account Details */}
         <Col xs={24} lg={isVendor ? 8 : 12}>
           <Card className="phase-card" title="Account Details">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24 }}>
+              <Avatar src={user?.avatar} size={72} icon={!user?.avatar ? <UserOutlined /> : undefined}>
+                {!user?.avatar ? getInitials(user?.name || 'U') : null}
+              </Avatar>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 600, marginBottom: 4 }}>Profile Picture</div>
+                <div style={{ color: '#6b7280', marginBottom: 8 }}>Upload a square image for your account avatar.</div>
+                <Upload showUploadList={false} beforeUpload={uploadAvatar} accept="image/*">
+                  <Button icon={uploadingAvatar ? <CameraOutlined /> : <UploadOutlined />} loading={uploadingAvatar}>
+                    Update Picture
+                  </Button>
+                </Upload>
+              </div>
+            </div>
             <Form form={userForm} layout="vertical" onFinish={saveUserProfile} onValuesChange={onUserValuesChange}>
               <Form.Item label="Email">
                 <Input value={user?.email} disabled prefix={<MailOutlined />} />
@@ -170,6 +235,57 @@ const Profile = () => {
               <Button type="primary" htmlType="submit" loading={savingUser} disabled={!userDirty}>
                 Save Account
               </Button>
+            </Form>
+
+            <Divider />
+
+            <Form form={passwordForm} layout="vertical" onFinish={onChangePassword}>
+              <Form.Item name="currentPassword" label="Current Password" rules={[{ required: true, message: 'Enter your current password' }]}>
+                <Input.Password prefix={<LockOutlined />} />
+              </Form.Item>
+              <Form.Item name="newPassword" label="New Password" rules={[{ required: true, message: 'Enter a new password' }, { min: 6, message: 'Password must be at least 6 characters' }]}>
+                <Input.Password prefix={<LockOutlined />} />
+              </Form.Item>
+              <Form.Item
+                name="confirmPassword"
+                label="Confirm New Password"
+                dependencies={['newPassword']}
+                rules={[
+                  { required: true, message: 'Confirm your new password' },
+                  ({ getFieldValue }) => ({
+                    validator(_, value) {
+                      if (!value || getFieldValue('newPassword') === value) {
+                        return Promise.resolve();
+                      }
+                      return Promise.reject(new Error('Passwords do not match'));
+                    },
+                  }),
+                ]}
+              >
+                <Input.Password prefix={<LockOutlined />} />
+              </Form.Item>
+              <Button type="default" htmlType="submit" loading={changingPassword}>
+                Change Password
+              </Button>
+            </Form>
+
+            <Divider />
+
+            <Form form={deleteForm} layout="vertical">
+              <Form.Item name="currentPassword" label="Confirm Password To Delete Account" rules={[{ required: true, message: 'Enter your password to continue' }]}>
+                <Input.Password prefix={<LockOutlined />} />
+              </Form.Item>
+              <Popconfirm
+                title="Delete account?"
+                description="This will permanently remove your account if there are no active dependencies. This cannot be undone."
+                onConfirm={onDeleteAccount}
+                okText="Delete"
+                okButtonProps={{ danger: true, loading: deletingAccount }}
+              >
+                <Button danger icon={<DeleteOutlined />} loading={deletingAccount}>
+                  Delete Account
+                </Button>
+              </Popconfirm>
             </Form>
           </Card>
         </Col>

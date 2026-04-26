@@ -1,8 +1,9 @@
 import React, { useContext, useEffect, useState, useCallback } from 'react';
 import { View, StyleSheet, ScrollView, RefreshControl, Alert } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import {
   Text, Card, Button, Avatar, Chip, Divider, TextInput, ActivityIndicator,
-  SegmentedButtons, IconButton,
+  SegmentedButtons,
 } from 'react-native-paper';
 import { AuthContext } from '../context/AuthContext';
 import { authService } from '../services/authService';
@@ -25,6 +26,13 @@ const ProfileScreen = () => {
   const [name, setName] = useState(user?.name || '');
   const [phone, setPhone] = useState(user?.phone || '');
   const [savingUser, setSavingUser] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [deletePassword, setDeletePassword] = useState('');
 
   // Vendor state
   const [vendor, setVendor] = useState(null);
@@ -42,7 +50,6 @@ const ProfileScreen = () => {
   const [instagram, setInstagram] = useState('');
   const [twitter, setTwitter] = useState('');
   const [youtube, setYoutube] = useState('');
-  const [showCatPicker, setShowCatPicker] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
@@ -56,6 +63,7 @@ const ProfileScreen = () => {
       // Load fresh profile
       const profileRes = await authService.getProfile();
       const u = profileRes.user || profileRes;
+      if (setUser) setUser(u);
       setName(u.name || '');
       setPhone(u.phone || '');
 
@@ -139,6 +147,89 @@ const ProfileScreen = () => {
     }
   };
 
+  const handlePickAvatar = async () => {
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (permission.status !== 'granted') {
+        Alert.alert('Permission needed', 'Please allow photo library access to update your profile picture.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (result.canceled || !result.assets?.[0]) return;
+
+      setUploadingAvatar(true);
+      const response = await authService.uploadAvatar(result.assets[0]);
+      if (response.user && setUser) setUser(response.user);
+      Alert.alert('Success', 'Profile picture updated');
+    } catch (err) {
+      Alert.alert('Error', getErrorMessage(err));
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      Alert.alert('Validation', 'Fill in all password fields');
+      return;
+    }
+    if (newPassword.length < 6) {
+      Alert.alert('Validation', 'New password must be at least 6 characters');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      Alert.alert('Validation', 'New password and confirmation do not match');
+      return;
+    }
+
+    setChangingPassword(true);
+    try {
+      await authService.changePassword({ currentPassword, newPassword });
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      Alert.alert('Success', 'Password changed successfully');
+    } catch (err) {
+      Alert.alert('Error', getErrorMessage(err));
+    } finally {
+      setChangingPassword(false);
+    }
+  };
+
+  const confirmDeleteAccount = () => {
+    if (!deletePassword) {
+      Alert.alert('Validation', 'Enter your current password to delete your account');
+      return;
+    }
+
+    Alert.alert('Delete Account', 'This permanently removes your account if there are no active dependencies. This cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          setDeletingAccount(true);
+          try {
+            await authService.deleteAccount({ currentPassword: deletePassword });
+            setDeletePassword('');
+            await logout();
+          } catch (err) {
+            Alert.alert('Error', getErrorMessage(err));
+          } finally {
+            setDeletingAccount(false);
+          }
+        },
+      },
+    ]);
+  };
+
   const handleLogout = () => {
     Alert.alert('Logout', 'Are you sure you want to log out?', [
       { text: 'Cancel', style: 'cancel' },
@@ -166,14 +257,21 @@ const ProfileScreen = () => {
       {/* Profile hero */}
       <Card style={styles.heroCard}>
         <Card.Content style={styles.heroContent}>
-          <Avatar.Text
-            size={76}
-            label={user?.name?.charAt(0)?.toUpperCase() || 'U'}
-            style={{ backgroundColor: getRoleColor(user?.role) }}
-            labelStyle={{ fontWeight: '800', fontSize: 30 }}
-          />
+          {user?.avatar ? (
+            <Avatar.Image size={76} source={{ uri: user.avatar }} />
+          ) : (
+            <Avatar.Text
+              size={76}
+              label={user?.name?.charAt(0)?.toUpperCase() || 'U'}
+              style={{ backgroundColor: getRoleColor(user?.role) }}
+              labelStyle={{ fontWeight: '800', fontSize: 30 }}
+            />
+          )}
           <Text variant="headlineSmall" style={styles.heroName}>{user?.name}</Text>
           <Text variant="bodyMedium" style={styles.heroEmail}>{user?.email}</Text>
+          <Button mode="outlined" onPress={handlePickAvatar} loading={uploadingAvatar} icon="camera-outline" style={styles.avatarBtn}>
+            Update Picture
+          </Button>
           <View style={styles.heroTags}>
             <Chip compact style={[styles.roleChip, { backgroundColor: getRoleColor(user?.role) }]} textStyle={styles.roleChipText}>
               {user?.role?.charAt(0).toUpperCase() + user?.role?.slice(1)}
@@ -248,6 +346,80 @@ const ProfileScreen = () => {
               icon="content-save"
             >
               Save Account
+            </Button>
+
+            <Divider style={styles.divider} />
+
+            <Text variant="titleMedium" style={styles.sectionTitle}>Security</Text>
+
+            <TextInput
+              label="Current Password"
+              value={currentPassword}
+              onChangeText={setCurrentPassword}
+              mode="outlined"
+              secureTextEntry
+              left={<TextInput.Icon icon="lock-outline" />}
+              style={styles.input}
+              outlineStyle={styles.inputOutline}
+            />
+
+            <TextInput
+              label="New Password"
+              value={newPassword}
+              onChangeText={setNewPassword}
+              mode="outlined"
+              secureTextEntry
+              left={<TextInput.Icon icon="lock-reset" />}
+              style={styles.input}
+              outlineStyle={styles.inputOutline}
+            />
+
+            <TextInput
+              label="Confirm New Password"
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              mode="outlined"
+              secureTextEntry
+              left={<TextInput.Icon icon="shield-check-outline" />}
+              style={styles.input}
+              outlineStyle={styles.inputOutline}
+            />
+
+            <Button
+              mode="outlined"
+              onPress={handleChangePassword}
+              loading={changingPassword}
+              style={styles.secondaryBtn}
+              icon="lock-reset"
+            >
+              Change Password
+            </Button>
+
+            <Divider style={styles.divider} />
+
+            <Text variant="titleMedium" style={styles.sectionTitle}>Delete Account</Text>
+            <Text style={styles.dangerText}>Enter your current password to permanently remove this account.</Text>
+
+            <TextInput
+              label="Password For Deletion"
+              value={deletePassword}
+              onChangeText={setDeletePassword}
+              mode="outlined"
+              secureTextEntry
+              left={<TextInput.Icon icon="alert-circle-outline" />}
+              style={styles.input}
+              outlineStyle={styles.inputOutline}
+            />
+
+            <Button
+              mode="contained-tonal"
+              onPress={confirmDeleteAccount}
+              loading={deletingAccount}
+              buttonColor="#fee2e2"
+              textColor={Colors.danger}
+              icon="delete-outline"
+            >
+              Delete Account
             </Button>
           </Card.Content>
         </Card>
@@ -470,6 +642,7 @@ const styles = StyleSheet.create({
   heroContent: { alignItems: 'center', paddingVertical: Spacing.xxl },
   heroName: { fontWeight: '800', marginTop: Spacing.md, color: Colors.textPrimary },
   heroEmail: { color: Colors.textSecondary, marginTop: Spacing.xs },
+  avatarBtn: { marginTop: Spacing.md, borderRadius: Radius.full },
   heroTags: { flexDirection: 'row', gap: 8, marginTop: Spacing.sm, flexWrap: 'wrap', justifyContent: 'center' },
   roleChip: { borderRadius: 12 },
   roleChipText: { color: '#fff', fontWeight: '600', fontSize: 12 },
@@ -512,6 +685,8 @@ const styles = StyleSheet.create({
 
   // Save button
   saveBtn: { borderRadius: Radius.sm, marginTop: Spacing.sm, backgroundColor: Colors.primary },
+  secondaryBtn: { borderRadius: Radius.sm, marginTop: Spacing.sm },
+  dangerText: { color: Colors.textSecondary, marginBottom: Spacing.md },
 
   // Logout
   logoutBtn: { borderRadius: Radius.sm, marginTop: Spacing.sm },

@@ -52,4 +52,14 @@ export const adminService = {
     const response = await api.delete(`/admin/vendors/${id}`);
     return response.data;
   },
+
+  syncGoogleFormVendors: async (payload) => {
+    const response = await api.post('/admin/vendors/sync-google-forms', payload);
+    return response.data;
+  },
+
+  syncGooglePlacesVendors: async (payload) => {
+    const response = await api.post('/admin/vendors/sync-google-places', payload);
+    return response.data;
+  },
 };

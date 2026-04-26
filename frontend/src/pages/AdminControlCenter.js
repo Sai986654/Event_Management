@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Button, Card, Col, Form, Input, Modal, Popconfirm, Row, Select, Space, Table, Tabs, Tag, message } from 'antd';
-import { DeleteOutlined, EditOutlined, PlusOutlined, AppstoreOutlined, ShopOutlined, TeamOutlined, UserAddOutlined } from '@ant-design/icons';
+import { Alert, Button, Card, Col, Form, Input, InputNumber, Modal, Popconfirm, Row, Select, Space, Table, Tabs, Tag, message } from 'antd';
+import { DeleteOutlined, EditOutlined, PlusOutlined, AppstoreOutlined, CloudUploadOutlined, EnvironmentOutlined, ShopOutlined, TeamOutlined, UserAddOutlined } from '@ant-design/icons';
 import { adminService } from '../services/adminService';
 import { vendorService } from '../services/vendorService';
 import { getErrorMessage } from '../utils/helpers';
@@ -166,6 +166,11 @@ const AdminControlCenter = () => {
   const [allVendors, setAllVendors] = useState([]);
   const [loadingAllVendors, setLoadingAllVendors] = useState(false);
   const [deletingVendorId, setDeletingVendorId] = useState(null);
+  const [syncingForms, setSyncingForms] = useState(false);
+  const [syncingPlaces, setSyncingPlaces] = useState(false);
+  const [lastSyncResult, setLastSyncResult] = useState(null);
+  const [formsSyncForm] = Form.useForm();
+  const [placesSyncForm] = Form.useForm();
 
   const loadAllVendors = useCallback(async () => {
     setLoadingAllVendors(true);
@@ -189,6 +194,42 @@ const AdminControlCenter = () => {
       message.error(getErrorMessage(err));
     } finally {
       setDeletingVendorId(null);
+    }
+  };
+
+  const syncFromForms = async (values) => {
+    setSyncingForms(true);
+    try {
+      const payload = {
+        ...values,
+        includeCredentialsInResponse: true,
+      };
+      const res = await adminService.syncGoogleFormVendors(payload);
+      setLastSyncResult({ source: 'Google Forms', ...res.results });
+      message.success('Google Form vendor sync completed');
+      await Promise.all([loadAllVendors(), loadVerificationQueue()]);
+    } catch (err) {
+      message.error(getErrorMessage(err));
+    } finally {
+      setSyncingForms(false);
+    }
+  };
+
+  const syncFromPlaces = async (values) => {
+    setSyncingPlaces(true);
+    try {
+      const payload = {
+        ...values,
+        includeCredentialsInResponse: true,
+      };
+      const res = await adminService.syncGooglePlacesVendors(payload);
+      setLastSyncResult({ source: 'Google Places', ...res.results });
+      message.success('Google Places vendor sync completed');
+      await Promise.all([loadAllVendors(), loadVerificationQueue()]);
+    } catch (err) {
+      message.error(getErrorMessage(err));
+    } finally {
+      setSyncingPlaces(false);
     }
   };
 
@@ -381,6 +422,99 @@ const AdminControlCenter = () => {
             ]}
           />
         </Card>
+      ),
+    },
+    {
+      key: 'onboarding',
+      label: <span><CloudUploadOutlined /> Vendor Onboarding</span>,
+      children: (
+        <Row gutter={[16, 16]}>
+          <Col xs={24} xl={12}>
+            <Card className="phase-card" title="Import From Google Forms">
+              <Form form={formsSyncForm} layout="vertical" onFinish={syncFromForms} initialValues={{ limit: 100 }}>
+                <Form.Item name="limit" label="Rows To Process">
+                  <InputNumber min={1} max={5000} style={{ width: '100%' }} />
+                </Form.Item>
+                <Form.Item name="spreadsheetId" label="Spreadsheet ID">
+                  <Input placeholder="Optional if GOOGLE_FORM_SHEET_ID is already set" />
+                </Form.Item>
+                <Form.Item name="range" label="Sheet Range">
+                  <Input placeholder="Form Responses 1!A1:ZZ1000" />
+                </Form.Item>
+                <Form.Item name="defaultPassword" label="Default Vendor Password">
+                  <Input.Password placeholder="Vendor@123" />
+                </Form.Item>
+                <Button type="primary" htmlType="submit" loading={syncingForms} icon={<CloudUploadOutlined />}>
+                  Start Form Onboarding
+                </Button>
+              </Form>
+            </Card>
+          </Col>
+          <Col xs={24} xl={12}>
+            <Card className="phase-card" title="Import From Google Places">
+              <Form form={placesSyncForm} layout="vertical" onFinish={syncFromPlaces} initialValues={{ limit: 50, radiusMeters: 15000 }}>
+                <Form.Item name="query" label="Search Query" rules={[{ required: true, message: 'Enter a Places search query' }]}>
+                  <Input placeholder="wedding caterers in Hyderabad" prefix={<EnvironmentOutlined />} />
+                </Form.Item>
+                <Row gutter={12}>
+                  <Col xs={24} md={12}>
+                    <Form.Item name="limit" label="Max Listings">
+                      <InputNumber min={1} max={200} style={{ width: '100%' }} />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={24} md={12}>
+                    <Form.Item name="radiusMeters" label="Radius (meters)">
+                      <InputNumber min={1000} max={50000} style={{ width: '100%' }} />
+                    </Form.Item>
+                  </Col>
+                </Row>
+                <Row gutter={12}>
+                  <Col xs={24} md={12}>
+                    <Form.Item name="type" label="Google Place Type">
+                      <Input placeholder="caterer, florist, lodging..." />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={24} md={12}>
+                    <Form.Item name="forceCategory" label="Force Marketplace Category">
+                      <Select allowClear options={[
+                        'catering', 'decor', 'photography', 'videography', 'music', 'venue', 'florist', 'transportation', 'other',
+                      ].map((value) => ({ value, label: value }))} />
+                    </Form.Item>
+                  </Col>
+                </Row>
+                <Form.Item name="defaultPassword" label="Default Vendor Password">
+                  <Input.Password placeholder="Vendor@123" />
+                </Form.Item>
+                <Button type="primary" htmlType="submit" loading={syncingPlaces} icon={<CloudUploadOutlined />}>
+                  Start Places Onboarding
+                </Button>
+              </Form>
+            </Card>
+          </Col>
+          <Col span={24}>
+            <Card className="phase-card" title="Latest Onboarding Run">
+              {lastSyncResult ? (
+                <Space direction="vertical" size={12} style={{ width: '100%' }}>
+                  <Alert
+                    type="info"
+                    showIcon
+                    message={`${lastSyncResult.source} completed`}
+                    description={`Processed: ${lastSyncResult.processed || 0}, Created: ${lastSyncResult.created || 0}, Skipped: ${lastSyncResult.skipped || 0}, Failed: ${lastSyncResult.failed || 0}`}
+                  />
+                  {Array.isArray(lastSyncResult.credentials) && lastSyncResult.credentials.length > 0 ? (
+                    <Input.TextArea
+                      readOnly
+                      rows={Math.min(10, lastSyncResult.credentials.length + 1)}
+                      value={lastSyncResult.credentials.map((item) => `${item.email} | ${item.password}`).join('\n')}
+                    />
+                  ) : null}
+                </Space>
+              ) : (
+                <div className="phase-empty">Trigger bulk onboarding from this tab. Results and created credentials will appear here.</div>
+              )}
+            </Card>
+          </Col>
+        </Row>
       ),
     },
     {

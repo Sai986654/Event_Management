@@ -45,4 +45,32 @@ export const authService = {
     }
     return response.data;
   },
+
+  uploadAvatar: async (file) => {
+    const formData = new FormData();
+    formData.append('file', {
+      uri: file.uri,
+      name: file.fileName || 'avatar.jpg',
+      type: file.mimeType || 'image/jpeg',
+    });
+
+    const response = await api.post('/auth/profile/avatar', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+
+    if (response.data.user) {
+      await AsyncStorage.setItem('user', JSON.stringify(response.data.user));
+    }
+    return response.data;
+  },
+
+  changePassword: async (payload) => {
+    const response = await api.put('/auth/password', payload);
+    return response.data;
+  },
+
+  deleteAccount: async (payload) => {
+    const response = await api.delete('/auth/account', { data: payload });
+    return response.data;
+  },
 };

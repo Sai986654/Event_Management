@@ -11,6 +11,8 @@ const { google } = require('googleapis');
 const { geocode } = require('./locationService');
 const { CATEGORY_FIELD_TEMPLATES } = require('./vendorFormSchemaService');
 
+const normalizeEmail = (value) => String(value || '').trim().toLowerCase();
+
 const CATEGORY_REQUIRED_FIELDS = Object.keys(CATEGORY_FIELD_TEMPLATES).reduce((acc, category) => {
   const fields = CATEGORY_FIELD_TEMPLATES[category] || [];
   acc[category] = fields.filter((f) => f.required).map((f) => f.key);
@@ -206,7 +208,8 @@ function mapFormToVendor(formData) {
 /**
  * Validate and sanitize vendor data
  */
-function validateVendorData(data) {
+function validateVendorData(data, options = {}) {
+  const enforceCategoryDetails = options.enforceCategoryDetails !== false;
   const errors = [];
   
   if (!data.email || !data.email.includes('@')) {
@@ -222,18 +225,20 @@ function validateVendorData(data) {
     errors.push('Invalid service category');
   }
 
-  const requiredFields = CATEGORY_REQUIRED_FIELDS[data.category] || CATEGORY_REQUIRED_FIELDS.other || [];
-  requiredFields.forEach((field) => {
-    const val = data.categoryDetails?.[field];
-    const missing =
-      val === undefined ||
-      val === null ||
-      (typeof val === 'string' && !val.trim()) ||
-      (Array.isArray(val) && val.length === 0);
-    if (missing) {
-      errors.push(`Missing required category field: ${field}`);
-    }
-  });
+  if (enforceCategoryDetails) {
+    const requiredFields = CATEGORY_REQUIRED_FIELDS[data.category] || CATEGORY_REQUIRED_FIELDS.other || [];
+    requiredFields.forEach((field) => {
+      const val = data.categoryDetails?.[field];
+      const missing =
+        val === undefined ||
+        val === null ||
+        (typeof val === 'string' && !val.trim()) ||
+        (Array.isArray(val) && val.length === 0);
+      if (missing) {
+        errors.push(`Missing required category field: ${field}`);
+      }
+    });
+  }
   
   return {
     isValid: errors.length === 0,
@@ -242,22 +247,16 @@ function validateVendorData(data) {
 }
 
 /**
- * Check if vendor already exists
- */
-async function vendorExists(email) {
-  const user = await prisma.user.findUnique({
-    where: { email },
-  });
-  return !!user;
-}
-
-/**
  * Create or update user and vendor profile from form data
  */
-async function syncVendorFromForm(formData) {
+async function syncVendorFromForm(formData, options = {}) {
   try {
     const mapped = mapFormToVendor(formData);
-    const validation = validateVendorData(mapped);
+    mapped.email = normalizeEmail(mapped.email);
+    let plainPasswordForUser = null;
+    const validation = validateVendorData(mapped, {
+      enforceCategoryDetails: options.enforceCategoryDetails,
+    });
     
     if (!validation.isValid) {
       return {
@@ -287,11 +286,11 @@ async function syncVendorFromForm(formData) {
         };
       }
     } else {
+      const plainPassword = String(options.defaultPassword || '').trim() || Math.random().toString(36).slice(-10);
+      plainPasswordForUser = plainPassword;
+
       // Create new user
-      const hashedPassword = await bcrypt.hash(
-        Math.random().toString(36).slice(-8),
-        10
-      );
+      const hashedPassword = await bcrypt.hash(plainPassword, 12);
       
       user = await prisma.user.create({
         data: {
@@ -369,6 +368,7 @@ async function syncVendorFromForm(formData) {
       userId: user.id,
       vendorId: vendor.id,
       status: 'created',
+      createdCredentials: plainPasswordForUser ? { email: mapped.email, password: plainPasswordForUser } : null,
       message: `Vendor created successfully. Admin review pending.`,
     };
   } catch (error) {
@@ -388,8 +388,10 @@ async function syncVendorFromForm(formData) {
 async function syncVendorsFromGoogleForm(options = {}) {
   const {
     spreadsheetId = process.env.GOOGLE_FORM_SHEET_ID,
-    range = process.env.GOOGLE_FORM_RANGE || 'Form Responses 1!A2:Z1000',
+    range = process.env.GOOGLE_FORM_RANGE || 'Form Responses 1!A1:ZZ1000',
     limit = 50,
+    defaultPassword = process.env.VENDOR_DEFAULT_PASSWORD,
+    includeCredentials = false,
   } = options;
   
   if (!spreadsheetId) {
@@ -406,6 +408,7 @@ async function syncVendorsFromGoogleForm(options = {}) {
       failed: 0,
       skipped: 0,
       errors: [],
+      credentials: [],
     };
     
     // Process up to limit
@@ -415,28 +418,32 @@ async function syncVendorsFromGoogleForm(options = {}) {
         results.skipped++;
         continue;
       }
-      
-      // Check for duplicates before syncing
-      const email = row['Email address'] || row.email;
-      if (await vendorExists(email)) {
-        results.skipped++;
-        continue;
-      }
-      
-      const syncResult = await syncVendorFromForm(row);
+
+      const syncResult = await syncVendorFromForm(row, { defaultPassword });
       
       results.processed++;
       if (syncResult.success) {
         results.created++;
+        if (includeCredentials && syncResult.createdCredentials?.password) {
+          results.credentials.push(syncResult.createdCredentials);
+        }
         console.log(`[VendorFormSync] ✓ Created vendor: ${syncResult.vendorId}`);
       } else {
-        results.failed++;
-        results.errors.push({
-          email: row['Email address'] || row.email,
-          error: syncResult.error,
-        });
-        console.warn(`[VendorFormSync] ✗ Failed: ${syncResult.error}`);
+        if (syncResult.status === 'already_exists') {
+          results.skipped++;
+        } else {
+          results.failed++;
+          results.errors.push({
+            email: row['Email address'] || row.email,
+            error: syncResult.error,
+          });
+          console.warn(`[VendorFormSync] ✗ Failed: ${syncResult.error}`);
+        }
       }
+    }
+
+    if (!includeCredentials) {
+      delete results.credentials;
     }
     
     console.log('[VendorFormSync] Sync completed:', results);

@@ -2,11 +2,15 @@ const router = require('express').Router();
 const { body } = require('express-validator');
 const validate = require('../middleware/validate');
 const { protect } = require('../middleware/auth');
+const upload = require('../middleware/upload');
 const {
   register,
   login,
   getMe,
   updateProfile,
+  uploadAvatar,
+  changePassword,
+  deleteAccount,
 } = require('../controllers/authController');
 
 router.post(
@@ -37,6 +41,25 @@ router.post(
 );
 
 router.get('/me', protect, getMe);
+router.get('/profile', protect, getMe);
 router.put('/profile', protect, updateProfile);
+router.post('/profile/avatar', protect, upload.single('file'), uploadAvatar);
+router.put(
+  '/password',
+  protect,
+  [
+    body('currentPassword').notEmpty().withMessage('Current password is required'),
+    body('newPassword').isLength({ min: 6 }).withMessage('New password must be at least 6 characters'),
+  ],
+  validate,
+  changePassword
+);
+router.delete(
+  '/account',
+  protect,
+  [body('currentPassword').notEmpty().withMessage('Current password is required')],
+  validate,
+  deleteAccount
+);
 
 module.exports = router;
