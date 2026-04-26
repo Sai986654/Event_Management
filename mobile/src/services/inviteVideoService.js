@@ -1,11 +1,16 @@
 import api from './api';
 
 export const inviteVideoService = {
-  createInviteJob: async ({ eventId, guests, images = [], music = null, voiceTemplate = '', voiceLang = 'en' }) => {
+  createInviteJob: async ({ eventId, guests, images = [], music = null, voiceTemplate = '', overlayText = '', voiceLang = 'en' }) => {
     const formData = new FormData();
     formData.append('eventId', String(eventId));
     formData.append('guests', JSON.stringify(guests || []));
-    if (voiceTemplate) formData.append('voiceTemplate', voiceTemplate);
+    // Encode both voice narration and overlay text in a single field so
+    // the backend can split them without a schema change.
+    const encodedTemplate = overlayText
+      ? `${voiceTemplate}|||OVERLAY|||${overlayText}`
+      : voiceTemplate;
+    if (encodedTemplate) formData.append('voiceTemplate', encodedTemplate);
     if (voiceLang) formData.append('voiceLang', voiceLang);
 
     images.forEach((asset, idx) => {

@@ -103,7 +103,7 @@ async function preResizeImage(inputPath) {
  * Get audio duration in seconds using ffprobe.
  */
 function getAudioDuration(audioPath) {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     const proc = spawn('ffprobe', [
       '-v', 'error',
       '-show_entries', 'format=duration',
@@ -117,6 +117,26 @@ function getAudioDuration(audioPath) {
       resolve(parseFloat(out.trim()) || 12);
     });
     proc.on('error', () => resolve(12));
+  });
+}
+
+function getVideoDuration(videoPath) {
+  return new Promise((resolve) => {
+    const proc = spawn('ffprobe', [
+      '-v', 'error',
+      '-select_streams', 'v:0',
+      '-show_entries', 'format=duration',
+      '-of', 'default=noprint_wrappers=1:nokey=1',
+      videoPath,
+    ]);
+    let out = '';
+    proc.stdout.on('data', (d) => { out += d.toString(); });
+    proc.on('close', (code) => {
+      if (code !== 0) return resolve(null);
+      const val = parseFloat(out.trim());
+      resolve(Number.isFinite(val) && val > 0 ? val : null);
+    });
+    proc.on('error', () => resolve(null));
   });
 }
 
@@ -239,9 +259,12 @@ function normalizeLegacyConfig(config) {
     throw new Error('At least 1 image is required');
   }
 
+  // Guarantee every photo is shown for at least 2.5 seconds.
+  // With 4 photos at 2.5s each + 3 crossfades of 0.75s = 10s - 2.25s = 7.75s total.
+  const PER_PHOTO_DURATION = Math.max(2.5, 3.2);
   const scenes = imagePaths.map((img, index) => ({
     background: img,
-    duration: 3.2,
+    duration: PER_PHOTO_DURATION,
     texts:
       index === 0 && config.overlayText
         ? [{ value: String(config.overlayText), start: 0.6, duration: 2.6, fontSize: 54, color: 'white' }]
@@ -613,14 +636,23 @@ async function attachAudioToBaseInviteVideo({
     const finalOutputPath = outputPath || tempPath('.mp4');
     ensureDir(path.dirname(finalOutputPath));
 
+    // Determine full video duration so we can pad audio to match all photos.
+    const videoDuration = await getVideoDuration(baseVideoPath);
+    const padTarget = videoDuration ? videoDuration.toFixed(3) : '30';
+
     const args = ['-y', '-i', baseVideoPath, '-i', voicePath];
-    let filterComplex = `[1:a]aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=mono,volume=1.0[voice]`;
+    // Pad voice audio to fill the full video so -shortest doesn't cut photos short.
+    let filterComplex =
+      `[1:a]aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=mono,` +
+      `volume=1.0,apad=whole_dur=${padTarget}[voice]`;
 
     if (musicPath) {
       args.push('-stream_loop', '-1', '-i', musicPath);
       filterComplex +=
-        `;[2:a]aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo,volume=0.55[music]` +
-        `;[voice][music]amix=inputs=2:duration=first:weights='1 0.5':dropout_transition=0.8[aout]`;
+        `;[2:a]aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo,` +
+        `volume=0.55,atrim=0:${padTarget},asetpts=PTS-STARTPTS,` +
+        `afade=t=out:st=${Math.max(0, Number(padTarget) - 1).toFixed(3)}:d=1.0[music]` +
+        `;[voice][music]amix=inputs=2:duration=longest:weights='1 0.5':dropout_transition=0.8[aout]`;
     } else {
       filterComplex += ';[voice]anull[aout]';
     }
@@ -633,7 +665,7 @@ async function attachAudioToBaseInviteVideo({
       '-c:a', 'aac',
       '-b:a', rpf.audioBitrate,
       '-movflags', '+faststart',
-      '-shortest',
+      ...(videoDuration ? ['-t', padTarget] : []),
       finalOutputPath
     );
 

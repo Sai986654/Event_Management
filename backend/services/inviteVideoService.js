@@ -3,6 +3,7 @@ const { prisma } = require('../config/db');
 const { r2Client, R2_BUCKET, R2_PUBLIC_URL } = require('../config/r2');
 const { PutObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
 const { generateSpeech } = require('./ttsService');
+const TTS_PROVIDER = process.env.TTS_PROVIDER || 'gtts';
 const {
   generateInviteVideo,
   attachAudioToBaseInviteVideo,
@@ -163,14 +164,42 @@ async function processInviteJob(jobId, io) {
   let processed = 0;
   let failed = 0;
 
-  // Render one base visual timeline for the entire job, then only compose personalized audio per guest.
-  const baseTextTemplate = (job.voiceTemplate || 'You are cordially invited').replace(/\{name\}/gi, '').trim();
+  // Decode voice narration and overlay text.
+  // The mobile app encodes both as: "voice text|||OVERLAY|||overlay text"
+  // If no separator, the whole string is the voice text.
+  const rawTemplate = job.voiceTemplate || '';
+  const OVERLAY_SEP = '|||OVERLAY|||';
+  let voiceRawTemplate, jobOverlayText;
+  if (rawTemplate.includes(OVERLAY_SEP)) {
+    const parts = rawTemplate.split(OVERLAY_SEP);
+    voiceRawTemplate = parts[0].trim();
+    jobOverlayText = parts[1] ? parts[1].trim() : '';
+  } else {
+    voiceRawTemplate = rawTemplate;
+    jobOverlayText = '';
+  }
+
+  // Strip {name} from voice text — the static body is generated ONCE and cached.
+  // This means 1 ElevenLabs API call total per unique template, not 1 per guest.
+  const baseTextTemplate = (voiceRawTemplate || 'You are cordially invited').replace(/\{name\}/gi, '').trim();
+  const videoOverlayText = jobOverlayText || 'You are Invited';
+  let baseVoiceBuffer = null;
+
+  // Pre-generate the static voice body once before the guest loop
+  if (TTS_PROVIDER === 'elevenlabs' && baseTextTemplate) {
+    try {
+      baseVoiceBuffer = await generateSpeech(baseTextTemplate, job.voiceLang || 'en');
+      console.log(`[InviteJob] ElevenLabs voice pre-generated once for job ${jobId}`);
+    } catch (err) {
+      console.warn(`[InviteJob] ElevenLabs voice generation failed, will retry per guest: ${err.message}`);
+    }
+  }
   let baseVideoPath = null;
   try {
     const baseRender = await generateInviteVideo({
       imagePaths: localImages,
       musicBuffer: null,
-      overlayText: baseTextTemplate || 'You are invited',
+      overlayText: videoOverlayText,
       renderProfile: process.env.FFMPEG_RENDER_PROFILE || 'memory_saver',
     });
     baseVideoPath = baseRender.videoPath;
@@ -192,9 +221,16 @@ async function processInviteJob(jobId, io) {
       });
 
       // 1. Generate TTS voice
-      const template = job.voiceTemplate || 'Dear {name}, you are cordially invited';
-      const voiceText = template.replace(/\{name\}/gi, guest.guestName);
-      const voiceBuffer = await generateSpeech(voiceText, job.voiceLang || 'en');
+      // For ElevenLabs: reuse the pre-generated static buffer (name is excluded to save quota).
+      // For other providers: generate per guest with the full personalized text.
+      let voiceBuffer;
+      if (TTS_PROVIDER === 'elevenlabs' && baseVoiceBuffer) {
+        voiceBuffer = baseVoiceBuffer; // reuse — 0 extra ElevenLabs chars billed
+      } else {
+        const template = voiceRawTemplate || 'Dear {name}, you are cordially invited';
+        const voiceText = template.replace(/\{name\}/gi, guest.guestName);
+        voiceBuffer = await generateSpeech(voiceText, job.voiceLang || 'en');
+      }
 
       // 2. Reuse base visual and only compose personalized audio
       const { videoPath } = await attachAudioToBaseInviteVideo({

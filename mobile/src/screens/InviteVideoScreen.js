@@ -145,6 +145,7 @@ const InviteVideoScreen = ({ route }) => {
 
   const [guestLines, setGuestLines] = useState('');
   const [voiceTemplate, setVoiceTemplate] = useState('');
+  const [overlayText, setOverlayText] = useState('');
   const [voiceLang, setVoiceLang] = useState('en');
   const [images, setImages] = useState([]);
   const [music, setMusic] = useState(null);
@@ -366,6 +367,7 @@ const InviteVideoScreen = ({ route }) => {
         images,
         music,
         voiceTemplate,
+        overlayText,
         voiceLang,
       });
 
@@ -531,22 +533,64 @@ const InviteVideoScreen = ({ route }) => {
 
         <Card style={styles.card}>
           <Card.Content>
-            <Text variant="titleMedium" style={styles.sectionTitle}>3) Voice Settings (Optional)</Text>
+            <Text variant="titleMedium" style={styles.sectionTitle}>3) Voice Narration (Optional)</Text>
+            <Text style={styles.hint}>
+              This text will be spoken aloud in the video. Use <Text style={styles.hintBold}>{'{name}'}</Text> and it will be replaced with each guest's name automatically.
+            </Text>
+
+            <View style={styles.quickTplRow}>
+              {[
+                { label: 'Wedding', text: "Dear {name}, you are cordially invited to our wedding celebration!" },
+                { label: 'Birthday', text: "Dear {name}, join us for a special birthday celebration!" },
+                { label: 'General', text: "Dear {name}, you are invited to our event!" },
+              ].map((tpl) => (
+                <Chip
+                  key={tpl.label}
+                  compact
+                  onPress={() => setVoiceTemplate(tpl.text)}
+                  style={styles.tplChip}
+                >
+                  {tpl.label}
+                </Chip>
+              ))}
+            </View>
+
             <TextInput
               mode="outlined"
-              label="Voice template"
+              label="Narration text (spoken aloud)"
               value={voiceTemplate}
               onChangeText={setVoiceTemplate}
-              placeholder="Warm festive tone"
+              placeholder="Dear {name}, you are cordially invited to our celebration!"
+              multiline
+              numberOfLines={3}
               style={styles.input}
             />
+            <Text style={styles.muted}>
+              {voiceTemplate
+                ? `Preview: "${voiceTemplate.replace(/\{name\}/gi, 'Raju')}"`
+                : 'Leave blank to use default narration'}
+            </Text>
+
+            <Text variant="titleMedium" style={[styles.sectionTitle, { marginTop: Spacing.md }]}>4) Video Overlay Text (Optional)</Text>
+            <Text style={styles.hint}>
+              Short text displayed on the video screen. Keep it brief — 2 to 5 words work best.
+            </Text>
+            <TextInput
+              mode="outlined"
+              label="Short text shown on video"
+              value={overlayText}
+              onChangeText={setOverlayText}
+              placeholder="You're Invited"
+              style={styles.input}
+            />
+
             <TextInput
               mode="outlined"
               label="Voice language"
               value={voiceLang}
               onChangeText={setVoiceLang}
               placeholder="en"
-              style={styles.input}
+              style={[styles.input, { marginTop: Spacing.sm }]}
             />
 
             <Button
@@ -698,6 +742,9 @@ const styles = StyleSheet.create({
 
   chipRow: { marginVertical: Spacing.sm },
   jobChip: { marginRight: Spacing.sm, backgroundColor: Colors.surfaceVariant },
+  quickTplRow: { flexDirection: 'row', gap: Spacing.xs, marginBottom: Spacing.sm, flexWrap: 'wrap' },
+  tplChip: { marginBottom: 4 },
+  hintBold: { fontWeight: '700', color: Colors.primary },
   promptTypeChip: { marginRight: Spacing.sm, backgroundColor: Colors.surfaceVariant },
   promptCard: {
     backgroundColor: Colors.surfaceVariant,

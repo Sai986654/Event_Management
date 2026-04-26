@@ -1,16 +1,30 @@
 const https = require('https');
 const http = require('http');
+const crypto = require('crypto');
 
 /**
  * Text-to-Speech service abstraction.
  *
  * Providers:
  *   'azure'      — Microsoft Azure Cognitive Services (500K chars/month FREE, excellent Indian language voices)
- *   'elevenlabs' — ElevenLabs (paid, English-focused)
+ *   'elevenlabs' — ElevenLabs (free plan, 10K chars/month — used cautiously with caching)
  *   'gtts'       — Google Translate TTS (free, low quality, fallback)
+ *
+ * ElevenLabs caching strategy:
+ *   - Strip {name} placeholders before sending to ElevenLabs.
+ *   - Cache generated audio buffers in memory keyed by SHA-256 of the text.
+ *   - Same template text = zero extra ElevenLabs API calls regardless of guest count.
+ *   - Dynamic names are NOT sent to ElevenLabs to conserve the 10K char/month limit.
  */
 
 const TTS_PROVIDER = process.env.TTS_PROVIDER || 'gtts'; // 'gtts' | 'azure' | 'elevenlabs'
+
+/* ── In-memory cache for ElevenLabs (keyed by SHA-256 of text) ── */
+const elevenLabsCache = new Map();
+
+function cacheKey(text) {
+  return crypto.createHash('sha256').update(text).digest('hex');
+}
 
 /* ── Azure voice mapping per language ────────────────────────── */
 const AZURE_VOICES = {
@@ -102,7 +116,7 @@ function escapeXml(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
 }
 
-/* ── ElevenLabs TTS (paid, high quality) ────────────────────── */
+/* ── ElevenLabs TTS — with deduplication cache ───────────────── */
 
 async function elevenLabsGenerate(text) {
   const apiKey = process.env.ELEVENLABS_API_KEY;
@@ -110,13 +124,27 @@ async function elevenLabsGenerate(text) {
 
   if (!apiKey) throw new Error('ELEVENLABS_API_KEY is required');
 
+  // Strip any {name} or {Name} placeholders — names are NOT sent to ElevenLabs
+  const sanitized = text.replace(/\{name\}/gi, '').replace(/\s{2,}/g, ' ').trim();
+
+  if (!sanitized) throw new Error('ElevenLabs: text is empty after stripping name placeholders');
+
+  // Return cached audio if same template was already generated this session
+  const key = cacheKey(sanitized);
+  if (elevenLabsCache.has(key)) {
+    console.log(`[ElevenLabs] Cache hit for text hash ${key.slice(0, 8)}… — 0 chars billed`);
+    return elevenLabsCache.get(key);
+  }
+
+  console.log(`[ElevenLabs] Generating TTS for ${sanitized.length} chars (hash ${key.slice(0, 8)}…)`);
+
   const body = JSON.stringify({
-    text,
+    text: sanitized,
     model_id: 'eleven_monolingual_v1',
     voice_settings: { stability: 0.5, similarity_boost: 0.75 },
   });
 
-  return new Promise((resolve, reject) => {
+  const buffer = await new Promise((resolve, reject) => {
     const req = https.request(
       `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
       {
@@ -143,6 +171,10 @@ async function elevenLabsGenerate(text) {
     req.on('error', reject);
     req.end(body);
   });
+
+  // Cache so all guests with the same template reuse this buffer
+  elevenLabsCache.set(key, buffer);
+  return buffer;
 }
 
 /* ── Public API ──────────────────────────────────────────────── */
