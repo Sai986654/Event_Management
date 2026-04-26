@@ -3,6 +3,7 @@ import { Alert, Button, Card, Col, Form, Input, InputNumber, Modal, Popconfirm, 
 import { DeleteOutlined, EditOutlined, PlusOutlined, AppstoreOutlined, CloudUploadOutlined, EnvironmentOutlined, ShopOutlined, TeamOutlined, UserAddOutlined } from '@ant-design/icons';
 import { adminService } from '../services/adminService';
 import { vendorService } from '../services/vendorService';
+import LocationAutocomplete from '../components/LocationAutocomplete';
 import { getErrorMessage } from '../utils/helpers';
 import './PhaseFlows.css';
 
@@ -462,7 +463,19 @@ const AdminControlCenter = () => {
                 <Row gutter={12}>
                   <Col xs={24} md={12}>
                     <Form.Item name="city" label="City">
-                      <Input placeholder="Hyderabad" />
+                      <LocationAutocomplete
+                        value={placesSyncForm.getFieldValue('city')}
+                        onChange={(value) => placesSyncForm.setFieldsValue({ city: value })}
+                        onLocationPick={(loc) => {
+                          placesSyncForm.setFieldsValue({
+                            city: loc?.city || loc?.name || placesSyncForm.getFieldValue('city') || '',
+                            state: loc?.state || placesSyncForm.getFieldValue('state') || '',
+                            lat: Number.isFinite(Number(loc?.lat)) ? Number(loc.lat) : placesSyncForm.getFieldValue('lat'),
+                            lng: Number.isFinite(Number(loc?.lng)) ? Number(loc.lng) : placesSyncForm.getFieldValue('lng'),
+                          });
+                        }}
+                        placeholder="Type city and pick a suggestion"
+                      />
                     </Form.Item>
                   </Col>
                   <Col xs={24} md={12}>

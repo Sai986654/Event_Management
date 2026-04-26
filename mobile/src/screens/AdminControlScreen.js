@@ -9,6 +9,7 @@ import { adminService } from '../services/adminService';
 import { getErrorMessage } from '../utils/helpers';
 import { AuthContext } from '../context/AuthContext';
 import { Colors, Spacing, Radius } from '../theme';
+import LocationPicker from '../components/LocationPicker';
 
 const roles = ['admin', 'organizer', 'customer', 'vendor', 'guest'];
 const tagColors = ['default', 'red', 'orange', 'gold', 'green', 'cyan', 'blue', 'purple', 'magenta', 'pink'];
@@ -384,7 +385,22 @@ const AdminControlScreen = () => {
         <Card.Content>
           <Text variant="titleSmall" style={{ fontWeight: '700', marginBottom: Spacing.md }}>Import From Google Places</Text>
           <TextInput label="Search Query" mode="outlined" value={placesSyncForm.query} onChangeText={(v) => setPlacesSyncForm((p) => ({ ...p, query: v }))} placeholder="wedding caterers in Hyderabad" style={styles.input} outlineStyle={styles.outline} />
-          <TextInput label="City" mode="outlined" value={placesSyncForm.city} onChangeText={(v) => setPlacesSyncForm((p) => ({ ...p, city: v }))} placeholder="Hyderabad" style={styles.input} outlineStyle={styles.outline} />
+          <LocationPicker
+            label="City"
+            value={placesSyncForm.city}
+            onChange={(v) => setPlacesSyncForm((p) => ({ ...p, city: v }))}
+            onLocationPick={(loc) =>
+              setPlacesSyncForm((p) => ({
+                ...p,
+                city: loc?.city || loc?.name || p.city,
+                state: loc?.state || p.state,
+                lat: Number.isFinite(Number(loc?.lat)) ? String(loc.lat) : p.lat,
+                lng: Number.isFinite(Number(loc?.lng)) ? String(loc.lng) : p.lng,
+              }))
+            }
+            placeholder="Type city and pick suggestion"
+            style={styles.input}
+          />
           <TextInput label="State" mode="outlined" value={placesSyncForm.state} onChangeText={(v) => setPlacesSyncForm((p) => ({ ...p, state: v }))} placeholder="Telangana" style={styles.input} outlineStyle={styles.outline} />
           <TextInput label="Latitude (optional)" mode="outlined" value={placesSyncForm.lat} onChangeText={(v) => setPlacesSyncForm((p) => ({ ...p, lat: v.replace(/[^0-9.\-]/g, '') }))} keyboardType="numeric" placeholder="17.3850" style={styles.input} outlineStyle={styles.outline} />
           <TextInput label="Longitude (optional)" mode="outlined" value={placesSyncForm.lng} onChangeText={(v) => setPlacesSyncForm((p) => ({ ...p, lng: v.replace(/[^0-9.\-]/g, '') }))} keyboardType="numeric" placeholder="78.4867" style={styles.input} outlineStyle={styles.outline} />
