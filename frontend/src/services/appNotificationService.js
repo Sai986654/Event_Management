@@ -15,4 +15,14 @@ export const appNotificationService = {
     const response = await api.put('app-notifications/read-all');
     return response.data;
   },
+
+  deleteOne: async (id) => {
+    const response = await api.delete(`app-notifications/${id}`);
+    return response.data;
+  },
+
+  deleteAll: async () => {
+    const response = await api.delete('app-notifications/delete-all');
+    return response.data;
+  },
 };

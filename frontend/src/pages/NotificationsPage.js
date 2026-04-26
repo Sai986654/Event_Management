@@ -5,8 +5,9 @@ import {
   CalendarOutlined,
   CheckCircleOutlined,
   CloseCircleOutlined,
+  DeleteOutlined,
   FileTextOutlined,
-  ShieldOutlined,
+  SafetyCertificateOutlined,
   TeamOutlined,
   UserOutlined,
 } from '@ant-design/icons';
@@ -42,7 +43,7 @@ const typeIcon = (type) => {
     booking_created: <CalendarOutlined style={{ color: '#667eea' }} />,
     booking_confirmed: <CheckCircleOutlined style={{ color: '#22c55e' }} />,
     booking_cancelled: <CloseCircleOutlined style={{ color: '#ef4444' }} />,
-    vendor_verified: <ShieldOutlined style={{ color: '#22c55e' }} />,
+    vendor_verified: <SafetyCertificateOutlined style={{ color: '#22c55e' }} />,
     event_created: <CalendarOutlined style={{ color: '#667eea' }} />,
     guest_rsvp: <UserOutlined style={{ color: '#667eea' }} />,
     guest_checkin: <TeamOutlined style={{ color: '#667eea' }} />,
@@ -66,7 +67,7 @@ const formatValue = (label, value) => {
 };
 
 /* ── Single Notification Card ── */
-const NotificationCard = ({ item, onRead, onOpenEvent }) => {
+const NotificationCard = ({ item, onRead, onDelete, onOpenEvent }) => {
   const rows = parseBody(item.body);
   const typeLbl = (item.type || '').replace(/_/g, ' ');
 
@@ -143,6 +144,9 @@ const NotificationCard = ({ item, onRead, onOpenEvent }) => {
             Mark Read
           </Button>
         )}
+        <Button size="small" type="text" danger icon={<DeleteOutlined />} onClick={() => onDelete(item.id)}>
+          Delete
+        </Button>
       </div>
     </div>
   );
@@ -178,6 +182,14 @@ const NotificationsPage = () => {
     try { await appNotificationService.markAllRead(); await load(); } catch (e) { console.error(getErrorMessage(e)); }
   };
 
+  const onDelete = async (id) => {
+    try { await appNotificationService.deleteOne(id); await load(); } catch (e) { console.error(getErrorMessage(e)); }
+  };
+
+  const onDeleteAll = async () => {
+    try { await appNotificationService.deleteAll(); await load(); } catch (e) { console.error(getErrorMessage(e)); }
+  };
+
   return (
     <div style={{ maxWidth: 760, margin: '24px auto', padding: '0 16px' }}>
       {/* Toolbar */}
@@ -193,6 +205,11 @@ const NotificationsPage = () => {
         {unreadCount > 0 && (
           <Button icon={<CheckCircleOutlined />} onClick={onReadAll}>
             Mark all read
+          </Button>
+        )}
+        {items.length > 0 && (
+          <Button danger icon={<DeleteOutlined />} onClick={onDeleteAll}>
+            Delete all
           </Button>
         )}
       </div>
@@ -213,6 +230,7 @@ const NotificationsPage = () => {
                 key={item.id}
                 item={item}
                 onRead={onRead}
+                onDelete={onDelete}
                 onOpenEvent={() => navigate(`/events/${item.metadata?.eventId}`)}
               />
             ))}

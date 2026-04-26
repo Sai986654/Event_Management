@@ -44,3 +44,20 @@ exports.markAllRead = asyncHandler(async (req, res) => {
   });
   res.json({ ok: true });
 });
+
+// DELETE /api/app-notifications/:id
+exports.deleteNotification = asyncHandler(async (req, res) => {
+  const id = Number(req.params.id);
+  const n = await prisma.appNotification.findFirst({
+    where: { id, userId: req.user.id },
+  });
+  if (!n) return res.status(404).json({ message: 'Notification not found' });
+  await prisma.appNotification.delete({ where: { id } });
+  res.json({ ok: true });
+});
+
+// DELETE /api/app-notifications
+exports.deleteAllNotifications = asyncHandler(async (req, res) => {
+  await prisma.appNotification.deleteMany({ where: { userId: req.user.id } });
+  res.json({ ok: true });
+});

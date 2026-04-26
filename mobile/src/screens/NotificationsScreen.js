@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, StyleSheet, FlatList, RefreshControl } from 'react-native';
+import { View, StyleSheet, FlatList, RefreshControl, Alert } from 'react-native';
 import { Text, Card, Button, Chip, ActivityIndicator, IconButton, Divider } from 'react-native-paper';
 import { appNotificationService } from '../services/appNotificationService';
 import { formatCurrency, getErrorMessage } from '../utils/helpers';
@@ -60,7 +60,7 @@ const formatValue = (label, value) => {
 };
 
 /* ── Notification Card ── */
-const NotificationCard = ({ item, onRead, onOpenEvent }) => {
+const NotificationCard = ({ item, onRead, onDelete, onOpenEvent }) => {
   const rows = parseBody(item.body);
   const icon = typeIcon(item.type);
   const typeLabel = (item.type || '').replace(/_/g, ' ');
@@ -111,6 +111,9 @@ const NotificationCard = ({ item, onRead, onOpenEvent }) => {
               Mark Read
             </Button>
           ) : null}
+          <Button mode="text" compact icon="delete-outline" textColor="#ef4444" onPress={() => onDelete(item.id)} style={styles.actionBtn} labelStyle={styles.actionLabel}>
+            Delete
+          </Button>
         </View>
       </Card.Content>
     </Card>
@@ -146,6 +149,19 @@ const NotificationsScreen = ({ navigation }) => {
     try { await appNotificationService.markAllRead(); await load(); } catch (e) { console.warn(getErrorMessage(e)); }
   };
 
+  const onDelete = async (id) => {
+    try { await appNotificationService.deleteOne(id); await load(); } catch (e) { console.warn(getErrorMessage(e)); }
+  };
+
+  const onDeleteAll = async () => {
+    Alert.alert('Delete All', 'Delete all notifications?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: async () => {
+        try { await appNotificationService.deleteAll(); await load(); } catch (e) { console.warn(getErrorMessage(e)); }
+      }},
+    ]);
+  };
+
   if (loading && !items.length) return <View style={styles.centered}><ActivityIndicator size="large" color={Colors.primary} /></View>;
 
   return (
@@ -158,6 +174,11 @@ const NotificationsScreen = ({ navigation }) => {
         {unreadCount > 0 ? (
           <Button mode="contained-tonal" compact icon="check-all" onPress={onReadAll} style={styles.markAllBtn} labelStyle={{ fontSize: 12 }}>
             Mark all read
+          </Button>
+        ) : null}
+        {items.length > 0 ? (
+          <Button mode="text" compact icon="delete-sweep-outline" textColor="#ef4444" onPress={onDeleteAll} labelStyle={{ fontSize: 12 }}>
+            Delete all
           </Button>
         ) : null}
       </View>
@@ -178,6 +199,7 @@ const NotificationsScreen = ({ navigation }) => {
           <NotificationCard
             item={item}
             onRead={onRead}
+            onDelete={onDelete}
             onOpenEvent={() => navigation.navigate('EventDetail', { eventId: item.metadata.eventId })}
           />
         )}
