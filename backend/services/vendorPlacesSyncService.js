@@ -6,6 +6,28 @@
 
 const { searchBusinesses } = require('./locationService');
 const { syncVendorFromForm } = require('./vendorFormSyncService');
+const { uploadFile } = require('./fileService');
+const { prisma } = require('../config/db');
+
+/**
+ * Fetch a Google Place photo by photo_reference and upload to R2.
+ * Returns the public URL or null on failure.
+ */
+async function fetchAndUploadPlacePhoto(photoReference, apiKey) {
+  if (!photoReference || !apiKey) return null;
+  try {
+    const url = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&photo_reference=${encodeURIComponent(photoReference)}&key=${apiKey}`;
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    const arrayBuffer = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    const contentType = response.headers.get('content-type') || 'image/jpeg';
+    const { url: publicUrl } = await uploadFile(buffer, 'vedika360/vendor-places-photos', { contentType });
+    return publicUrl;
+  } catch {
+    return null;
+  }
+}
 
 const mapPlaceTypesToCategory = (types = [], fallback = 'other') => {
   const set = new Set((types || []).map((t) => String(t).toLowerCase()));
@@ -77,6 +99,8 @@ async function syncVendorsFromGooglePlaces(options = {}) {
     forceCategory,
   } = options;
 
+  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+
   const q = String(query || '').trim() || [type, city, state, 'wedding vendor'].filter(Boolean).join(' ');
   if (!q) {
     throw new Error('Query is required for Google Places sync');
@@ -103,6 +127,10 @@ async function syncVendorsFromGooglePlaces(options = {}) {
   };
 
   for (const place of places.slice(0, limit)) {
+    if (!place.name || !String(place.name).trim()) {
+      results.skipped += 1;
+      continue;
+    }
     const payload = toFormLikePayload(place, { city, state, forceCategory });
 
     const syncResult = await syncVendorFromForm(payload, {
@@ -116,6 +144,17 @@ async function syncVendorsFromGooglePlaces(options = {}) {
       results.created += 1;
       if (includeCredentials && syncResult.createdCredentials?.password) {
         results.credentials.push(syncResult.createdCredentials);
+      }
+
+      // Fetch and attach cover photo from Google Places if available
+      if (place.photoReference && syncResult.vendorId) {
+        const photoUrl = await fetchAndUploadPlacePhoto(place.photoReference, apiKey);
+        if (photoUrl) {
+          await prisma.vendor.update({
+            where: { id: syncResult.vendorId },
+            data: { coverImage: photoUrl },
+          }).catch(() => {}); // Non-fatal
+        }
       }
       continue;
     }

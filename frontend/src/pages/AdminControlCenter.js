@@ -222,6 +222,9 @@ const AdminControlCenter = () => {
         ...values,
         includeCredentialsInResponse: true,
       };
+      // Strip undefined/null lat and lng to avoid backend float validation errors
+      if (payload.lat == null) delete payload.lat;
+      if (payload.lng == null) delete payload.lng;
       const res = await adminService.syncGooglePlacesVendors(payload);
       setLastSyncResult({ source: 'Google Places', ...res.results });
       message.success('Google Places vendor sync completed');
@@ -456,6 +459,30 @@ const AdminControlCenter = () => {
                 <Form.Item name="query" label="Search Query" rules={[{ required: true, message: 'Enter a Places search query' }]}>
                   <Input placeholder="wedding caterers in Hyderabad" prefix={<EnvironmentOutlined />} />
                 </Form.Item>
+                <Row gutter={12}>
+                  <Col xs={24} md={12}>
+                    <Form.Item name="city" label="City">
+                      <Input placeholder="Hyderabad" />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={24} md={12}>
+                    <Form.Item name="state" label="State">
+                      <Input placeholder="Telangana" />
+                    </Form.Item>
+                  </Col>
+                </Row>
+                <Row gutter={12}>
+                  <Col xs={24} md={12}>
+                    <Form.Item name="lat" label="Latitude (optional)">
+                      <InputNumber placeholder="17.3850" style={{ width: '100%' }} />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={24} md={12}>
+                    <Form.Item name="lng" label="Longitude (optional)">
+                      <InputNumber placeholder="78.4867" style={{ width: '100%' }} />
+                    </Form.Item>
+                  </Col>
+                </Row>
                 <Row gutter={12}>
                   <Col xs={24} md={12}>
                     <Form.Item name="limit" label="Max Listings">

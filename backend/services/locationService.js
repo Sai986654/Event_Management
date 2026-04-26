@@ -222,6 +222,7 @@ const searchBusinesses = async ({ query, lat, lng, radiusMeters = 15000, type, m
         totalRatings: Number(item.user_ratings_total || 0),
         businessStatus: item.business_status || '',
         types: Array.isArray(item.types) ? item.types : [],
+        photoReference: Array.isArray(item.photos) && item.photos.length > 0 ? item.photos[0].photo_reference : null,
       });
     }
 

@@ -37,7 +37,7 @@ const AdminControlScreen = () => {
   const [syncingForms, setSyncingForms] = useState(false);
   const [syncingPlaces, setSyncingPlaces] = useState(false);
   const [formsSyncForm, setFormsSyncForm] = useState({ limit: '100', spreadsheetId: '', range: '', defaultPassword: '' });
-  const [placesSyncForm, setPlacesSyncForm] = useState({ query: '', limit: '50', radiusMeters: '15000', type: '', forceCategory: '', defaultPassword: '' });
+  const [placesSyncForm, setPlacesSyncForm] = useState({ query: '', city: '', state: '', lat: '', lng: '', limit: '50', radiusMeters: '15000', type: '', forceCategory: '', defaultPassword: '' });
   const [lastSyncResult, setLastSyncResult] = useState(null);
 
   // ── Create User ─────────────────────────────────────────────────
@@ -197,6 +197,10 @@ const AdminControlScreen = () => {
         limit: Number(placesSyncForm.limit) || 50,
         radiusMeters: Number(placesSyncForm.radiusMeters) || 15000,
         includeCredentialsInResponse: true,
+        ...(placesSyncForm.city.trim() ? { city: placesSyncForm.city.trim() } : {}),
+        ...(placesSyncForm.state.trim() ? { state: placesSyncForm.state.trim() } : {}),
+        ...(placesSyncForm.lat.trim() ? { lat: Number(placesSyncForm.lat) } : {}),
+        ...(placesSyncForm.lng.trim() ? { lng: Number(placesSyncForm.lng) } : {}),
         ...(placesSyncForm.type.trim() ? { type: placesSyncForm.type.trim() } : {}),
         ...(placesSyncForm.forceCategory.trim() ? { forceCategory: placesSyncForm.forceCategory.trim() } : {}),
         ...(placesSyncForm.defaultPassword.trim() ? { defaultPassword: placesSyncForm.defaultPassword.trim() } : {}),
@@ -380,6 +384,10 @@ const AdminControlScreen = () => {
         <Card.Content>
           <Text variant="titleSmall" style={{ fontWeight: '700', marginBottom: Spacing.md }}>Import From Google Places</Text>
           <TextInput label="Search Query" mode="outlined" value={placesSyncForm.query} onChangeText={(v) => setPlacesSyncForm((p) => ({ ...p, query: v }))} placeholder="wedding caterers in Hyderabad" style={styles.input} outlineStyle={styles.outline} />
+          <TextInput label="City" mode="outlined" value={placesSyncForm.city} onChangeText={(v) => setPlacesSyncForm((p) => ({ ...p, city: v }))} placeholder="Hyderabad" style={styles.input} outlineStyle={styles.outline} />
+          <TextInput label="State" mode="outlined" value={placesSyncForm.state} onChangeText={(v) => setPlacesSyncForm((p) => ({ ...p, state: v }))} placeholder="Telangana" style={styles.input} outlineStyle={styles.outline} />
+          <TextInput label="Latitude (optional)" mode="outlined" value={placesSyncForm.lat} onChangeText={(v) => setPlacesSyncForm((p) => ({ ...p, lat: v.replace(/[^0-9.\-]/g, '') }))} keyboardType="numeric" placeholder="17.3850" style={styles.input} outlineStyle={styles.outline} />
+          <TextInput label="Longitude (optional)" mode="outlined" value={placesSyncForm.lng} onChangeText={(v) => setPlacesSyncForm((p) => ({ ...p, lng: v.replace(/[^0-9.\-]/g, '') }))} keyboardType="numeric" placeholder="78.4867" style={styles.input} outlineStyle={styles.outline} />
           <TextInput label="Max Listings" mode="outlined" value={placesSyncForm.limit} onChangeText={(v) => setPlacesSyncForm((p) => ({ ...p, limit: v.replace(/[^0-9]/g, '') }))} keyboardType="number-pad" style={styles.input} outlineStyle={styles.outline} />
           <TextInput label="Radius (meters)" mode="outlined" value={placesSyncForm.radiusMeters} onChangeText={(v) => setPlacesSyncForm((p) => ({ ...p, radiusMeters: v.replace(/[^0-9]/g, '') }))} keyboardType="number-pad" style={styles.input} outlineStyle={styles.outline} />
           <TextInput label="Google Place Type" mode="outlined" value={placesSyncForm.type} onChangeText={(v) => setPlacesSyncForm((p) => ({ ...p, type: v }))} placeholder="caterer, florist, lodging" style={styles.input} outlineStyle={styles.outline} />
