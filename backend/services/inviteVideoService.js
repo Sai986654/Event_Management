@@ -15,7 +15,20 @@ const {
 const { messagingService } = require('./messagingService');
 const { inviteQueue } = require('./jobQueue');
 
+// Maximum retry attempts after the first failure.
 const MAX_RETRIES = 2;
+
+function isNonRetryableTtsError(err) {
+  const msg = String(err?.message || '');
+  return (
+    /ElevenLabs\s+401/i.test(msg) ||
+    /authorization_error/i.test(msg) ||
+    /model_deprecated_free_tier/i.test(msg) ||
+    /subscription_required/i.test(msg) ||
+    /detected_unusual_activity/i.test(msg) ||
+    /free\s*tier\s*usage\s*disabled/i.test(msg)
+  );
+}
 
 function timestampKeyPart(date = new Date()) {
   return date.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
@@ -191,6 +204,28 @@ async function processInviteJob(jobId, io) {
       baseVoiceBuffer = await generateSpeech(baseTextTemplate, job.voiceLang || 'en');
       console.log(`[InviteJob] ElevenLabs voice pre-generated once for job ${jobId}`);
     } catch (err) {
+      if (isNonRetryableTtsError(err)) {
+        const guestIds = job.guestVideos
+          .filter((g) => g.status === 'pending' || g.status === 'processing')
+          .map((g) => g.id);
+
+        if (guestIds.length > 0) {
+          await prisma.inviteGuestVideo.updateMany({
+            where: { id: { in: guestIds } },
+            data: {
+              status: 'failed',
+              error: `Non-retryable TTS error: ${err.message}`,
+            },
+          });
+        }
+
+        cleanupFiles(localImages);
+        await failJob(jobId, `Non-retryable TTS error: ${err.message}`);
+        emitProgress(io, job.eventId, jobId, { status: 'failed', error: err.message });
+        console.error(`[InviteJob] Job ${jobId} failed early due to non-retryable TTS error: ${err.message}`);
+        return;
+      }
+
       console.warn(`[InviteJob] ElevenLabs voice generation failed, will retry per guest: ${err.message}`);
     }
   }
@@ -210,8 +245,13 @@ async function processInviteJob(jobId, io) {
     return;
   }
 
+  // Process only guests still needing work.
+  const guestsToProcess = job.guestVideos.filter(
+    (g) => g.status === 'pending' || g.status === 'processing'
+  );
+
   // Process each guest sequentially within this job (parallelism is at the job queue level)
-  for (const guest of job.guestVideos) {
+  for (const guest of guestsToProcess) {
     const tempFiles = [];
     try {
       // Update guest status
@@ -279,7 +319,9 @@ async function processInviteJob(jobId, io) {
     } catch (err) {
       console.error(`[InviteJob] Guest ${guest.guestName} failed: ${err.message}`);
       const retries = guest.retries + 1;
-      if (retries <= MAX_RETRIES) {
+      const nonRetryable = isNonRetryableTtsError(err);
+
+      if (!nonRetryable && retries <= MAX_RETRIES) {
         await prisma.inviteGuestVideo.update({
           where: { id: guest.id },
           data: { status: 'pending', retries, error: err.message },
@@ -287,7 +329,11 @@ async function processInviteJob(jobId, io) {
       } else {
         await prisma.inviteGuestVideo.update({
           where: { id: guest.id },
-          data: { status: 'failed', retries, error: err.message },
+          data: {
+            status: 'failed',
+            retries,
+            error: nonRetryable ? `Non-retryable TTS error: ${err.message}` : err.message,
+          },
         });
         failed++;
       }
