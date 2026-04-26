@@ -153,7 +153,6 @@ async function elevenLabsGenerate(text) {
         method: 'POST',
         headers: {
           'xi-api-key': apiKey,
-          Authorization: `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
           Accept: 'audio/mpeg',
           'User-Agent': 'Vedika 360-TTS',
