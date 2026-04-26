@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Input, Select, Card, Row, Col, Spin, message, Rate, Button, Empty, Tag, Modal } from 'antd';
+import { Input, Select, Card, Row, Col, Spin, message, Rate, Button, Empty, Tag, Modal, Pagination } from 'antd';
 import { SearchOutlined, ShopOutlined, CheckCircleOutlined, EnvironmentOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { vendorService } from '../services/vendorService';
@@ -13,6 +13,7 @@ const VendorMarketplace = () => {
   const navigate = useNavigate();
   const [vendors, setVendors] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [vendorPagination, setVendorPagination] = useState({ current: 1, pageSize: 12, total: 0 });
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [locationFilter, setLocationFilter] = useState('');
@@ -46,19 +47,21 @@ const VendorMarketplace = () => {
   }, [eventId, selectedCategory]);
 
   useEffect(() => {
-    fetchVendors();
+    setVendorPagination({ current: 1, pageSize: vendorPagination.pageSize, total: 0 });
+    fetchVendors(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCategory, locationFilter, stateFilter]);
 
-  const fetchVendors = async () => {
+  const fetchVendors = async (page = 1) => {
     try {
       setLoading(true);
-      const params = {};
+      const params = { page, limit: vendorPagination.pageSize };
       if (selectedCategory) params.category = selectedCategory;
       if (locationFilter.trim()) params.city = locationFilter.trim();
       if (stateFilter) params.state = stateFilter;
       const data = await vendorService.searchVendors(params);
       setVendors(data.vendors || []);
+      setVendorPagination({ current: page, pageSize: vendorPagination.pageSize, total: data.total || 0 });
     } catch (error) {
       message.error(getErrorMessage(error));
     } finally {
@@ -75,16 +78,6 @@ const VendorMarketplace = () => {
       vendor.businessName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       vendor.description?.toLowerCase().includes(searchTerm.toLowerCase())
     )
-    .filter((vendor) => {
-      if (!locationFilter.trim()) return true;
-      const needle = locationFilter.toLowerCase().trim();
-      const hay = `${vendor.city || ''} ${vendor.state || ''}`.toLowerCase();
-      return hay.includes(needle);
-    })
-    .filter((vendor) => {
-      if (!stateFilter) return true;
-      return String(vendor.state || '').toLowerCase().includes(stateFilter.toLowerCase());
-    })
     .sort((a, b) => {
       if (sortBy === 'fit-score') {
         return Number(fitMap[b.id]?.fitScore || 0) - Number(fitMap[a.id]?.fitScore || 0);
@@ -251,11 +244,12 @@ const VendorMarketplace = () => {
         {filteredVendors.length === 0 ? (
           <Empty description="No vendors found. Try adjusting your search or filters." />
         ) : (
-          <Row gutter={[16, 16]} className="vendors-grid">
-            {filteredVendors.map((vendor) => {
-              const pkgRange = getPackageRange(vendor);
-              return (
-                <Col xs={24} sm={12} md={8} key={vendor.id}>
+          <>
+            <Row gutter={[16, 16]} className="vendors-grid">
+              {filteredVendors.map((vendor) => {
+                const pkgRange = getPackageRange(vendor);
+                return (
+                  <Col xs={24} sm={12} md={8} key={vendor.id}>
                   <Card
                     hoverable
                     className="vendor-card"
@@ -327,7 +321,17 @@ const VendorMarketplace = () => {
                 </Col>
               );
             })}
-          </Row>
+            </Row>
+            <div style={{ marginTop: 24, textAlign: 'center' }}>
+              <Pagination
+                current={vendorPagination.current}
+                pageSize={vendorPagination.pageSize}
+                total={vendorPagination.total}
+                onChange={(page) => fetchVendors(page)}
+                style={{ marginTop: 24 }}
+              />
+            </div>
+          </>
         )}
       </Spin>
 

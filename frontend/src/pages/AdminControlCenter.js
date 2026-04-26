@@ -169,21 +169,21 @@ const AdminControlCenter = () => {
   const [deletingVendorId, setDeletingVendorId] = useState(null);
   const [syncingForms, setSyncingForms] = useState(false);
   const [syncingPlaces, setSyncingPlaces] = useState(false);
-  const [lastSyncResult, setLastSyncResult] = useState(null);
-  const [formsSyncForm] = Form.useForm();
+  const [lastSyncResult, setLastSyncResult] = useState(null);  const [vendorPagination, setVendorPagination] = useState({ current: 1, pageSize: 20, total: 0 });  const [formsSyncForm] = Form.useForm();
   const [placesSyncForm] = Form.useForm();
 
-  const loadAllVendors = useCallback(async () => {
+  const loadAllVendors = useCallback(async (page = 1, pageSize = 20) => {
     setLoadingAllVendors(true);
     try {
-      const res = await adminService.getAllVendors({ limit: 100 });
+      const res = await adminService.getAllVendors({ page, limit: pageSize });
       setAllVendors(res.vendors || []);
+      setVendorPagination({ current: page, pageSize, total: res.total || 0 });
     } catch (err) {
       message.error(getErrorMessage(err));
     } finally {
       setLoadingAllVendors(false);
     }
-  }, []);
+  }, [];
 
   const removeVendor = async (id) => {
     setDeletingVendorId(id);
@@ -304,7 +304,12 @@ const AdminControlCenter = () => {
             loading={loadingAllVendors}
             rowKey="id"
             dataSource={allVendors}
-            pagination={{ pageSize: 20 }}
+            pagination={{
+              current: vendorPagination.current,
+              pageSize: vendorPagination.pageSize,
+              total: vendorPagination.total,
+              onChange: (page, pageSize) => loadAllVendors(page, pageSize),
+            }}
             locale={{ emptyText: <div className="phase-empty">No vendors registered yet.</div> }}
             columns={[
               { title: 'Business', dataIndex: 'businessName', ellipsis: true },

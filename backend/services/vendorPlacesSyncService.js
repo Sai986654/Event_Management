@@ -196,8 +196,12 @@ const sanitizeId = (value) =>
     .slice(0, 40);
 
 const buildSyntheticVendorEmail = (place) => {
-  const suffix = sanitizeId(place.placeId || place.name || `${Date.now()}`) || String(Date.now());
-  return `vendor+${suffix}@google-place.local`;
+  const namePart = String(place.name || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '')
+    .slice(0, 40);
+  const suffix = namePart || sanitizeId(place.placeId || '') || String(Date.now());
+  return `${suffix}@vedika360.com`;
 };
 
 const buildDescription = (place) => {

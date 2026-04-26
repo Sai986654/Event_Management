@@ -33,10 +33,15 @@ const VendorListScreen = ({ navigation }) => {
   const [vendors, setVendors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [vendorPage, setVendorPage] = useState(1);
+  const [vendorTotal, setVendorTotal] = useState(0);
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('all');
   const [sortBy, setSortBy] = useState('top-rated');
   const [sortMenuVisible, setSortMenuVisible] = useState(false);
+
+  const VENDORS_PER_PAGE = 10;
 
   // Location state
   const [nearMe, setNearMe] = useState(false);
@@ -80,9 +85,11 @@ const VendorListScreen = ({ navigation }) => {
     }
   }, [locationLoading]);
 
-  const fetchVendors = useCallback(async (locOverride) => {
+  const fetchVendors = useCallback(async (locOverride, page = 1, append = false) => {
+    if (page === 1) setLoading(true);
+    else setLoadingMore(true);
     try {
-      const params = {};
+      const params = { page, limit: VENDORS_PER_PAGE };
       if (category !== 'all') params.category = category;
 
       const loc = locOverride || userLocation;
@@ -96,28 +103,49 @@ const VendorListScreen = ({ navigation }) => {
       }
 
       const data = await vendorService.searchVendors(params);
-      setVendors(data.vendors || []);
+      const newVendors = data.vendors || [];
+      
+      // Deduplicate vendors by ID when appending
+      if (append) {
+        setVendors((prev) => {
+          const vendorIds = new Set(prev.map(v => v.id));
+          const dedupedNew = newVendors.filter(v => !vendorIds.has(v.id));
+          return [...prev, ...dedupedNew];
+        });
+      } else {
+        setVendors(newVendors);
+      }
+      
+      setVendorPage(page);
+      setVendorTotal(data.total || 0);
       setNearbyCount(data.nearby != null ? data.nearby : null);
     } catch (err) {
       console.warn(getErrorMessage(err));
     } finally {
-      setLoading(false);
+      if (page === 1) setLoading(false);
+      else setLoadingMore(false);
       setRefreshing(false);
     }
-  }, [search, category, nearMe, userLocation, radiusKm]);
+  }, [search, category, nearMe, userLocation, radiusKm, VENDORS_PER_PAGE]);
+
+  // Load more vendors
+  const loadMore = useCallback(() => {
+    if (loadingMore || vendors.length >= vendorTotal) return;
+    fetchVendors(undefined, vendorPage + 1, true);
+  }, [loadingMore, vendors.length, vendorTotal, vendorPage, fetchVendors]);
 
   // Toggle "Near Me" - request location on first enable
   const handleToggleNearMe = useCallback(async () => {
     if (!nearMe) {
       // Turning ON
       setNearMe(true);
-      setLoading(true);
+      setVendorPage(1);
       if (!userLocation) {
         const coords = await requestLocation();
         if (!coords) { setLoading(false); return; }
-        fetchVendors(coords);
+        fetchVendors(coords, 1, false);
       } else {
-        fetchVendors();
+        fetchVendors(undefined, 1, false);
       }
     } else {
       // Turning OFF
@@ -125,12 +153,12 @@ const VendorListScreen = ({ navigation }) => {
       setUserLocation(null);
       setLocationCity('');
       setNearbyCount(null);
-      setLoading(true);
-      fetchVendors();
+      setVendorPage(1);
+      fetchVendors(undefined, 1, false);
     }
   }, [nearMe, userLocation, requestLocation, fetchVendors]);
 
-  useEffect(() => { fetchVendors(); }, [fetchVendors]);
+  useEffect(() => { setVendorPage(1); fetchVendors(undefined, 1, false); }, [fetchVendors]);
 
   const sortedVendors = useMemo(() => {
     const sorted = [...vendors];
@@ -335,7 +363,7 @@ const VendorListScreen = ({ navigation }) => {
         <Text style={styles.resultCount}>
           {nearMe && nearbyCount != null
             ? `${nearbyCount} nearby within ${radiusKm} km`
-            : `${sortedVendors.length} vendor${sortedVendors.length !== 1 ? 's' : ''} found`}
+            : `${vendors.length}/${vendorTotal} vendor${vendorTotal !== 1 ? 's' : ''}`}
         </Text>
         <Menu
           visible={sortMenuVisible}
@@ -365,7 +393,7 @@ const VendorListScreen = ({ navigation }) => {
           data={sortedVendors}
           keyExtractor={(item) => String(item.id)}
           renderItem={renderVendor}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchVendors(); }} colors={[Colors.primary]} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); setVendorPage(1); fetchVendors(undefined, 1, false); }} colors={[Colors.primary]} />}
           contentContainerStyle={styles.listContent}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
@@ -373,6 +401,19 @@ const VendorListScreen = ({ navigation }) => {
               <Text style={styles.emptyTitle}>No vendors found</Text>
               <Text style={styles.emptyText}>Try adjusting your search or category filter</Text>
             </View>
+          }
+          ListFooterComponent={
+            vendors.length < vendorTotal ? (
+              <Button
+                mode="contained-tonal"
+                loading={loadingMore}
+                disabled={loadingMore}
+                onPress={loadMore}
+                style={{ marginTop: Spacing.md, marginBottom: Spacing.lg }}
+              >
+                Load More ({vendors.length} of {vendorTotal})
+              </Button>
+            ) : null
           }
         />
       )}

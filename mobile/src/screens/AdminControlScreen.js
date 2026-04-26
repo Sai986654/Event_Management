@@ -34,7 +34,11 @@ const AdminControlScreen = () => {
   // ── Vendor Management ───────────────────────────────────────────
   const [allVendors, setAllVendors] = useState([]);
   const [loadingAllVendors, setLoadingAllVendors] = useState(false);
+  const [loadingMoreVendors, setLoadingMoreVendors] = useState(false);
+  const [vendorPage, setVendorPage] = useState(1);
+  const [vendorTotal, setVendorTotal] = useState(0);
   const [deletingVendorId, setDeletingVendorId] = useState(null);
+  const VENDORS_PER_PAGE = 15;
   const [syncingForms, setSyncingForms] = useState(false);
   const [syncingPlaces, setSyncingPlaces] = useState(false);
   const [formsSyncForm, setFormsSyncForm] = useState({ limit: '100', spreadsheetId: '', range: '', defaultPassword: '' });
@@ -72,17 +76,38 @@ const AdminControlScreen = () => {
     }
   }, []);
 
-  const loadAllVendors = useCallback(async () => {
-    setLoadingAllVendors(true);
+  const loadAllVendors = useCallback(async (page = 1, append = false) => {
+    if (page === 1) setLoadingAllVendors(true);
+    else setLoadingMoreVendors(true);
     try {
-      const res = await adminService.getAllVendors({ limit: 100 });
-      setAllVendors(res.vendors || []);
+      const res = await adminService.getAllVendors({ page, limit: VENDORS_PER_PAGE });
+      const vendors = res.vendors || [];
+      
+      // Deduplicate vendors by ID when appending
+      if (append) {
+        setAllVendors((prev) => {
+          const vendorIds = new Set(prev.map(v => v.id));
+          const dedupedNew = vendors.filter(v => !vendorIds.has(v.id));
+          return [...prev, ...dedupedNew];
+        });
+      } else {
+        setAllVendors(vendors);
+      }
+      
+      setVendorPage(page);
+      setVendorTotal(res.total || 0);
     } catch (err) {
       setMessage(getErrorMessage(err)); setMessageType('error');
     } finally {
-      setLoadingAllVendors(false);
+      if (page === 1) setLoadingAllVendors(false);
+      else setLoadingMoreVendors(false);
     }
   }, []);
+
+  const loadMore = useCallback(() => {
+    if (loadingMoreVendors || allVendors.length >= vendorTotal) return;
+    loadAllVendors(vendorPage + 1, true);
+  }, [loadingMoreVendors, allVendors.length, vendorTotal, vendorPage, loadAllVendors]);
 
   const loadAll = useCallback(async () => {
     await Promise.all([loadVerificationQueue(), loadCategories(), loadAllVendors()]);
@@ -280,7 +305,12 @@ const AdminControlScreen = () => {
 
   const renderVendorManagement = () => (
     <View>
-      <Text variant="titleMedium" style={styles.sectionTitle}>All Marketplace Vendors</Text>
+      <View style={styles.tabHeader}>
+        <Text variant="titleMedium" style={styles.sectionTitle}>All Marketplace Vendors</Text>
+        <Text variant="bodySmall" style={{ color: Colors.textSecondary }}>
+          {allVendors.length}/{vendorTotal}
+        </Text>
+      </View>
       {loadingAllVendors && <ActivityIndicator style={{ marginVertical: Spacing.md }} color={Colors.primary} />}
       {allVendors.length === 0 && !loadingAllVendors && (
         <Text style={styles.emptyText}>No vendors registered yet.</Text>
@@ -314,6 +344,17 @@ const AdminControlScreen = () => {
           </Card.Content>
         </Card>
       ))}
+      {allVendors.length < vendorTotal && (
+        <Button
+          mode="contained-tonal"
+          loading={loadingMoreVendors}
+          disabled={loadingMoreVendors}
+          onPress={loadMore}
+          style={{ marginTop: Spacing.md }}
+        >
+          Load More ({allVendors.length} of {vendorTotal})
+        </Button>
+      )}
     </View>
   );
 
