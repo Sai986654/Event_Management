@@ -183,7 +183,7 @@ const AdminControlCenter = () => {
     } finally {
       setLoadingAllVendors(false);
     }
-  }, [];
+  }, []);
 
   const removeVendor = async (id) => {
     setDeletingVendorId(id);

@@ -359,18 +359,47 @@ const vendorStatStyles = StyleSheet.create({
 const DashboardScreen = ({ navigation }) => {
   const { user } = useContext(AuthContext);
   const role = user?.role;
+  const [unreadCount, setUnreadCount] = React.useState(0);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    const fetchUnread = async () => {
+      try {
+        const { appNotificationService } = require('../services/appNotificationService');
+        const data = await appNotificationService.list({ limit: 1 });
+        if (!cancelled) setUnreadCount(data.unreadCount ?? 0);
+      } catch (_) {}
+    };
+    fetchUnread();
+    const interval = setInterval(fetchUnread, 30000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, []);
 
   useLayoutEffect(() => {
     navigation.setOptions({
       headerRight: () => (
-        <IconButton
-          icon="bell-outline"
-          iconColor="#fff"
-          onPress={() => navigation.navigate('Notifications')}
-        />
+        <View>
+          <IconButton
+            icon="bell-outline"
+            iconColor="#fff"
+            onPress={() => navigation.navigate('Notifications')}
+          />
+          {unreadCount > 0 && (
+            <View style={{
+              position: 'absolute', top: 6, right: 6,
+              backgroundColor: '#ef4444', borderRadius: 10,
+              minWidth: 18, height: 18, justifyContent: 'center', alignItems: 'center',
+              paddingHorizontal: 4, borderWidth: 2, borderColor: '#5c6bc0',
+            }}>
+              <Text style={{ color: '#fff', fontSize: 10, fontWeight: '800', lineHeight: 13 }}>
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </Text>
+            </View>
+          )}
+        </View>
       ),
     });
-  }, [navigation]);
+  }, [navigation, unreadCount]);
 
   if (role === 'vendor') return <VendorDashboard user={user} navigation={navigation} />;
   return <EventsDashboard user={user} navigation={navigation} />;
