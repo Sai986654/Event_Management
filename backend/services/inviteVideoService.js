@@ -20,13 +20,11 @@ const MAX_RETRIES = 2;
 
 function isNonRetryableTtsError(err) {
   const msg = String(err?.message || '');
+  // Only consider it non-retryable if ALL providers have been exhausted
   return (
-    /ElevenLabs\s+401/i.test(msg) ||
-    /authorization_error/i.test(msg) ||
-    /model_deprecated_free_tier/i.test(msg) ||
-    /subscription_required/i.test(msg) ||
-    /detected_unusual_activity/i.test(msg) ||
-    /free\s*tier\s*usage\s*disabled/i.test(msg)
+    /All\s+TTS\s+providers\s+failed/i.test(msg) ||
+    // Network/system errors that won't be fixed by retrying
+    /ENOTFOUND|ECONNREFUSED|ECONNRESET|timeout/i.test(msg)
   );
 }
 

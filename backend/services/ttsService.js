@@ -183,20 +183,112 @@ async function elevenLabsGenerate(text) {
 /* ── Public API ──────────────────────────────────────────────── */
 
 /**
+ * Determine if an error is a fatal, non-retryable TTS error from a specific provider.
+ * @param {Error} err - The error to check.
+ * @param {string} provider - The provider that threw the error.
+ * @returns {boolean}
+ */
+function isFatalProviderError(err, provider) {
+  const msg = String(err?.message || '');
+  
+  if (provider === 'elevenlabs') {
+    return (
+      /ElevenLabs\s+401/i.test(msg) ||
+      /authorization_error/i.test(msg) ||
+      /model_deprecated_free_tier/i.test(msg) ||
+      /subscription_required/i.test(msg) ||
+      /detected_unusual_activity/i.test(msg) ||
+      /free\s*tier\s*usage\s*disabled/i.test(msg)
+    );
+  }
+  
+  if (provider === 'azure') {
+    // Azure auth errors or quota exceeded
+    return /401|403|subscription|quota/i.test(msg);
+  }
+  
+  return false;
+}
+
+/**
+ * Get fallback providers for a primary provider.
+ * @param {string} primaryProvider - The primary provider that failed.
+ * @returns {Array<string>} Ordered list of fallback providers to try.
+ */
+function getFallbackProviders(primaryProvider) {
+  switch (primaryProvider) {
+    case 'elevenlabs':
+      // If ElevenLabs fails, try Azure (if configured), then gtts
+      return process.env.AZURE_TTS_KEY ? ['azure', 'gtts'] : ['gtts'];
+    case 'azure':
+      // If Azure fails, try gtts (gtts always works as last resort)
+      return ['gtts'];
+    case 'gtts':
+    default:
+      return [];
+  }
+}
+
+/**
  * Generate speech audio buffer from text.
+ * Automatically falls back to alternative providers if the primary one fails.
+ * 
  * @param {string} text - The text to convert.
+ * @param {string} lang - Language code (default: 'en').
  * @returns {Promise<Buffer>} MP3 audio buffer.
  */
 async function generateSpeech(text, lang = 'en') {
-  switch (TTS_PROVIDER) {
-    case 'azure':
-      return azureGenerate(text, lang);
-    case 'elevenlabs':
-      return elevenLabsGenerate(text);
-    case 'gtts':
-    default:
-      return gttsGenerate(text, lang);
+  const primaryProvider = TTS_PROVIDER;
+  const providers = [primaryProvider, ...getFallbackProviders(primaryProvider)];
+  const errors = [];
+
+  for (const provider of providers) {
+    try {
+      console.log(`[TTS] Attempting speech generation with provider: ${provider}`);
+      
+      let buffer;
+      switch (provider) {
+        case 'azure':
+          buffer = await azureGenerate(text, lang);
+          break;
+        case 'elevenlabs':
+          buffer = await elevenLabsGenerate(text);
+          break;
+        case 'gtts':
+        default:
+          buffer = await gttsGenerate(text, lang);
+          break;
+      }
+
+      if (provider !== primaryProvider) {
+        console.log(`[TTS] Primary provider "${primaryProvider}" failed, fell back to "${provider}" successfully`);
+      }
+      return buffer;
+    } catch (err) {
+      errors.push({ provider, error: err });
+      const isFatal = isFatalProviderError(err, provider);
+      console.warn(
+        `[TTS] Provider "${provider}" failed ${isFatal ? '(fatal, not retryable)' : '(will try fallback)'}: ${err.message}`
+      );
+
+      if (isFatal && provider === primaryProvider) {
+        // Fatal error from primary provider — try fallbacks
+        continue;
+      } else if (isFatal && provider !== primaryProvider) {
+        // Fatal error from fallback — skip to next fallback
+        continue;
+      } else {
+        // Retryable error — stop here and bubble up
+        throw err;
+      }
+    }
   }
+
+  // All providers exhausted — return detailed error
+  const errorDetails = errors
+    .map((e) => `${e.provider}: ${e.error.message}`)
+    .join(' | ');
+  throw new Error(`All TTS providers failed. Tried: ${errorDetails}`);
 }
 
 module.exports = { generateSpeech };
