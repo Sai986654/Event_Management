@@ -6,6 +6,11 @@
   "scripts": {
     "start": "node server.js",
     "migrate:deploy": "prisma migrate deploy",
+    "migrate:init": "node scripts/initialize-migrations.js --deploy --validate",
+    "migrate:status": "prisma migrate status",
+    "migrate:resolve": "prisma migrate resolve --applied 202603202250_phase1_foundation",
+    "db:init": "node scripts/initialize-migrations.js --deploy --validate",
+    "db:reset": "prisma migrate reset --force",
     "start:prod": "sh ./scripts/start-production.sh",
     "vendor:webhook:setup": "node scripts/setup-vendor-webhook.js",
     "vendor:webhook:bootstrap": "node scripts/bootstrap-vendor-webhook.js",

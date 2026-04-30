@@ -4,6 +4,7 @@ const http = require('http');
 const cors = require('cors');
 const { Server } = require('socket.io');
 const { connectDBWithRetry, getDatabaseState, prisma } = require('./config/db');
+const { ensureDatabaseReady, getMigrationState } = require('./utils/databaseSetup');
 const errorHandler = require('./middleware/errorHandler');
 const initSocket = require('./socket');
 const { createOriginHandler } = require('./config/corsOrigins');
@@ -109,6 +110,7 @@ app.use('/api/payments', paymentRoutes);
 // Health check
 app.get('/api/health', (req, res) => {
   const dbState = getDatabaseState();
+  const migrationState = getMigrationState();
   const status = dbState.ready ? 'ok' : 'starting';
 
   res.status(dbState.ready ? 200 : 503).json({
@@ -120,6 +122,11 @@ app.get('/api/health', (req, res) => {
       attempts: dbState.attempts,
       connectedAt: dbState.connectedAt,
       lastError: dbState.lastError,
+    },
+    migrations: {
+      initialized: migrationState.initialized,
+      hasPendingMigrations: migrationState.hasPendingMigrations,
+      lastCheck: migrationState.lastCheck,
     },
   });
 });
@@ -134,6 +141,18 @@ const start = async () => {
   server.listen(PORT, () => {
     console.log(`Vedika 360 server running on port ${PORT}`);
   });
+
+  // Ensure database migrations are applied before starting services
+  const migrationsReady = await ensureDatabaseReady({
+    verbose: process.env.NODE_ENV === 'development',
+    skipValidation: process.env.SKIP_SCHEMA_VALIDATION === 'true',
+  });
+
+  if (!migrationsReady) {
+    console.error('[DB] Failed to apply database migrations');
+    console.error('[DB] Please run: npm run migrate:deploy');
+    process.exit(1);
+  }
 
   connectDBWithRetry().catch((error) => {
     console.error('[DB] Unable to establish connection loop:', error?.message || error);
