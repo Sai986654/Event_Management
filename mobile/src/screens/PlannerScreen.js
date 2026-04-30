@@ -6,10 +6,10 @@ import { eventService } from '../services/eventService';
 import { packageService } from '../services/packageService';
 import { orderService } from '../services/orderService';
 import { aiService } from '../services/aiService';
-import { formatCurrency, getErrorMessage, getPaymentRequirement } from '../utils/helpers';
+import { formatCurrency, getErrorMessage } from '../utils/helpers';
 import { AuthContext } from '../context/AuthContext';
 import { Colors, Spacing, Radius } from '../theme';
-import { paymentService } from '../services/paymentService';
+import { runWithPaymentRetry } from '../utils/paymentRetry';
 
 const PlannerScreen = () => {
   const { user } = useContext(AuthContext);

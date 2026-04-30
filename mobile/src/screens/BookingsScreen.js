@@ -3,9 +3,9 @@ import { View, StyleSheet, FlatList, RefreshControl, Alert } from 'react-native'
 import { Text, Card, Chip, Button, ActivityIndicator } from 'react-native-paper';
 import { AuthContext } from '../context/AuthContext';
 import { bookingService } from '../services/bookingService';
-import { formatDate, formatCurrency, getErrorMessage, getPaymentRequirement, getStatusColor } from '../utils/helpers';
+import { formatDate, formatCurrency, getErrorMessage, getStatusColor } from '../utils/helpers';
 import { Colors, Spacing, Radius } from '../theme';
-import { paymentService } from '../services/paymentService';
+import { runWithPaymentRetry } from '../utils/paymentRetry';
 
 const BookingsScreen = () => {
   const { user } = useContext(AuthContext);
@@ -27,25 +27,15 @@ const BookingsScreen = () => {
 
   useEffect(() => { fetchBookings(); }, [fetchBookings]);
 
-  const handleUpdateStatus = async (id, status, hasRetriedAfterPayment = false) => {
+  const handleUpdateStatus = async (id, status) => {
     try {
-      await bookingService.updateBookingStatus(id, status);
+      await runWithPaymentRetry({
+        action: () => bookingService.updateBookingStatus(id, status),
+        paymentDescription: `Booking #${id} ${status}`,
+        onPaymentError: (paymentErr) => Alert.alert('Payment Error', getErrorMessage(paymentErr)),
+      });
       fetchBookings();
     } catch (err) {
-      const paymentRequirement = getPaymentRequirement(err);
-      if (paymentRequirement && !hasRetriedAfterPayment) {
-        try {
-          await paymentService.checkoutForRequirement(
-            paymentRequirement,
-            `Booking #${paymentRequirement.entityId} ${status}`
-          );
-          await handleUpdateStatus(id, status, true);
-          return;
-        } catch (paymentErr) {
-          Alert.alert('Payment Error', getErrorMessage(paymentErr));
-          return;
-        }
-      }
       Alert.alert('Error', getErrorMessage(err));
     }
   };

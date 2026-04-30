@@ -7,11 +7,11 @@ import { AuthContext } from '../context/AuthContext';
 import { eventService } from '../services/eventService';
 import { bookingService } from '../services/bookingService';
 import { guestService } from '../services/guestService';
-import { formatDate, formatCurrency, getErrorMessage, getPaymentRequirement, getStatusColor } from '../utils/helpers';
+import { formatDate, formatCurrency, getErrorMessage, getStatusColor } from '../utils/helpers';
 import { aiService } from '../services/aiService';
 import { Colors, Spacing, Radius } from '../theme';
 import LocationPicker from '../components/LocationPicker';
-import { paymentService } from '../services/paymentService';
+import { runWithPaymentRetry } from '../utils/paymentRetry';
 
 const EventDetailScreen = ({ route, navigation }) => {
   const { eventId } = route.params;
@@ -126,25 +126,15 @@ const EventDetailScreen = ({ route, navigation }) => {
     }
   };
 
-  const performBookingAction = async (bookingId, status, hasRetriedAfterPayment = false) => {
+  const performBookingAction = async (bookingId, status) => {
     try {
-      await bookingService.updateBookingStatus(bookingId, status);
+      await runWithPaymentRetry({
+        action: () => bookingService.updateBookingStatus(bookingId, status),
+        paymentDescription: `Booking #${bookingId} confirmation`,
+        onPaymentError: (paymentErr) => Alert.alert('Payment Error', getErrorMessage(paymentErr)),
+      });
       setBookings((prev) => prev.map((b) => (b.id === bookingId ? { ...b, status } : b)));
     } catch (err) {
-      const paymentRequirement = getPaymentRequirement(err);
-      if (paymentRequirement && !hasRetriedAfterPayment) {
-        try {
-          await paymentService.checkoutForRequirement(
-            paymentRequirement,
-            `Booking #${paymentRequirement.entityId} confirmation`
-          );
-          await performBookingAction(bookingId, status, true);
-          return;
-        } catch (paymentErr) {
-          Alert.alert('Payment Error', getErrorMessage(paymentErr));
-          return;
-        }
-      }
       Alert.alert('Error', getErrorMessage(err));
     }
   };
