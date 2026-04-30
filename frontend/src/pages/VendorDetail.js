@@ -12,8 +12,9 @@ import { vendorService } from '../services/vendorService';
 import { bookingService } from '../services/bookingService';
 import { eventService } from '../services/eventService';
 import { aiService } from '../services/aiService';
+import { paymentService } from '../services/paymentService';
 import { AuthContext } from '../context/AuthContext';
-import { formatCurrency, getErrorMessage } from '../utils/helpers';
+import { formatCurrency, getErrorMessage, getPaymentRequirement } from '../utils/helpers';
 import './VendorDetail.css';
 
 const VendorDetail = () => {
@@ -97,6 +98,26 @@ const VendorDetail = () => {
       setBookingVisible(false);
       bookingForm.resetFields();
     } catch (error) {
+      const paymentRequirement = getPaymentRequirement(error);
+      if (paymentRequirement) {
+        try {
+          await paymentService.checkoutForEntity({
+            entityType: paymentRequirement.entityType,
+            entityId: paymentRequirement.entityId,
+            amount: paymentRequirement.config?.amount,
+            description: `Booking #${paymentRequirement.entityId} confirmation`,
+          });
+
+          await bookingService.updateBookingStatus(paymentRequirement.entityId, 'confirmed');
+          message.success('Booking created and payment completed successfully.');
+          setBookingVisible(false);
+          bookingForm.resetFields();
+          return;
+        } catch (paymentError) {
+          message.error(getErrorMessage(paymentError));
+          return;
+        }
+      }
       message.error(getErrorMessage(error));
     } finally {
       setBookingLoading(false);

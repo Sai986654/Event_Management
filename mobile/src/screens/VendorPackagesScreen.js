@@ -5,7 +5,8 @@ import { AuthContext } from '../context/AuthContext';
 import { vendorService } from '../services/vendorService';
 import { bookingService } from '../services/bookingService';
 import { eventService } from '../services/eventService';
-import { formatCurrency, getErrorMessage } from '../utils/helpers';
+import { paymentService } from '../services/paymentService';
+import { formatCurrency, getErrorMessage, getPaymentRequirement } from '../utils/helpers';
 import { Colors, Spacing, Radius } from '../theme';
 import DatePickerInput from '../components/DatePickerInput';
 
@@ -149,6 +150,23 @@ const VendorPackagesScreen = ({ route, navigation }) => {
         { text: 'OK', onPress: () => { setBookingModal(false); navigation.goBack(); } },
       ]);
     } catch (err) {
+      const paymentRequirement = getPaymentRequirement(err);
+      if (paymentRequirement) {
+        try {
+          await paymentService.checkoutForRequirement(
+            paymentRequirement,
+            `Booking #${paymentRequirement.entityId} confirmation`
+          );
+          await bookingService.updateBookingStatus(paymentRequirement.entityId, 'confirmed');
+          Alert.alert('Success', 'Booking created and payment completed!', [
+            { text: 'OK', onPress: () => { setBookingModal(false); navigation.goBack(); } },
+          ]);
+          return;
+        } catch (paymentError) {
+          Alert.alert('Payment Error', getErrorMessage(paymentError));
+          return;
+        }
+      }
       Alert.alert('Error', getErrorMessage(err));
     } finally {
       setSubmitting(false);

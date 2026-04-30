@@ -12,16 +12,45 @@ exports.createBooking = asyncHandler(async (req, res) => {
   const vendorDoc = await prisma.vendor.findUnique({ where: { id: Number(vendor) } });
   if (!vendorDoc) return res.status(404).json({ message: 'Vendor not found' });
 
-  const booking = await prisma.booking.create({
-    data: {
-      eventId: Number(event),
-      vendorId: Number(vendor),
+  const eventId = Number(event);
+  const vendorId = Number(vendor);
+  let booking = await prisma.booking.findFirst({
+    where: {
+      eventId,
+      vendorId,
       organizerId: req.user.id,
-      price,
-      serviceDate: new Date(serviceDate),
-      notes,
     },
   });
+
+  if (!booking) {
+    booking = await prisma.booking.create({
+      data: {
+        eventId,
+        vendorId,
+        organizerId: req.user.id,
+        price,
+        serviceDate: new Date(serviceDate),
+        notes,
+      },
+    });
+  }
+
+  const requirement = await paymentService.requireCompletedPaymentForEntity({
+    entityType: 'booking',
+    entityId: booking.id,
+    userId: booking.organizerId,
+  });
+
+  if (requirement.required) {
+    return res.status(402).json({
+      message: 'Payment is required before confirming this booking',
+      requiredPayment: true,
+      entityType: 'booking',
+      entityId: booking.id,
+      booking,
+      config: requirement.config,
+    });
+  }
 
   await sendEmail({
     to: req.user.email,
@@ -30,7 +59,7 @@ exports.createBooking = asyncHandler(async (req, res) => {
   });
 
   const io = req.app.get('io');
-  io?.to(`event-${event}`).emit('booking:created', booking);
+  io?.to(`event-${eventId}`).emit('booking:created', booking);
   const creator = await prisma.user.findUnique({ where: { id: req.user.id } });
   await dispatchBookingCreated(io, booking, { creatorUser: creator }).catch((err) =>
     console.error('[BookingCreate] notifications', err.message)
