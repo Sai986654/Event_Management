@@ -15,7 +15,6 @@
 
 const { execSync } = require('child_process');
 const path = require('path');
-const fs = require('fs');
 
 const COLORS = {
   reset: '\x1b[0m',
@@ -49,11 +48,8 @@ const runCommand = (cmd, silent = false) => {
 
 const checkDatabaseConnection = () => {
   log.info('Checking database connection...');
-  const result = runCommand(
-    'npx prisma db execute --stdin < /dev/null || echo "ok"',
-    true
-  );
-  return result.success || true;
+  const result = runCommand('npx prisma migrate status', true);
+  return result.success;
 };
 
 const getMigrationStatus = () => {
@@ -73,23 +69,9 @@ const deployMigrations = () => {
   if (result.success) {
     log.success('Migrations deployed successfully');
     return true;
-  } else if (result.error?.includes('P1014')) {
-    // Shadow database validation error
-    log.warn('Shadow database validation issue detected');
-    log.info('Attempting to resolve validation issue...');
-    
-    // Try marking the baseline as applied if it's the issue
-    const resolveResult = runCommand(
-      'npx prisma migrate resolve --applied 202603202250_phase1_foundation',
-      true
-    );
-    
-    if (resolveResult.success) {
-      log.success('Resolved migration checkpoint');
-      return true;
-    }
   }
   
+  log.error('Refusing automatic migrate resolve to avoid schema drift.');
   log.error(`Migration failed: ${result.error}`);
   return false;
 };
@@ -120,29 +102,9 @@ const validateSchema = () => {
   return false;
 };
 
-const handleShadowDatabaseIssue = () => {
-  log.warn('Handling shadow database issue...');
-  
-  // Set environment variable to disable shadow database
-  const env = process.env;
-  env.PRISMA_HIDE_UPDATE_MESSAGE = 'true';
-  
-  log.info('Attempting migration with fallback strategy...');
-  const result = runCommand('npx prisma migrate deploy --skip-validation', true);
-  
-  if (result.success) {
-    log.success('Migrations deployed with fallback strategy');
-    return true;
-  }
-  
-  log.warn('Fallback strategy did not work, trying alternative approach...');
-  return false;
-};
-
 const main = async () => {
   const args = process.argv.slice(2);
   const isDeploy = args.includes('--deploy');
-  const isReset = args.includes('--reset');
   const isValidate = args.includes('--validate');
 
   console.log(`\n${COLORS.blue}═══════════════════════════════════════${COLORS.reset}`);
@@ -175,11 +137,7 @@ const main = async () => {
     // Step 5: Deploy migrations
     if (isDeploy) {
       if (!deployMigrations()) {
-        // Try shadow database workaround
-        if (!handleShadowDatabaseIssue()) {
-          log.error('Failed to deploy migrations even with fallback strategy');
-          process.exit(1);
-        }
+        process.exit(1);
       }
     }
 

@@ -14,10 +14,8 @@
 
 const { execSync } = require('child_process');
 const path = require('path');
-const fs = require('fs');
 
 const BACKEND_DIR = path.join(__dirname, '..');
-const SCHEMA_PATH = path.join(BACKEND_DIR, 'prisma', 'schema.prisma');
 
 const migrationState = {
   initialized: false,
@@ -89,25 +87,9 @@ const deployPendingMigrations = async () => {
     return true;
   }
 
-  // Check for shadow database validation error
-  const errorMsg = result.stderr + result.stdout;
-  if (errorMsg.includes('P1014') || errorMsg.includes('shadow')) {
-    console.warn('[DB] Shadow database validation issue detected');
-    console.log('[DB] Attempting recovery strategy...');
-    
-    // Try to resolve the baseline migration checkpoint
-    const resolveResult = executePrismaCommand(
-      'migrate resolve --applied 202603202250_phase1_foundation'
-    );
-    
-    if (resolveResult.success) {
-      console.log('[DB] ✓ Resolved migration checkpoint');
-      migrationState.initialized = true;
-      return true;
-    }
-  }
-
   console.error('[DB] ✗ Failed to deploy migrations:', result.error);
+  console.error('[DB] Refusing automatic migrate resolve to avoid schema drift.');
+  console.error('[DB] Run `npx prisma migrate status` and apply a targeted repair migration if needed.');
   return false;
 };
 

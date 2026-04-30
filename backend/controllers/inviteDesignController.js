@@ -27,7 +27,7 @@ const parsePositiveInt = (value) => {
 const inviteDesignTablesReady = async () => {
   try {
     const rows = await prisma.$queryRawUnsafe(
-      "SELECT to_regclass('public.invite_designs') AS invite_designs, to_regclass('public.invite_design_assets') AS invite_design_assets, to_regclass('public.invite_design_exports') AS invite_design_exports"
+      "SELECT to_regclass('public.invite_designs')::text AS invite_designs, to_regclass('public.invite_design_assets')::text AS invite_design_assets, to_regclass('public.invite_design_exports')::text AS invite_design_exports"
     );
     const row = rows?.[0] || {};
     return Boolean(row.invite_designs && row.invite_design_assets && row.invite_design_exports);
