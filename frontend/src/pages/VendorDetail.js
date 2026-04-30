@@ -104,7 +104,7 @@ const VendorDetail = () => {
           await paymentService.checkoutForEntity({
             entityType: paymentRequirement.entityType,
             entityId: paymentRequirement.entityId,
-            amount: paymentRequirement.config?.amount,
+            amount: Number(paymentRequirement.config?.amount || values.price || 0),
             description: `Booking #${paymentRequirement.entityId} confirmation`,
           });
 

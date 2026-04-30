@@ -30,10 +30,14 @@ export const paymentService = {
     if (!requirement?.entityType || !requirement?.entityId) {
       throw new Error('Invalid payment requirement');
     }
+    const configAmount = Number(requirement?.config?.amount || 0);
+    const fallbackAmount = Number(requirement?.suggestedAmount || requirement?.booking?.price || 0);
+    const amount = configAmount > 0 ? configAmount : fallbackAmount;
+
     return paymentService.initiatePayment({
       entityType: requirement.entityType,
       entityId: requirement.entityId,
-      amount: requirement?.config?.amount,
+      amount,
       description,
     });
   },

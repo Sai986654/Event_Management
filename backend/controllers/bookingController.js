@@ -47,6 +47,7 @@ exports.createBooking = asyncHandler(async (req, res) => {
       requiredPayment: true,
       entityType: 'booking',
       entityId: booking.id,
+      suggestedAmount: Number(booking.price || 0),
       booking,
       config: requirement.config,
     });

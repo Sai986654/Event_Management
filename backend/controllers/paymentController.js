@@ -24,18 +24,22 @@ exports.initiatePayment = asyncHandler(async (req, res) => {
     return res.status(400).json({ message: 'Payment is not enabled for this service' });
   }
 
-  const amountFromConfig = Number(config?.amount || 0);
-  const amountFromRequest = Number(amount || 0);
-  const finalAmount = amountFromConfig > 0 ? amountFromConfig : amountFromRequest;
-
-  if (!finalAmount || finalAmount <= 0) {
-    return res.status(400).json({ message: 'Amount must be greater than 0' });
-  }
-
-  // Verify entity exists
+  // Verify entity exists and can be accessed by current user.
   const validEntity = await verifyEntity(entityType, entityId, userId);
   if (!validEntity) {
     return res.status(404).json({ message: `${entityType} not found` });
+  }
+
+  const amountFromConfig = Number(config?.amount || 0);
+  const amountFromRequest = Number(amount || 0);
+  const amountFromEntity =
+    entityType === 'booking'
+      ? Number(validEntity?.price || 0)
+      : 0;
+  const finalAmount = amountFromConfig > 0 ? amountFromConfig : (amountFromRequest > 0 ? amountFromRequest : amountFromEntity);
+
+  if (!finalAmount || finalAmount <= 0) {
+    return res.status(400).json({ message: 'Amount must be greater than 0' });
   }
 
   try {
