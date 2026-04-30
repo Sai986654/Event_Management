@@ -27,22 +27,19 @@ const BookingsScreen = () => {
 
   useEffect(() => { fetchBookings(); }, [fetchBookings]);
 
-  const handleUpdateStatus = async (id, status) => {
+  const handleUpdateStatus = async (id, status, hasRetriedAfterPayment = false) => {
     try {
       await bookingService.updateBookingStatus(id, status);
       fetchBookings();
     } catch (err) {
       const paymentRequirement = getPaymentRequirement(err);
-      if (paymentRequirement) {
+      if (paymentRequirement && !hasRetriedAfterPayment) {
         try {
-          const order = await paymentService.createPaymentOrderFromRequirement(
+          await paymentService.checkoutForRequirement(
             paymentRequirement,
             `Booking #${paymentRequirement.entityId} ${status}`
           );
-          Alert.alert(
-            'Payment Initiated',
-            `Amount: INR ${order.amount}. Complete payment on web app and retry this action.`
-          );
+          await handleUpdateStatus(id, status, true);
           return;
         } catch (paymentErr) {
           Alert.alert('Payment Error', getErrorMessage(paymentErr));

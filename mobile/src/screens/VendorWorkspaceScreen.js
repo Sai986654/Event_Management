@@ -399,18 +399,20 @@ const VendorWorkspaceScreen = ({ navigation }) => {
     return Array.isArray(vendor?.portfolio) ? vendor.portfolio : [];
   }, [vendor]);
 
-  const pickAndUploadMedia = async () => {
+  const pickAndUploadMedia = async (existingAsset = null, hasRetriedAfterPayment = false) => {
     if (!vendor?.id) { Alert.alert('Error', 'Create your business profile first.'); return; }
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') { Alert.alert('Permission needed', 'Allow access to your photos to upload portfolio media.'); return; }
+    let asset = existingAsset;
+    if (!asset) {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') { Alert.alert('Permission needed', 'Allow access to your photos to upload portfolio media.'); return; }
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.All,
-      quality: 0.8,
-    });
-    if (result.canceled || !result.assets?.[0]) return;
-
-    const asset = result.assets[0];
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.All,
+        quality: 0.8,
+      });
+      if (result.canceled || !result.assets?.[0]) return;
+      asset = result.assets[0];
+    }
     setUploadingMedia(true);
     try {
       await vendorService.uploadVendorMedia(vendor.id, {
@@ -423,16 +425,13 @@ const VendorWorkspaceScreen = ({ navigation }) => {
       await loadData();
     } catch (err) {
       const paymentRequirement = getPaymentRequirement(err);
-      if (paymentRequirement) {
+      if (paymentRequirement && !hasRetriedAfterPayment) {
         try {
-          const order = await paymentService.createPaymentOrderFromRequirement(
+          await paymentService.checkoutForRequirement(
             paymentRequirement,
             `Vendor portfolio #${paymentRequirement.entityId} media upload`
           );
-          Alert.alert(
-            'Payment Initiated',
-            `Amount: INR ${order.amount}. Complete payment on web app and retry upload.`
-          );
+          await pickAndUploadMedia(asset, true);
           return;
         } catch (paymentErr) {
           Alert.alert('Payment Error', getErrorMessage(paymentErr));

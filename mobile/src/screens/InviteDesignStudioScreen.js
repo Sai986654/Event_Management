@@ -164,7 +164,7 @@ const InviteDesignStudioScreen = ({ route }) => {
     }
   };
 
-  const exportPdf = async () => {
+  const exportPdf = async (hasRetriedAfterPayment = false) => {
     if (!selectedDesign) {
       Alert.alert('Select design', 'Choose a design first.');
       return;
@@ -178,16 +178,13 @@ const InviteDesignStudioScreen = ({ route }) => {
       Alert.alert('Exported', 'PDF export created.');
     } catch (err) {
       const paymentRequirement = getPaymentRequirement(err);
-      if (paymentRequirement) {
+      if (paymentRequirement && !hasRetriedAfterPayment) {
         try {
-          const order = await paymentService.createPaymentOrderFromRequirement(
+          await paymentService.checkoutForRequirement(
             paymentRequirement,
             `Invite design #${paymentRequirement.entityId} export`
           );
-          Alert.alert(
-            'Payment Initiated',
-            `Amount: INR ${order.amount}. Complete payment on web app and retry export.`
-          );
+          await exportPdf(true);
           return;
         } catch (paymentErr) {
           Alert.alert('Payment Error', getErrorMessage(paymentErr));

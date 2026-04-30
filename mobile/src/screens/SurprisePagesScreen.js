@@ -150,7 +150,7 @@ const SurprisePagesScreen = ({ navigation }) => {
     setSnack('Link copied! Share it with your special person 💕');
   };
 
-  const handlePublish = async (page) => {
+  const handlePublish = async (page, hasRetriedAfterPayment = false) => {
     try {
       setSnack('Deploying your surprise...');
       const res = await surpriseService.publishPage(page.id, 'auto');
@@ -158,16 +158,13 @@ const SurprisePagesScreen = ({ navigation }) => {
       loadData();
     } catch (err) {
       const paymentRequirement = getPaymentRequirement(err);
-      if (paymentRequirement) {
+      if (paymentRequirement && !hasRetriedAfterPayment) {
         try {
-          const order = await paymentService.createPaymentOrderFromRequirement(
+          await paymentService.checkoutForRequirement(
             paymentRequirement,
             `Surprise page #${paymentRequirement.entityId} publish`
           );
-          Alert.alert(
-            'Payment Initiated',
-            `Amount: INR ${order.amount}. Complete payment on web app and retry publish.`
-          );
+          await handlePublish(page, true);
           return;
         } catch (paymentErr) {
           Alert.alert('Payment Error', getErrorMessage(paymentErr));

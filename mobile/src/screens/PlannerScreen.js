@@ -183,7 +183,7 @@ const PlannerScreen = () => {
     finally { setQuoting(false); }
   };
 
-  const placeOrder = async () => {
+  const placeOrder = async (hasRetriedAfterPayment = false) => {
     if (!quote?.id) { setMsg('Generate quote first'); setMsgType('error'); return; }
     try {
       setPlacing(true);
@@ -192,14 +192,13 @@ const PlannerScreen = () => {
       setMsg('Order placed'); setMsgType('success');
     } catch (err) {
       const paymentRequirement = getPaymentRequirement(err);
-      if (paymentRequirement) {
+      if (paymentRequirement && !hasRetriedAfterPayment) {
         try {
-          const order = await paymentService.createPaymentOrderFromRequirement(
+          await paymentService.checkoutForRequirement(
             paymentRequirement,
             `Order #${paymentRequirement.entityId} payment`
           );
-          setMsg(`Payment order created for INR ${order.amount}. Complete payment on web and retry.`);
-          setMsgType('info');
+          await placeOrder(true);
           return;
         } catch (paymentErr) {
           setMsg(getErrorMessage(paymentErr));

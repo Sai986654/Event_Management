@@ -1,4 +1,5 @@
 import api from './api';
+import Constants from 'expo-constants';
 
 export const paymentService = {
   getRequirement: async (entityType, entityId) => {
@@ -39,6 +40,10 @@ export const paymentService = {
 
   checkoutForRequirement: async (requirement, description) => {
     const order = await paymentService.createPaymentOrderFromRequirement(requirement, description);
+
+    if (Constants.appOwnership === 'expo') {
+      throw new Error('Native Razorpay checkout is not available in Expo Go. Use an EAS dev/preview/prod build.');
+    }
 
     let RazorpayCheckout = null;
     try {

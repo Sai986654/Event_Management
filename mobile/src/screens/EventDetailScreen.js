@@ -126,6 +126,29 @@ const EventDetailScreen = ({ route, navigation }) => {
     }
   };
 
+  const performBookingAction = async (bookingId, status, hasRetriedAfterPayment = false) => {
+    try {
+      await bookingService.updateBookingStatus(bookingId, status);
+      setBookings((prev) => prev.map((b) => (b.id === bookingId ? { ...b, status } : b)));
+    } catch (err) {
+      const paymentRequirement = getPaymentRequirement(err);
+      if (paymentRequirement && !hasRetriedAfterPayment) {
+        try {
+          await paymentService.checkoutForRequirement(
+            paymentRequirement,
+            `Booking #${paymentRequirement.entityId} confirmation`
+          );
+          await performBookingAction(bookingId, status, true);
+          return;
+        } catch (paymentErr) {
+          Alert.alert('Payment Error', getErrorMessage(paymentErr));
+          return;
+        }
+      }
+      Alert.alert('Error', getErrorMessage(err));
+    }
+  };
+
   const handleBookingAction = (bookingId, status, label) => {
     Alert.alert(label, `Are you sure you want to ${label.toLowerCase()} this booking?`, [
       { text: 'Cancel' },
@@ -133,29 +156,7 @@ const EventDetailScreen = ({ route, navigation }) => {
         text: label,
         style: status === 'cancelled' ? 'destructive' : 'default',
         onPress: async () => {
-          try {
-            await bookingService.updateBookingStatus(bookingId, status);
-            setBookings((prev) => prev.map((b) => (b.id === bookingId ? { ...b, status } : b)));
-          } catch (err) {
-            const paymentRequirement = getPaymentRequirement(err);
-            if (paymentRequirement) {
-              try {
-                const order = await paymentService.createPaymentOrderFromRequirement(
-                  paymentRequirement,
-                  `Booking #${paymentRequirement.entityId} confirmation`
-                );
-                Alert.alert(
-                  'Payment Initiated',
-                  `Amount: INR ${order.amount}. Complete this payment from the web app, then retry this action.`
-                );
-                return;
-              } catch (paymentErr) {
-                Alert.alert('Payment Error', getErrorMessage(paymentErr));
-                return;
-              }
-            }
-            Alert.alert('Error', getErrorMessage(err));
-          }
+          await performBookingAction(bookingId, status);
         },
       },
     ]);
