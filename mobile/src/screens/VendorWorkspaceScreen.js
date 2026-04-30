@@ -10,9 +10,8 @@ import { vendorService } from '../services/vendorService';
 import { packageService } from '../services/packageService';
 import { adminService } from '../services/adminService';
 import { getErrorMessage, formatCurrency } from '../utils/helpers';
-import { getErrorMessage, getPaymentRequirement } from '../utils/helpers';
-import { paymentService } from '../services/paymentService';
 import { Colors, Spacing, Radius } from '../theme';
+import { runWithPaymentRetry } from '../utils/paymentRetry';
 
 const FALLBACK_CATEGORIES = ['catering', 'decor', 'photography', 'videography', 'music', 'venue', 'florist', 'transportation', 'other'];
 const catLabel = (c) => c ? c.charAt(0).toUpperCase() + c.slice(1) : '';
@@ -399,7 +398,7 @@ const VendorWorkspaceScreen = ({ navigation }) => {
     return Array.isArray(vendor?.portfolio) ? vendor.portfolio : [];
   }, [vendor]);
 
-  const pickAndUploadMedia = async (existingAsset = null, hasRetriedAfterPayment = false) => {
+  const pickAndUploadMedia = async (existingAsset = null) => {
     if (!vendor?.id) { Alert.alert('Error', 'Create your business profile first.'); return; }
     let asset = existingAsset;
     if (!asset) {
@@ -415,29 +414,23 @@ const VendorWorkspaceScreen = ({ navigation }) => {
     }
     setUploadingMedia(true);
     try {
-      await vendorService.uploadVendorMedia(vendor.id, {
-        uri: asset.uri,
-        fileName: asset.fileName || `media-${Date.now()}.jpg`,
-        mimeType: asset.mimeType || (asset.type === 'video' ? 'video/mp4' : 'image/jpeg'),
-      }, mediaCaption);
-      Alert.alert('Success', 'Portfolio media uploaded');
-      setMediaCaption('');
-      await loadData();
+      await runWithPaymentRetry({
+        action: async () => {
+          await vendorService.uploadVendorMedia(vendor.id, {
+            uri: asset.uri,
+            fileName: asset.fileName || `media-${Date.now()}.jpg`,
+            mimeType: asset.mimeType || (asset.type === 'video' ? 'video/mp4' : 'image/jpeg'),
+          }, mediaCaption);
+          Alert.alert('Success', 'Portfolio media uploaded');
+          setMediaCaption('');
+          await loadData();
+        },
+        paymentDescription: `Vendor portfolio media upload`,
+        onPaymentError: (err) => {
+          Alert.alert('Payment Error', getErrorMessage(err));
+        },
+      });
     } catch (err) {
-      const paymentRequirement = getPaymentRequirement(err);
-      if (paymentRequirement && !hasRetriedAfterPayment) {
-        try {
-          await paymentService.checkoutForRequirement(
-            paymentRequirement,
-            `Vendor portfolio #${paymentRequirement.entityId} media upload`
-          );
-          await pickAndUploadMedia(asset, true);
-          return;
-        } catch (paymentErr) {
-          Alert.alert('Payment Error', getErrorMessage(paymentErr));
-          return;
-        }
-      }
       Alert.alert('Upload Error', getErrorMessage(err));
     } finally {
       setUploadingMedia(false);

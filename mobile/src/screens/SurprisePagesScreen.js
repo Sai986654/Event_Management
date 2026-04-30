@@ -7,9 +7,9 @@ import {
   Snackbar, Text, TextInput, Portal, Modal,
 } from 'react-native-paper';
 import { Colors, Radius, Spacing } from '../theme';
-import { getErrorMessage, getPaymentRequirement } from '../utils/helpers';
+import { getErrorMessage } from '../utils/helpers';
 import { surpriseService } from '../services/surpriseService';
-import { paymentService } from '../services/paymentService';
+import { runWithPaymentRetry } from '../utils/paymentRetry';
 
 const CATEGORIES = [
   { key: 'proposal', label: 'Proposal', emoji: '💍', color: '#f093fb' },
@@ -150,27 +150,21 @@ const SurprisePagesScreen = ({ navigation }) => {
     setSnack('Link copied! Share it with your special person 💕');
   };
 
-  const handlePublish = async (page, hasRetriedAfterPayment = false) => {
+  const handlePublish = async (page) => {
     try {
       setSnack('Deploying your surprise...');
-      const res = await surpriseService.publishPage(page.id, 'auto');
-      setSnack(`Published to ${res.deploy.target}! 🚀`);
-      loadData();
+      await runWithPaymentRetry({
+        action: async () => {
+          const res = await surpriseService.publishPage(page.id, 'auto');
+          setSnack(`Published to ${res.deploy.target}! 🚀`);
+          loadData();
+        },
+        paymentDescription: `Surprise page publish`,
+        onPaymentError: (err) => {
+          Alert.alert('Payment Error', getErrorMessage(err));
+        },
+      });
     } catch (err) {
-      const paymentRequirement = getPaymentRequirement(err);
-      if (paymentRequirement && !hasRetriedAfterPayment) {
-        try {
-          await paymentService.checkoutForRequirement(
-            paymentRequirement,
-            `Surprise page #${paymentRequirement.entityId} publish`
-          );
-          await handlePublish(page, true);
-          return;
-        } catch (paymentErr) {
-          Alert.alert('Payment Error', getErrorMessage(paymentErr));
-          return;
-        }
-      }
       Alert.alert('Error', getErrorMessage(err));
     }
   };

@@ -3,9 +3,9 @@ import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { Button, Card, Chip, Divider, Text, TextInput } from 'react-native-paper';
 import { inviteDesignService } from '../services/inviteDesignService';
 import { eventService } from '../services/eventService';
-import { getErrorMessage, getPaymentRequirement } from '../utils/helpers';
+import { getErrorMessage } from '../utils/helpers';
 import { Colors, Radius, Spacing } from '../theme';
-import { paymentService } from '../services/paymentService';
+import { runWithPaymentRetry } from '../utils/paymentRetry';
 
 const InviteDesignStudioScreen = ({ route }) => {
   const { eventId } = route.params;
@@ -164,7 +164,7 @@ const InviteDesignStudioScreen = ({ route }) => {
     }
   };
 
-  const exportPdf = async (hasRetriedAfterPayment = false) => {
+  const exportPdf = async () => {
     if (!selectedDesign) {
       Alert.alert('Select design', 'Choose a design first.');
       return;
@@ -172,25 +172,19 @@ const InviteDesignStudioScreen = ({ route }) => {
 
     setBusy(true);
     try {
-      await inviteDesignService.exportDesign(selectedDesign.id, { format: 'pdf' });
-      const exportRes = await inviteDesignService.listExports(selectedDesign.id);
-      setExportsList(exportRes.exports || []);
-      Alert.alert('Exported', 'PDF export created.');
+      await runWithPaymentRetry({
+        action: async () => {
+          await inviteDesignService.exportDesign(selectedDesign.id, { format: 'pdf' });
+          const exportRes = await inviteDesignService.listExports(selectedDesign.id);
+          setExportsList(exportRes.exports || []);
+          Alert.alert('Exported', 'PDF export created.');
+        },
+        paymentDescription: `Invite design export`,
+        onPaymentError: (err) => {
+          Alert.alert('Payment Error', getErrorMessage(err));
+        },
+      });
     } catch (err) {
-      const paymentRequirement = getPaymentRequirement(err);
-      if (paymentRequirement && !hasRetriedAfterPayment) {
-        try {
-          await paymentService.checkoutForRequirement(
-            paymentRequirement,
-            `Invite design #${paymentRequirement.entityId} export`
-          );
-          await exportPdf(true);
-          return;
-        } catch (paymentErr) {
-          Alert.alert('Payment Error', getErrorMessage(paymentErr));
-          return;
-        }
-      }
       Alert.alert('Error', getErrorMessage(err));
     } finally {
       setBusy(false);
