@@ -31,6 +31,7 @@ const chatRoutes = require('./routes/chatRoutes');
 const webhookRoutes = require('./routes/webhookRoutes');
 const vendorFormSchemaRoutes = require('./routes/vendorFormSchemaRoutes');
 const surpriseRoutes = require('./routes/surpriseRoutes');
+const paymentRoutes = require('./routes/paymentRoutes');
 
 const app = express();
 const server = http.createServer(app);
@@ -103,6 +104,7 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/webhooks', webhookRoutes);
 app.use('/api/public', vendorFormSchemaRoutes);
 app.use('/api/surprises', surpriseRoutes);
+app.use('/api/payments', paymentRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

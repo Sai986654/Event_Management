@@ -7,10 +7,11 @@ import { AuthContext } from '../context/AuthContext';
 import { eventService } from '../services/eventService';
 import { bookingService } from '../services/bookingService';
 import { guestService } from '../services/guestService';
-import { formatDate, formatCurrency, getErrorMessage, getStatusColor } from '../utils/helpers';
+import { formatDate, formatCurrency, getErrorMessage, getPaymentRequirement, getStatusColor } from '../utils/helpers';
 import { aiService } from '../services/aiService';
 import { Colors, Spacing, Radius } from '../theme';
 import LocationPicker from '../components/LocationPicker';
+import { paymentService } from '../services/paymentService';
 
 const EventDetailScreen = ({ route, navigation }) => {
   const { eventId } = route.params;
@@ -136,6 +137,23 @@ const EventDetailScreen = ({ route, navigation }) => {
             await bookingService.updateBookingStatus(bookingId, status);
             setBookings((prev) => prev.map((b) => (b.id === bookingId ? { ...b, status } : b)));
           } catch (err) {
+            const paymentRequirement = getPaymentRequirement(err);
+            if (paymentRequirement) {
+              try {
+                const order = await paymentService.createPaymentOrderFromRequirement(
+                  paymentRequirement,
+                  `Booking #${paymentRequirement.entityId} confirmation`
+                );
+                Alert.alert(
+                  'Payment Initiated',
+                  `Amount: INR ${order.amount}. Complete this payment from the web app, then retry this action.`
+                );
+                return;
+              } catch (paymentErr) {
+                Alert.alert('Payment Error', getErrorMessage(paymentErr));
+                return;
+              }
+            }
             Alert.alert('Error', getErrorMessage(err));
           }
         },

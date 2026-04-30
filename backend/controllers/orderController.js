@@ -2,6 +2,7 @@ const { prisma } = require('../config/db');
 const asyncHandler = require('../utils/asyncHandler');
 const { estimatePackagePrice } = require('../utils/pricing');
 const { dispatchOrderQuoted } = require('../services/inAppNotificationService');
+const paymentService = require('../services/paymentService');
 
 exports.createOrderQuote = asyncHandler(async (req, res) => {
   const { eventId, selections = [], notes } = req.body;
@@ -138,6 +139,22 @@ exports.placeOrder = asyncHandler(async (req, res) => {
 
   if (order.customerId !== req.user.id && req.user.role !== 'admin') {
     return res.status(403).json({ message: 'Not authorized' });
+  }
+
+  const requirement = await paymentService.requireCompletedPaymentForEntity({
+    entityType: 'order',
+    entityId: order.id,
+    userId: order.customerId,
+  });
+
+  if (requirement.required) {
+    return res.status(402).json({
+      message: 'Payment is required before placing this order',
+      requiredPayment: true,
+      entityType: 'order',
+      entityId: order.id,
+      config: requirement.config,
+    });
   }
 
   const updated = await prisma.eventOrder.update({

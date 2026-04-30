@@ -5,7 +5,8 @@ import { packageService } from '../services/packageService';
 import { orderService } from '../services/orderService';
 import { vendorService } from '../services/vendorService';
 import { aiService } from '../services/aiService';
-import { getErrorMessage } from '../utils/helpers';
+import { getErrorMessage, getPaymentRequirement } from '../utils/helpers';
+import { paymentService } from '../services/paymentService';
 import './PhaseFlows.css';
 
 const { Text } = Typography;
@@ -460,7 +461,7 @@ const EventPlanner = () => {
     }
   };
 
-  const placeOrder = async () => {
+  const placeOrder = async (hasRetriedAfterPayment = false) => {
     if (!quote?.id) return;
     setPlacingOrder(true);
     try {
@@ -468,6 +469,22 @@ const EventPlanner = () => {
       setQuote((prev) => ({ ...prev, ...res.order }));
       message.success('Order placed');
     } catch (err) {
+      const paymentRequirement = getPaymentRequirement(err);
+      if (paymentRequirement && !hasRetriedAfterPayment) {
+        try {
+          await paymentService.checkoutForEntity({
+            entityType: paymentRequirement.entityType,
+            entityId: paymentRequirement.entityId,
+            amount: paymentRequirement.config?.amount,
+            description: `Order #${paymentRequirement.entityId} payment`,
+          });
+          await placeOrder(true);
+          return;
+        } catch (paymentError) {
+          message.error(getErrorMessage(paymentError));
+          return;
+        }
+      }
       message.error(getErrorMessage(err));
     } finally {
       setPlacingOrder(false);

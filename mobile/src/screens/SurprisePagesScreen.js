@@ -7,8 +7,9 @@ import {
   Snackbar, Text, TextInput, Portal, Modal,
 } from 'react-native-paper';
 import { Colors, Radius, Spacing } from '../theme';
-import { getErrorMessage } from '../utils/helpers';
+import { getErrorMessage, getPaymentRequirement } from '../utils/helpers';
 import { surpriseService } from '../services/surpriseService';
+import { paymentService } from '../services/paymentService';
 
 const CATEGORIES = [
   { key: 'proposal', label: 'Proposal', emoji: '💍', color: '#f093fb' },
@@ -155,7 +156,26 @@ const SurprisePagesScreen = ({ navigation }) => {
       const res = await surpriseService.publishPage(page.id, 'auto');
       setSnack(`Published to ${res.deploy.target}! 🚀`);
       loadData();
-    } catch (err) { Alert.alert('Error', getErrorMessage(err)); }
+    } catch (err) {
+      const paymentRequirement = getPaymentRequirement(err);
+      if (paymentRequirement) {
+        try {
+          const order = await paymentService.createPaymentOrderFromRequirement(
+            paymentRequirement,
+            `Surprise page #${paymentRequirement.entityId} publish`
+          );
+          Alert.alert(
+            'Payment Initiated',
+            `Amount: INR ${order.amount}. Complete payment on web app and retry publish.`
+          );
+          return;
+        } catch (paymentErr) {
+          Alert.alert('Payment Error', getErrorMessage(paymentErr));
+          return;
+        }
+      }
+      Alert.alert('Error', getErrorMessage(err));
+    }
   };
 
   const handleUnpublish = async (page) => {

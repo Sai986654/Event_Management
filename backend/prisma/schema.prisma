@@ -136,6 +136,7 @@ model User {
   chatThreadsStarted ChatThread[] @relation("ThreadCreator")
   chatMessages       ChatMessage[]
   surprisePages      SurprisePage[]
+  payments           Payment[]
 
   @@map("users")
 }
@@ -796,4 +797,91 @@ model ChatMessage {
 
   @@index([threadId, createdAt])
   @@map("chat_messages")
+}
+
+// ── Payment System (Razorpay Integration) ────────────────────────
+
+enum PaymentStatus {
+  pending
+  initiated
+  completed
+  failed
+  refunded
+}
+
+enum PaymentMethod {
+  razorpay
+  upi
+  card
+  netbanking
+}
+
+enum PaymentEntityType {
+  event
+  booking
+  order
+  surprise_page
+  invite_design_export
+  vendor_portfolio
+}
+
+model Payment {
+  id                    Int               @id @default(autoincrement())
+  razorpayOrderId       String            @unique @map("razorpay_order_id") @db.VarChar(120)
+  razorpayPaymentId     String?           @map("razorpay_payment_id") @db.VarChar(120)
+  razorpaySignature     String?           @map("razorpay_signature") @db.VarChar(500)
+  razorpayRefundId      String?           @map("razorpay_refund_id") @db.VarChar(120)
+  userId                Int               @map("user_id")
+  entityType            PaymentEntityType @map("entity_type")
+  entityId              Int               @map("entity_id")
+  amount                Decimal           @db.Decimal(12, 2)
+  currency              String            @default("INR") @db.VarChar(10)
+  status                PaymentStatus     @default(pending)
+  paymentMethod         PaymentMethod?    @map("payment_method")
+  description           String?           @db.Text
+  notes                 Json              @default("{}")
+  receiptId             String?           @map("receipt_id") @db.VarChar(120)
+  failureReason         String?           @map("failure_reason") @db.Text
+  attemptCount          Int               @default(0) @map("attempt_count")
+  completedAt           DateTime?         @map("completed_at")
+  refundedAt            DateTime?         @map("refunded_at")
+  createdAt             DateTime          @default(now()) @map("created_at")
+  updatedAt             DateTime          @updatedAt @map("updated_at")
+
+  user                  User              @relation(fields: [userId], references: [id])
+
+  @@index([userId, status])
+  @@index([entityType, entityId])
+  @@index([razorpayOrderId])
+  @@index([createdAt(sort: Desc)])
+  @@map("payments")
+}
+
+model PaymentConfiguration {
+  id                    Int               @id @default(autoincrement())
+  entityType            PaymentEntityType @unique @map("entity_type")
+  isEnabled             Boolean           @default(false) @map("is_enabled")
+  amount                Decimal?          @db.Decimal(12, 2)
+  description           String?           @db.Text
+  allowManualOverride   Boolean           @default(true) @map("allow_manual_override")
+  notes                 Json              @default("{}")
+  createdAt             DateTime          @default(now()) @map("created_at")
+  updatedAt             DateTime          @updatedAt @map("updated_at")
+
+  @@map("payment_configurations")
+}
+
+model PaymentWebhookLog {
+  id                    Int               @id @default(autoincrement())
+  webhookId             String            @map("webhook_id") @db.VarChar(120)
+  eventType             String            @map("event_type") @db.VarChar(100)
+  payload               Json              @default("{}")
+  processed             Boolean           @default(false)
+  error                 String?           @db.Text
+  processedAt           DateTime?         @map("processed_at")
+  createdAt             DateTime          @default(now()) @map("created_at")
+
+  @@index([webhookId])
+  @@index([eventType, processed])
+  @@map("payment_webhook_logs")
 }

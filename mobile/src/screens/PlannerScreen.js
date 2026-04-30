@@ -6,9 +6,10 @@ import { eventService } from '../services/eventService';
 import { packageService } from '../services/packageService';
 import { orderService } from '../services/orderService';
 import { aiService } from '../services/aiService';
-import { formatCurrency, getErrorMessage } from '../utils/helpers';
+import { formatCurrency, getErrorMessage, getPaymentRequirement } from '../utils/helpers';
 import { AuthContext } from '../context/AuthContext';
 import { Colors, Spacing, Radius } from '../theme';
+import { paymentService } from '../services/paymentService';
 
 const PlannerScreen = () => {
   const { user } = useContext(AuthContext);
@@ -189,7 +190,26 @@ const PlannerScreen = () => {
       const res = await orderService.placeOrder(quote.id);
       setQuote((prev) => ({ ...prev, ...res.order }));
       setMsg('Order placed'); setMsgType('success');
-    } catch (err) { setMsg(getErrorMessage(err)); setMsgType('error'); }
+    } catch (err) {
+      const paymentRequirement = getPaymentRequirement(err);
+      if (paymentRequirement) {
+        try {
+          const order = await paymentService.createPaymentOrderFromRequirement(
+            paymentRequirement,
+            `Order #${paymentRequirement.entityId} payment`
+          );
+          setMsg(`Payment order created for INR ${order.amount}. Complete payment on web and retry.`);
+          setMsgType('info');
+          return;
+        } catch (paymentErr) {
+          setMsg(getErrorMessage(paymentErr));
+          setMsgType('error');
+          return;
+        }
+      }
+      setMsg(getErrorMessage(err));
+      setMsgType('error');
+    }
     finally { setPlacing(false); }
   };
 

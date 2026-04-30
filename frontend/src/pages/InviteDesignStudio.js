@@ -28,7 +28,8 @@ import {
 import { eventService } from '../services/eventService';
 import { guestService } from '../services/guestService';
 import { inviteDesignService } from '../services/inviteDesignService';
-import { getErrorMessage } from '../utils/helpers';
+import { getErrorMessage, getPaymentRequirement } from '../utils/helpers';
+import { paymentService } from '../services/paymentService';
 import './InviteDesignStudio.css';
 
 const { Text, Title } = Typography;
@@ -222,7 +223,7 @@ const InviteDesignStudio = () => {
     }
   };
 
-  const handleExportPdf = async () => {
+  const handleExportPdf = async (hasRetriedAfterPayment = false) => {
     if (!selectedDesignId) {
       message.warning('Select a design first.');
       return;
@@ -235,6 +236,22 @@ const InviteDesignStudio = () => {
       const exportRes = await inviteDesignService.listExports(selectedDesignId);
       setExportsList(exportRes.exports || []);
     } catch (error) {
+      const paymentRequirement = getPaymentRequirement(error);
+      if (paymentRequirement && !hasRetriedAfterPayment) {
+        try {
+          await paymentService.checkoutForEntity({
+            entityType: paymentRequirement.entityType,
+            entityId: paymentRequirement.entityId,
+            amount: paymentRequirement.config?.amount,
+            description: `Invite design #${paymentRequirement.entityId} export`,
+          });
+          await handleExportPdf(true);
+          return;
+        } catch (paymentError) {
+          message.error(getErrorMessage(paymentError));
+          return;
+        }
+      }
       message.error(getErrorMessage(error));
     } finally {
       setExportingPdf(false);

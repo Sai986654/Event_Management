@@ -34,6 +34,18 @@ export const getErrorMessage = (error) => {
   return msg;
 };
 
+export const getPaymentRequirement = (error) => {
+  const data = error?.response?.data;
+  if (!data || !data.requiredPayment) return null;
+  if (!data.entityType || !data.entityId) return null;
+  return {
+    entityType: data.entityType,
+    entityId: Number(data.entityId),
+    config: data.config || null,
+    message: data.message || 'Payment is required for this action',
+  };
+};
+
 export const getRoleColor = (role) => {
   const colors = {
     admin: '#ff4d4f',

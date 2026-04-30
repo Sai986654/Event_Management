@@ -3,6 +3,7 @@ const asyncHandler = require('../utils/asyncHandler');
 const { paginate } = require('../utils/pagination');
 const { uploadFile } = require('../services/fileService');
 const { geocode } = require('../services/locationService');
+const paymentService = require('../services/paymentService');
 
 const normalizeCategoryTags = (categories) => {
   if (Array.isArray(categories)) {
@@ -161,6 +162,22 @@ exports.uploadVendorMedia = asyncHandler(async (req, res) => {
 
   if (vendor.userId !== req.user.id && req.user.role !== 'admin') {
     return res.status(403).json({ message: 'Not authorized' });
+  }
+
+  const requirement = await paymentService.requireCompletedPaymentForEntity({
+    entityType: 'vendor_portfolio',
+    entityId: vendor.id,
+    userId: vendor.userId,
+  });
+
+  if (requirement.required) {
+    return res.status(402).json({
+      message: 'Payment is required before adding portfolio media',
+      requiredPayment: true,
+      entityType: 'vendor_portfolio',
+      entityId: vendor.id,
+      config: requirement.config,
+    });
   }
 
   if (!req.file) {

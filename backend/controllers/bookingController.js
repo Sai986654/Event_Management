@@ -3,6 +3,7 @@ const asyncHandler = require('../utils/asyncHandler');
 const { paginate } = require('../utils/pagination');
 const { sendEmail } = require('../services/notificationService');
 const { dispatchBookingCreated } = require('../services/inAppNotificationService');
+const paymentService = require('../services/paymentService');
 
 // POST /api/bookings
 exports.createBooking = asyncHandler(async (req, res) => {
@@ -86,6 +87,25 @@ exports.updateBookingStatus = asyncHandler(async (req, res) => {
   });
   if (!isOrganizer && !isVendor && req.user.role !== 'admin') {
     return res.status(403).json({ message: 'Not authorized to update this booking' });
+  }
+
+  const nextStatus = String(req.body.status || '').toLowerCase();
+  if (nextStatus === 'confirmed') {
+    const requirement = await paymentService.requireCompletedPaymentForEntity({
+      entityType: 'booking',
+      entityId: booking.id,
+      userId: booking.organizerId,
+    });
+
+    if (requirement.required) {
+      return res.status(402).json({
+        message: 'Payment is required before confirming this booking',
+        requiredPayment: true,
+        entityType: 'booking',
+        entityId: booking.id,
+        config: requirement.config,
+      });
+    }
   }
 
   const updated = await prisma.booking.update({

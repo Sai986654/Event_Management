@@ -4,6 +4,7 @@ const { paginate } = require('../utils/pagination');
 const slugify = require('slugify');
 const crypto = require('crypto');
 const { deploySurprisePage } = require('../services/surpriseDeployService');
+const paymentService = require('../services/paymentService');
 
 const generateSlug = (title) =>
   slugify(title, { lower: true, strict: true }) + '-' + crypto.randomBytes(4).toString('hex');
@@ -281,6 +282,22 @@ exports.publishSurprisePage = asyncHandler(async (req, res) => {
   if (!page) return res.status(404).json({ message: 'Not found' });
   if (page.userId !== req.user.id && req.user.role !== 'admin') {
     return res.status(403).json({ message: 'Access denied' });
+  }
+
+  const requirement = await paymentService.requireCompletedPaymentForEntity({
+    entityType: 'surprise_page',
+    entityId: page.id,
+    userId: page.userId,
+  });
+
+  if (requirement.required) {
+    return res.status(402).json({
+      message: 'Payment is required before publishing this surprise page',
+      requiredPayment: true,
+      entityType: 'surprise_page',
+      entityId: page.id,
+      config: requirement.config,
+    });
   }
 
   const result = await deploySurprisePage(page, deployTarget || 'auto');

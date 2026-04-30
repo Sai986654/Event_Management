@@ -3,8 +3,9 @@ import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { Button, Card, Chip, Divider, Text, TextInput } from 'react-native-paper';
 import { inviteDesignService } from '../services/inviteDesignService';
 import { eventService } from '../services/eventService';
-import { getErrorMessage } from '../utils/helpers';
+import { getErrorMessage, getPaymentRequirement } from '../utils/helpers';
 import { Colors, Radius, Spacing } from '../theme';
+import { paymentService } from '../services/paymentService';
 
 const InviteDesignStudioScreen = ({ route }) => {
   const { eventId } = route.params;
@@ -176,6 +177,23 @@ const InviteDesignStudioScreen = ({ route }) => {
       setExportsList(exportRes.exports || []);
       Alert.alert('Exported', 'PDF export created.');
     } catch (err) {
+      const paymentRequirement = getPaymentRequirement(err);
+      if (paymentRequirement) {
+        try {
+          const order = await paymentService.createPaymentOrderFromRequirement(
+            paymentRequirement,
+            `Invite design #${paymentRequirement.entityId} export`
+          );
+          Alert.alert(
+            'Payment Initiated',
+            `Amount: INR ${order.amount}. Complete payment on web app and retry export.`
+          );
+          return;
+        } catch (paymentErr) {
+          Alert.alert('Payment Error', getErrorMessage(paymentErr));
+          return;
+        }
+      }
       Alert.alert('Error', getErrorMessage(err));
     } finally {
       setBusy(false);

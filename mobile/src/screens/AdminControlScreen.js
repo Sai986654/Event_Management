@@ -51,6 +51,11 @@ const AdminControlScreen = () => {
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState('info');
 
+  // ── Payment Configuration ─────────────────────────────────────
+  const [paymentConfigs, setPaymentConfigs] = useState([]);
+  const [loadingPaymentConfigs, setLoadingPaymentConfigs] = useState(false);
+  const [savingPaymentConfig, setSavingPaymentConfig] = useState('');
+
   // ── Load Functions ──────────────────────────────────────────────
   const loadVerificationQueue = useCallback(async () => {
     setLoadingVendors(true);
@@ -109,10 +114,38 @@ const AdminControlScreen = () => {
     loadAllVendors(vendorPage + 1, true);
   }, [loadingMoreVendors, allVendors.length, vendorTotal, vendorPage, loadAllVendors]);
 
+  const loadPaymentConfigurations = useCallback(async () => {
+    setLoadingPaymentConfigs(true);
+    try {
+      const res = await adminService.getPaymentConfigurations();
+      setPaymentConfigs(res.configs || []);
+    } catch (err) {
+      setMessage(getErrorMessage(err));
+      setMessageType('error');
+    } finally {
+      setLoadingPaymentConfigs(false);
+    }
+  }, []);
+
   const loadAll = useCallback(async () => {
-    await Promise.all([loadVerificationQueue(), loadCategories(), loadAllVendors()]);
+    await Promise.all([loadVerificationQueue(), loadCategories(), loadAllVendors(), loadPaymentConfigurations()]);
     setRefreshing(false);
-  }, [loadVerificationQueue, loadCategories, loadAllVendors]);
+  }, [loadVerificationQueue, loadCategories, loadAllVendors, loadPaymentConfigurations]);
+
+  const updatePaymentConfiguration = async (entityType, patch) => {
+    setSavingPaymentConfig(entityType);
+    try {
+      await adminService.upsertPaymentConfiguration(entityType, patch);
+      setMessage(`Payment config updated for ${entityType}`);
+      setMessageType('success');
+      await loadPaymentConfigurations();
+    } catch (err) {
+      setMessage(getErrorMessage(err));
+      setMessageType('error');
+    } finally {
+      setSavingPaymentConfig('');
+    }
+  };
 
   useEffect(() => { loadAll(); }, [loadAll]);
 
@@ -476,6 +509,61 @@ const AdminControlScreen = () => {
     </View>
   );
 
+  const renderPayments = () => (
+    <View>
+      <Text variant="titleMedium" style={styles.sectionTitle}>Service Payment Controls</Text>
+      {loadingPaymentConfigs && <ActivityIndicator style={{ marginVertical: Spacing.md }} color={Colors.primary} />}
+      {paymentConfigs.length === 0 && !loadingPaymentConfigs && (
+        <Text style={styles.emptyText}>No payment configurations found.</Text>
+      )}
+      {paymentConfigs.map((cfg) => (
+        <Card key={cfg.entityType} style={styles.itemCard}>
+          <Card.Content>
+            <Text variant="titleSmall" style={{ fontWeight: '700' }}>{cfg.entityType}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: Spacing.xs }}>
+              <Text style={{ color: Colors.textSecondary }}>Enabled</Text>
+              <Button
+                compact
+                mode={cfg.isEnabled ? 'contained' : 'outlined'}
+                loading={savingPaymentConfig === cfg.entityType}
+                onPress={() =>
+                  updatePaymentConfiguration(cfg.entityType, {
+                    isEnabled: !cfg.isEnabled,
+                    amount: cfg.amount,
+                    allowManualOverride: cfg.allowManualOverride,
+                    description: cfg.description,
+                  })
+                }
+              >
+                {cfg.isEnabled ? 'On' : 'Off'}
+              </Button>
+            </View>
+            <TextInput
+              label="Amount (INR)"
+              mode="outlined"
+              value={String(cfg.amount ?? 0)}
+              onChangeText={(v) => {
+                const nextAmount = Number(v.replace(/[^0-9.]/g, '') || 0);
+                setPaymentConfigs((prev) => prev.map((p) => (p.entityType === cfg.entityType ? { ...p, amount: nextAmount } : p)));
+              }}
+              onBlur={() =>
+                updatePaymentConfiguration(cfg.entityType, {
+                  isEnabled: cfg.isEnabled,
+                  amount: Number(cfg.amount || 0),
+                  allowManualOverride: cfg.allowManualOverride,
+                  description: cfg.description,
+                })
+              }
+              keyboardType="numeric"
+              style={styles.input}
+              outlineStyle={styles.outline}
+            />
+          </Card.Content>
+        </Card>
+      ))}
+    </View>
+  );
+
   return (
     <ScrollView
       style={styles.container}
@@ -493,6 +581,7 @@ const AdminControlScreen = () => {
       {/* Tab Switcher */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabScroll}>
         {[
+          { value: 'payments', label: 'Payments' },
           { value: 'categories', label: 'Categories' },
           { value: 'vendors', label: 'Vendors' },
           { value: 'verification', label: 'Verification' },
@@ -515,6 +604,7 @@ const AdminControlScreen = () => {
       <Card style={styles.card}>
         <Card.Content>
           {activeTab === 'categories' && renderCategories()}
+          {activeTab === 'payments' && renderPayments()}
           {activeTab === 'vendors' && renderVendorManagement()}
           {activeTab === 'verification' && renderVerificationQueue()}
           {activeTab === 'onboarding' && renderOnboarding()}

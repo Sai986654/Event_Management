@@ -3,8 +3,9 @@ import { View, StyleSheet, FlatList, RefreshControl, Alert } from 'react-native'
 import { Text, Card, Chip, Button, ActivityIndicator } from 'react-native-paper';
 import { AuthContext } from '../context/AuthContext';
 import { bookingService } from '../services/bookingService';
-import { formatDate, formatCurrency, getErrorMessage, getStatusColor } from '../utils/helpers';
+import { formatDate, formatCurrency, getErrorMessage, getPaymentRequirement, getStatusColor } from '../utils/helpers';
 import { Colors, Spacing, Radius } from '../theme';
+import { paymentService } from '../services/paymentService';
 
 const BookingsScreen = () => {
   const { user } = useContext(AuthContext);
@@ -31,6 +32,23 @@ const BookingsScreen = () => {
       await bookingService.updateBookingStatus(id, status);
       fetchBookings();
     } catch (err) {
+      const paymentRequirement = getPaymentRequirement(err);
+      if (paymentRequirement) {
+        try {
+          const order = await paymentService.createPaymentOrderFromRequirement(
+            paymentRequirement,
+            `Booking #${paymentRequirement.entityId} ${status}`
+          );
+          Alert.alert(
+            'Payment Initiated',
+            `Amount: INR ${order.amount}. Complete payment on web app and retry this action.`
+          );
+          return;
+        } catch (paymentErr) {
+          Alert.alert('Payment Error', getErrorMessage(paymentErr));
+          return;
+        }
+      }
       Alert.alert('Error', getErrorMessage(err));
     }
   };

@@ -5,7 +5,8 @@ import { AuthContext } from '../context/AuthContext';
 import { vendorService } from '../services/vendorService';
 import { packageService } from '../services/packageService';
 import { adminService } from '../services/adminService';
-import { getErrorMessage } from '../utils/helpers';
+import { getErrorMessage, getPaymentRequirement } from '../utils/helpers';
+import { paymentService } from '../services/paymentService';
 import './PhaseFlows.css';
 
 const FALLBACK_CATEGORIES = ['catering', 'decor', 'photography', 'videography', 'music', 'venue', 'florist', 'transportation', 'other'];
@@ -360,7 +361,7 @@ const VendorWorkspace = () => {
   };
 
   // ---- Portfolio media ----
-  const handlePortfolioUpload = async ({ file, onSuccess, onError }) => {
+  const handlePortfolioUpload = async ({ file, onSuccess, onError }, hasRetriedAfterPayment = false) => {
     if (!vendor?.id) { message.warning('Create your business profile first.'); return; }
     setUploadingMedia(true);
     try {
@@ -370,6 +371,23 @@ const VendorWorkspace = () => {
       await loadData();
       if (typeof onSuccess === 'function') onSuccess('ok');
     } catch (err) {
+      const paymentRequirement = getPaymentRequirement(err);
+      if (paymentRequirement && !hasRetriedAfterPayment) {
+        try {
+          await paymentService.checkoutForEntity({
+            entityType: paymentRequirement.entityType,
+            entityId: paymentRequirement.entityId,
+            amount: paymentRequirement.config?.amount,
+            description: `Vendor portfolio #${paymentRequirement.entityId} media upload`,
+          });
+          await handlePortfolioUpload({ file, onSuccess, onError }, true);
+          return;
+        } catch (paymentError) {
+          message.error(getErrorMessage(paymentError));
+          if (typeof onError === 'function') onError(paymentError);
+          return;
+        }
+      }
       message.error(getErrorMessage(err));
       if (typeof onError === 'function') onError(err);
     } finally {

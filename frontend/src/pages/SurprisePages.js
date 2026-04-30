@@ -11,6 +11,8 @@ import {
   ClockCircleOutlined,
 } from '@ant-design/icons';
 import { surpriseService } from '../services/surpriseService';
+import { paymentService } from '../services/paymentService';
+import { getErrorMessage, getPaymentRequirement } from '../utils/helpers';
 
 const { Title, Text, Paragraph } = Typography;
 const { TextArea } = Input;
@@ -162,7 +164,7 @@ const SurprisePages = () => {
 
   const getShareUrl = (page) => page.deployedUrl || `${window.location.origin}/surprise/${page.slug}`;
 
-  const handlePublish = async (page) => {
+  const handlePublish = async (page, hasRetriedAfterPayment = false) => {
     try {
       message.loading({ content: 'Deploying your surprise...', key: 'publish', duration: 0 });
       const res = await surpriseService.publishPage(page.id, 'auto');
@@ -173,6 +175,22 @@ const SurprisePages = () => {
       });
       loadData();
     } catch (err) {
+      const paymentRequirement = getPaymentRequirement(err);
+      if (paymentRequirement && !hasRetriedAfterPayment) {
+        try {
+          await paymentService.checkoutForEntity({
+            entityType: paymentRequirement.entityType,
+            entityId: paymentRequirement.entityId,
+            amount: paymentRequirement.config?.amount,
+            description: `Surprise page #${paymentRequirement.entityId} publish`,
+          });
+          await handlePublish(page, true);
+          return;
+        } catch (paymentError) {
+          message.error({ content: getErrorMessage(paymentError), key: 'publish' });
+          return;
+        }
+      }
       message.error({ content: err.response?.data?.message || 'Publish failed', key: 'publish' });
     }
   };

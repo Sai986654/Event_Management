@@ -10,6 +10,8 @@ import { vendorService } from '../services/vendorService';
 import { packageService } from '../services/packageService';
 import { adminService } from '../services/adminService';
 import { getErrorMessage, formatCurrency } from '../utils/helpers';
+import { getErrorMessage, getPaymentRequirement } from '../utils/helpers';
+import { paymentService } from '../services/paymentService';
 import { Colors, Spacing, Radius } from '../theme';
 
 const FALLBACK_CATEGORIES = ['catering', 'decor', 'photography', 'videography', 'music', 'venue', 'florist', 'transportation', 'other'];
@@ -420,6 +422,23 @@ const VendorWorkspaceScreen = ({ navigation }) => {
       setMediaCaption('');
       await loadData();
     } catch (err) {
+      const paymentRequirement = getPaymentRequirement(err);
+      if (paymentRequirement) {
+        try {
+          const order = await paymentService.createPaymentOrderFromRequirement(
+            paymentRequirement,
+            `Vendor portfolio #${paymentRequirement.entityId} media upload`
+          );
+          Alert.alert(
+            'Payment Initiated',
+            `Amount: INR ${order.amount}. Complete payment on web app and retry upload.`
+          );
+          return;
+        } catch (paymentErr) {
+          Alert.alert('Payment Error', getErrorMessage(paymentErr));
+          return;
+        }
+      }
       Alert.alert('Upload Error', getErrorMessage(err));
     } finally {
       setUploadingMedia(false);

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, Button, Card, Col, Form, Input, InputNumber, Modal, Popconfirm, Row, Select, Space, Table, Tabs, Tag, message } from 'antd';
+import { Alert, Button, Card, Col, Form, Input, InputNumber, Modal, Popconfirm, Row, Select, Space, Switch, Table, Tabs, Tag, message } from 'antd';
 import { DeleteOutlined, EditOutlined, PlusOutlined, AppstoreOutlined, CloudUploadOutlined, EnvironmentOutlined, ShopOutlined, TeamOutlined, UserAddOutlined } from '@ant-design/icons';
 import { adminService } from '../services/adminService';
 import { vendorService } from '../services/vendorService';
@@ -241,6 +241,36 @@ const AdminControlCenter = () => {
   const [creatingUser, setCreatingUser] = useState(false);
   const [userForm] = Form.useForm();
 
+  // ── Payment Configuration ───────────────────────────────────────
+  const [paymentConfigs, setPaymentConfigs] = useState([]);
+  const [loadingPaymentConfigs, setLoadingPaymentConfigs] = useState(false);
+  const [savingPaymentConfig, setSavingPaymentConfig] = useState('');
+
+  const loadPaymentConfigs = useCallback(async () => {
+    setLoadingPaymentConfigs(true);
+    try {
+      const res = await adminService.getPaymentConfigurations();
+      setPaymentConfigs(res.configs || []);
+    } catch (err) {
+      message.error(getErrorMessage(err));
+    } finally {
+      setLoadingPaymentConfigs(false);
+    }
+  }, []);
+
+  const updatePaymentConfig = async (entityType, patch) => {
+    setSavingPaymentConfig(entityType);
+    try {
+      await adminService.upsertPaymentConfiguration(entityType, patch);
+      message.success(`Payment config updated for ${entityType}`);
+      await loadPaymentConfigs();
+    } catch (err) {
+      message.error(getErrorMessage(err));
+    } finally {
+      setSavingPaymentConfig('');
+    }
+  };
+
   const createUser = async (values) => {
     setCreatingUser(true);
     try {
@@ -260,10 +290,88 @@ const AdminControlCenter = () => {
     loadCategories();
     loadInviteTemplates();
     loadAllVendors();
-  }, [loadVerificationQueue, loadCategories, loadInviteTemplates, loadAllVendors]);
+    loadPaymentConfigs();
+  }, [loadVerificationQueue, loadCategories, loadInviteTemplates, loadAllVendors, loadPaymentConfigs]);
 
   // ── Tab items ──────────────────────────────────────────────────────
   const tabItems = [
+    {
+      key: 'payments',
+      label: <span><AppstoreOutlined /> Payments</span>,
+      children: (
+        <Card className="phase-card" title="Service Payment Controls">
+          <Table
+            loading={loadingPaymentConfigs}
+            rowKey="entityType"
+            dataSource={paymentConfigs}
+            pagination={false}
+            locale={{ emptyText: <div className="phase-empty">No payment configurations found.</div> }}
+            columns={[
+              { title: 'Service', dataIndex: 'entityType', render: (v) => <code>{v}</code> },
+              {
+                title: 'Enabled',
+                dataIndex: 'isEnabled',
+                width: 140,
+                render: (v, r) => (
+                  <Switch
+                    checked={Boolean(v)}
+                    loading={savingPaymentConfig === r.entityType}
+                    onChange={(checked) =>
+                      updatePaymentConfig(r.entityType, {
+                        isEnabled: checked,
+                        amount: r.amount,
+                        allowManualOverride: r.allowManualOverride,
+                        description: r.description,
+                      })
+                    }
+                  />
+                ),
+              },
+              {
+                title: 'Amount (INR)',
+                dataIndex: 'amount',
+                width: 180,
+                render: (v, r) => (
+                  <InputNumber
+                    min={0}
+                    value={v ?? 0}
+                    style={{ width: '100%' }}
+                    onBlur={(e) => {
+                      const raw = Number(e.target.value || 0);
+                      updatePaymentConfig(r.entityType, {
+                        isEnabled: r.isEnabled,
+                        amount: Number.isFinite(raw) ? raw : 0,
+                        allowManualOverride: r.allowManualOverride,
+                        description: r.description,
+                      });
+                    }}
+                  />
+                ),
+              },
+              {
+                title: 'Manual Override',
+                dataIndex: 'allowManualOverride',
+                width: 160,
+                render: (v, r) => (
+                  <Switch
+                    checked={Boolean(v)}
+                    loading={savingPaymentConfig === r.entityType}
+                    onChange={(checked) =>
+                      updatePaymentConfig(r.entityType, {
+                        isEnabled: r.isEnabled,
+                        amount: r.amount,
+                        allowManualOverride: checked,
+                        description: r.description,
+                      })
+                    }
+                  />
+                ),
+              },
+            ]}
+          />
+        </Card>
+      ),
+    },
     {
       key: 'categories',
       label: <span><AppstoreOutlined /> Categories</span>,

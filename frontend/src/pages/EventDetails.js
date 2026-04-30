@@ -25,10 +25,11 @@ import { guestService } from '../services/guestService';
 import { bookingService } from '../services/bookingService';
 import { aiService } from '../services/aiService';
 import { useEventSocket } from '../hooks/useEventSocket';
-import { formatDate, formatCurrency, getErrorMessage } from '../utils/helpers';
+import { formatDate, formatCurrency, getErrorMessage, getPaymentRequirement } from '../utils/helpers';
 import { notificationService } from '../services/notificationService';
 import { AuthContext } from '../context/AuthContext';
 import InviteVideoManager from '../components/InviteVideoManager';
+import { paymentService } from '../services/paymentService';
 import './EventDetails.css';
 
 const { TextArea } = Input;
@@ -151,7 +152,7 @@ const EventDetails = () => {
     { title: 'Check-in', dataIndex: 'checkedIn', key: 'checkedIn', render: (val) => val ? 'Yes' : 'No' },
   ];
 
-  const handleUpdateBookingStatus = async (bookingId, status) => {
+  const handleUpdateBookingStatus = async (bookingId, status, hasRetriedAfterPayment = false) => {
     try {
       await bookingService.updateBookingStatus(bookingId, status);
       message.success(`Booking ${status}`);
@@ -159,6 +160,22 @@ const EventDetails = () => {
         prev.map((b) => (b.id === bookingId ? { ...b, status } : b))
       );
     } catch (error) {
+      const paymentRequirement = getPaymentRequirement(error);
+      if (paymentRequirement && !hasRetriedAfterPayment) {
+        try {
+          await paymentService.checkoutForEntity({
+            entityType: paymentRequirement.entityType,
+            entityId: paymentRequirement.entityId,
+            amount: paymentRequirement.config?.amount,
+            description: `Booking #${paymentRequirement.entityId} confirmation`,
+          });
+          await handleUpdateBookingStatus(bookingId, status, true);
+          return;
+        } catch (paymentError) {
+          message.error(getErrorMessage(paymentError));
+          return;
+        }
+      }
       message.error(getErrorMessage(error));
     }
   };

@@ -62,4 +62,14 @@ export const adminService = {
     const response = await api.post('/admin/vendors/sync-google-places', payload);
     return response.data;
   },
+
+  getPaymentConfigurations: async () => {
+    const response = await api.get('/payments/configurations');
+    return response.data;
+  },
+
+  upsertPaymentConfiguration: async (entityType, payload) => {
+    const response = await api.put(`/payments/configurations/${entityType}`, payload);
+    return response.data;
+  },
 };

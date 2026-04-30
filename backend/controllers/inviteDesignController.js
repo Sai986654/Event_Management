@@ -4,6 +4,7 @@ const { prisma } = require('../config/db');
 const asyncHandler = require('../utils/asyncHandler');
 const { listInviteTemplates, generatePersonalizedInvite } = require('../services/personalizedInviteService');
 const { sendInviteLink } = require('../services/notificationService');
+const paymentService = require('../services/paymentService');
 const { r2Client, R2_BUCKET, R2_PUBLIC_URL } = require('../config/r2');
 
 const canManageEvent = (event, user) =>
@@ -313,6 +314,22 @@ exports.exportInviteDesign = asyncHandler(async (req, res) => {
 
   if (!design) return res.status(404).json({ message: 'Invite design not found' });
   if (!canManageEvent(design.event, req.user)) return res.status(403).json({ message: 'Not authorized' });
+
+  const requirement = await paymentService.requireCompletedPaymentForEntity({
+    entityType: 'invite_design_export',
+    entityId: design.id,
+    userId: design.event.organizerId,
+  });
+
+  if (requirement.required) {
+    return res.status(402).json({
+      message: 'Payment is required before exporting this invite design',
+      requiredPayment: true,
+      entityType: 'invite_design_export',
+      entityId: design.id,
+      config: requirement.config,
+    });
+  }
 
   let fileUrl = req.body.url ? String(req.body.url).trim() : null;
   let fileKey = req.body.fileKey ? String(req.body.fileKey).trim() : null;
