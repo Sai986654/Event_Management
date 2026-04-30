@@ -247,7 +247,15 @@ module.exports = exports;
 exports.PAYMENT_ENTITY_TYPES = PAYMENT_ENTITY_TYPES;
 
 exports.getPaymentConfigurations = async () => {
-  const rows = await prisma.paymentConfiguration.findMany({ orderBy: { entityType: 'asc' } });
+  let rows = [];
+  try {
+    rows = await prisma.paymentConfiguration.findMany({ orderBy: { entityType: 'asc' } });
+  } catch (error) {
+    console.error('Error fetching payment configurations:', error?.message || error);
+    // Drift-safe fallback: return disabled defaults when table is not yet migrated.
+    rows = [];
+  }
+
   const byType = new Map(rows.map((row) => [row.entityType, row]));
 
   return PAYMENT_ENTITY_TYPES.map((entityType) => {
