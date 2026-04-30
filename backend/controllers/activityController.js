@@ -31,8 +31,13 @@ const activitiesBelongToVendor = async (vendorId, orderId) => {
 };
 
 exports.updateActivityProgress = asyncHandler(async (req, res) => {
+  const activityId = Number(req.params.id);
+  if (!Number.isInteger(activityId) || activityId <= 0) {
+    return res.status(400).json({ message: 'Invalid activity id' });
+  }
+
   const activity = await prisma.eventActivity.findUnique({
-    where: { id: Number(req.params.id) },
+    where: { id: activityId },
     include: { order: true },
   });
   if (!activity) return res.status(404).json({ message: 'Activity not found' });

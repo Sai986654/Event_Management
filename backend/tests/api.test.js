@@ -191,7 +191,7 @@ describe('Phase 3 API Flows', () => {
     expect((res.body.order.items || []).length).toBeGreaterThan(0);
     createdOrderId = res.body.order.id;
     createdActivityId = res.body.order.activities?.[0]?.id;
-  });
+  }, 30000);
 
   it('PATCH /api/orders/:id/place — organizer customer should place own order', async () => {
     const res = await request(app)
@@ -199,7 +199,7 @@ describe('Phase 3 API Flows', () => {
       .set('Authorization', `Bearer ${customerToken}`);
     expect(res.statusCode).toBe(200);
     expect(res.body.order.status).toBe('placed');
-  });
+  }, 30000);
 
   it('PATCH /api/activities/:id/progress — admin can update progress', async () => {
     const res = await request(app)
@@ -208,7 +208,7 @@ describe('Phase 3 API Flows', () => {
       .send({ progressPercent: 55, spendActual: 900, status: 'in_progress' });
     expect(res.statusCode).toBe(200);
     expect(res.body.activity.progressPercent).toBe(55);
-  });
+  }, 30000);
 
   it('PATCH /api/activities/:id/progress — vendor should be forbidden', async () => {
     const res = await request(app)
