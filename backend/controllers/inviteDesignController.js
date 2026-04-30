@@ -23,6 +23,30 @@ const parsePositiveInt = (value) => {
   return Number.isInteger(num) && num > 0 ? num : null;
 };
 
+const inviteDesignTablesReady = async () => {
+  try {
+    const rows = await prisma.$queryRawUnsafe(
+      "SELECT to_regclass('public.invite_designs') AS invite_designs, to_regclass('public.invite_design_assets') AS invite_design_assets, to_regclass('public.invite_design_exports') AS invite_design_exports"
+    );
+    const row = rows?.[0] || {};
+    return Boolean(row.invite_designs && row.invite_design_assets && row.invite_design_exports);
+  } catch (_error) {
+    return false;
+  }
+};
+
+const ensureInviteDesignTablesReady = async (res) => {
+  const ready = await inviteDesignTablesReady();
+  if (ready) return true;
+
+  res.status(503).json({
+    message:
+      'Invite Design Studio is not ready on this database yet. Run prisma migrate deploy on the active production database and retry.',
+    code: 'INVITE_DESIGN_MIGRATION_PENDING',
+  });
+  return false;
+};
+
 const buildBasicDesignPdfBuffer = ({ design, event }) =>
   new Promise((resolve, reject) => {
     const chunks = [];
@@ -89,6 +113,8 @@ exports.getInviteDesignTemplates = asyncHandler(async (_req, res) => {
 
 // GET /api/invites/designs?eventId=:id
 exports.listInviteDesigns = asyncHandler(async (req, res) => {
+  if (!(await ensureInviteDesignTablesReady(res))) return;
+
   const eventId = parsePositiveInt(req.query.eventId);
   if (!eventId) return res.status(400).json({ message: 'eventId is required' });
 
@@ -119,6 +145,8 @@ exports.listInviteDesigns = asyncHandler(async (req, res) => {
 
 // POST /api/invites/designs
 exports.createInviteDesign = asyncHandler(async (req, res) => {
+  if (!(await ensureInviteDesignTablesReady(res))) return;
+
   const eventId = parsePositiveInt(req.body.eventId);
   const name = String(req.body.name || '').trim();
 
@@ -151,6 +179,8 @@ exports.createInviteDesign = asyncHandler(async (req, res) => {
 
 // GET /api/invites/designs/:id
 exports.getInviteDesignById = asyncHandler(async (req, res) => {
+  if (!(await ensureInviteDesignTablesReady(res))) return;
+
   const id = parsePositiveInt(req.params.id);
   if (!id) return res.status(400).json({ message: 'Invalid design id' });
 
@@ -171,6 +201,8 @@ exports.getInviteDesignById = asyncHandler(async (req, res) => {
 
 // PATCH /api/invites/designs/:id
 exports.updateInviteDesign = asyncHandler(async (req, res) => {
+  if (!(await ensureInviteDesignTablesReady(res))) return;
+
   const id = parsePositiveInt(req.params.id);
   if (!id) return res.status(400).json({ message: 'Invalid design id' });
 
@@ -222,6 +254,8 @@ exports.updateInviteDesign = asyncHandler(async (req, res) => {
 
 // POST /api/invites/designs/:id/duplicate
 exports.duplicateInviteDesign = asyncHandler(async (req, res) => {
+  if (!(await ensureInviteDesignTablesReady(res))) return;
+
   const id = parsePositiveInt(req.params.id);
   if (!id) return res.status(400).json({ message: 'Invalid design id' });
 
@@ -264,6 +298,8 @@ exports.duplicateInviteDesign = asyncHandler(async (req, res) => {
 
 // POST /api/invites/designs/:id/export
 exports.exportInviteDesign = asyncHandler(async (req, res) => {
+  if (!(await ensureInviteDesignTablesReady(res))) return;
+
   const id = parsePositiveInt(req.params.id);
   const format = normalizeFormat(req.body.format);
 
@@ -313,6 +349,8 @@ exports.exportInviteDesign = asyncHandler(async (req, res) => {
 
 // GET /api/invites/designs/:id/exports
 exports.listInviteDesignExports = asyncHandler(async (req, res) => {
+  if (!(await ensureInviteDesignTablesReady(res))) return;
+
   const id = parsePositiveInt(req.params.id);
   if (!id) return res.status(400).json({ message: 'Invalid design id' });
 
@@ -334,6 +372,8 @@ exports.listInviteDesignExports = asyncHandler(async (req, res) => {
 
 // POST /api/invites/designs/:id/personalize/:guestId
 exports.attachDesignToGuest = asyncHandler(async (req, res) => {
+  if (!(await ensureInviteDesignTablesReady(res))) return;
+
   const designId = parsePositiveInt(req.params.id);
   const guestId = parsePositiveInt(req.params.guestId);
 
@@ -370,6 +410,8 @@ exports.attachDesignToGuest = asyncHandler(async (req, res) => {
 
 // POST /api/invites/designs/:id/send
 exports.generateAndSendFromDesign = asyncHandler(async (req, res) => {
+  if (!(await ensureInviteDesignTablesReady(res))) return;
+
   const designId = parsePositiveInt(req.params.id);
   const sendVia = String(req.body.sendVia || 'email').toLowerCase();
 
