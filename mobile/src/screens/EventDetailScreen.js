@@ -520,6 +520,9 @@ const EventDetailScreen = ({ route, navigation }) => {
                 <Button mode="contained-tonal" icon="video-wireless-outline" style={styles.manageBtn} onPress={() => navigation.navigate('InviteVideos', { eventId, eventTitle: event.title, eventType: event.type })}>
                   Invite Videos
                 </Button>
+                <Button mode="contained-tonal" icon="brush-variant" style={styles.manageBtn} onPress={() => navigation.navigate('InviteDesignStudio', { eventId, eventTitle: event.title })}>
+                  Invite Studio
+                </Button>
               </Card.Content>
             </Card>
 

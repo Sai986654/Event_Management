@@ -19,7 +19,7 @@ import {
   Select,
   Image,
 } from 'antd';
-import { EditOutlined, DeleteOutlined, ControlOutlined, ShopOutlined, CopyOutlined, VideoCameraOutlined, BulbOutlined, CheckSquareOutlined } from '@ant-design/icons';
+import { EditOutlined, DeleteOutlined, ControlOutlined, ShopOutlined, CopyOutlined, VideoCameraOutlined, BulbOutlined, CheckSquareOutlined, BgColorsOutlined } from '@ant-design/icons';
 import { eventService } from '../services/eventService';
 import { guestService } from '../services/guestService';
 import { bookingService } from '../services/bookingService';
@@ -393,6 +393,11 @@ const EventDetails = () => {
               {isOrgOrAdmin && (
                 <Link to={`/events/${eventId}/guests`}>
                   <Button>Guests</Button>
+                </Link>
+              )}
+              {isOrgOrAdmin && (
+                <Link to={`/events/${eventId}/invite-studio`}>
+                  <Button icon={<BgColorsOutlined />}>Invite Studio</Button>
                 </Link>
               )}
               {(isCustomer || isAdmin) && (

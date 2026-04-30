@@ -216,6 +216,7 @@ model Event {
   reviews   Review[]
   media     Media[]
   inviteJobs InviteJob[]
+  inviteDesigns InviteDesign[]
   instantPhotos InstantPhoto[]
 
   @@index([organizerId, date])
@@ -426,6 +427,8 @@ model Guest {
   inviteTone         String?    @map("invite_tone") @db.VarChar(30)
   inviteLanguage     String     @default("en") @map("invite_language") @db.VarChar(10)
   inviteTemplateKey  String?    @map("invite_template_key") @db.VarChar(50)
+  inviteDesignId     Int?       @map("invite_design_id")
+  personalizedLayoutOverrides Json @default("{}") @map("personalized_layout_overrides")
   customInviteMessage String?   @map("custom_invite_message") @db.Text
   personalizedInviteMessage String? @map("personalized_invite_message") @db.Text
   personalizedInvitePdfUrl String?  @map("personalized_invite_pdf_url") @db.VarChar(500)
@@ -443,9 +446,11 @@ model Guest {
   updatedAt          DateTime   @updatedAt @map("updated_at")
 
   event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  inviteDesign InviteDesign? @relation(fields: [inviteDesignId], references: [id], onDelete: SetNull)
 
   @@index([eventId])
   @@index([eventId, email])
+  @@index([inviteDesignId])
   @@map("guests")
 }
 
@@ -511,6 +516,26 @@ enum InviteJobStatus {
   failed
 }
 
+enum InviteDesignStatus {
+  draft
+  published
+  archived
+}
+
+enum InviteDesignAssetType {
+  image
+  font
+  sticker
+  icon
+  audio
+}
+
+enum InviteExportFormat {
+  png
+  jpg
+  pdf
+}
+
 model InviteJob {
   id            Int             @id @default(autoincrement())
   eventId       Int             @map("event_id")
@@ -552,6 +577,61 @@ model InviteGuestVideo {
 
   @@index([jobId, status])
   @@map("invite_guest_videos")
+}
+
+model InviteDesign {
+  id          Int                @id @default(autoincrement())
+  eventId     Int                @map("event_id")
+  name        String             @db.VarChar(160)
+  category    String?            @db.VarChar(80)
+  status      InviteDesignStatus @default(draft)
+  canvasSize  String             @default("1080x1920") @map("canvas_size") @db.VarChar(40)
+  language    String             @default("en") @db.VarChar(10)
+  jsonLayout  Json               @default("{}") @map("json_layout")
+  previewUrl  String?            @map("preview_url") @db.VarChar(500)
+  version     Int                @default(1)
+  createdAt   DateTime           @default(now()) @map("created_at")
+  updatedAt   DateTime           @updatedAt @map("updated_at")
+
+  event       Event              @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  guests      Guest[]
+  assets      InviteDesignAsset[]
+  exports     InviteDesignExport[]
+
+  @@index([eventId, status])
+  @@index([eventId, updatedAt(sort: Desc)])
+  @@map("invite_designs")
+}
+
+model InviteDesignAsset {
+  id         Int                  @id @default(autoincrement())
+  designId   Int                  @map("design_id")
+  type       InviteDesignAssetType
+  url        String               @db.VarChar(500)
+  metadata   Json                 @default("{}")
+  createdAt  DateTime             @default(now()) @map("created_at")
+
+  design     InviteDesign         @relation(fields: [designId], references: [id], onDelete: Cascade)
+
+  @@index([designId, type])
+  @@map("invite_design_assets")
+}
+
+model InviteDesignExport {
+  id              Int               @id @default(autoincrement())
+  designId        Int               @map("design_id")
+  format          InviteExportFormat
+  fileUrl         String            @map("file_url") @db.VarChar(500)
+  fileKey         String?           @map("file_key") @db.VarChar(500)
+  width           Int?
+  height          Int?
+  createdByUserId Int?              @map("created_by_user_id")
+  createdAt       DateTime          @default(now()) @map("created_at")
+
+  design          InviteDesign      @relation(fields: [designId], references: [id], onDelete: Cascade)
+
+  @@index([designId, createdAt(sort: Desc)])
+  @@map("invite_design_exports")
 }
 
 // ── Instant Photo Download (Live Photo Wall) ────────────────────────

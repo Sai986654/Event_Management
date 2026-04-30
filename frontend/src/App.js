@@ -25,6 +25,7 @@ import VendorWorkspace from './pages/VendorWorkspace';
 import AdminControlCenter from './pages/AdminControlCenter';
 import EventPlanner from './pages/EventPlanner';
 import ActivityTracker from './pages/ActivityTracker';
+import InviteDesignStudio from './pages/InviteDesignStudio';
 
 import NotificationsPage from './pages/NotificationsPage';
 import Profile from './pages/Profile';
@@ -148,6 +149,16 @@ const AppInner = () => {
             <ProtectedRoute allowedRoles={['admin', 'organizer']}>
               <AppLayout>
                 <EventControlPanel />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/events/:eventId/invite-studio"
+          element={
+            <ProtectedRoute allowedRoles={['admin', 'organizer']}>
+              <AppLayout>
+                <InviteDesignStudio />
               </AppLayout>
             </ProtectedRoute>
           }
