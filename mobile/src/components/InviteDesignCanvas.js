@@ -1,0 +1,849 @@
+import React, { useMemo, useRef, useState } from 'react';
+import { ScrollView, StyleSheet, View } from 'react-native';
+import { Button, Card, Chip, Divider, Text, TextInput } from 'react-native-paper';
+import { Colors, Radius, Spacing } from '../theme';
+
+const DEFAULT_LAYOUT = {
+  canvasSize: '1080x1920',
+  backgroundColor: '#fff7f2',
+  elements: [],
+};
+
+const parseCanvasSize = (value) => {
+  const [wRaw, hRaw] = String(value || '1080x1920').split('x');
+  const width = Math.max(320, Number(wRaw) || 1080);
+  const height = Math.max(320, Number(hRaw) || 1920);
+  return { width, height };
+};
+
+const numberOrFallback = (value, fallback) => {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return fallback;
+  return num;
+};
+
+const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+const cloneLayout = (value) => JSON.parse(JSON.stringify(value || DEFAULT_LAYOUT));
+
+const InviteDesignCanvas = ({ layout, onLayoutChange }) => {
+  const mergedLayout = {
+    ...DEFAULT_LAYOUT,
+    ...(layout && typeof layout === 'object' ? layout : {}),
+    elements: Array.isArray(layout?.elements) ? layout.elements : [],
+  };
+
+  const [selectedElementId, setSelectedElementId] = useState(null);
+  const [selectedElementIds, setSelectedElementIds] = useState([]);
+  const [multiSelectMode, setMultiSelectMode] = useState(false);
+  const [snapToGrid, setSnapToGrid] = useState(true);
+  const [showSafeArea, setShowSafeArea] = useState(true);
+  const [historyPast, setHistoryPast] = useState([]);
+  const [historyFuture, setHistoryFuture] = useState([]);
+  const dragRef = useRef({
+    activeElementId: null,
+    mode: 'move',
+    startPageX: 0,
+    startPageY: 0,
+    startX: 0,
+    startY: 0,
+    startWidth: 0,
+    startHeight: 0,
+    groupElementIds: [],
+    startPositions: {},
+  });
+
+  const selectedElement = useMemo(
+    () => mergedLayout.elements.find((element) => element.id === selectedElementId) || null,
+    [mergedLayout.elements, selectedElementId]
+  );
+
+  const canvasSize = parseCanvasSize(mergedLayout.canvasSize);
+  const previewWidth = 260;
+  const previewHeight = Math.round((canvasSize.height / canvasSize.width) * previewWidth);
+
+  const commitLayout = (nextLayout, options = {}) => {
+    const { trackHistory = true } = options;
+    if (trackHistory) {
+      setHistoryPast((prev) => [...prev.slice(-39), cloneLayout(mergedLayout)]);
+      setHistoryFuture([]);
+    }
+    onLayoutChange(nextLayout);
+  };
+
+  const patchLayout = (patch, options = {}) => {
+    commitLayout({
+      ...mergedLayout,
+      ...patch,
+    }, options);
+  };
+
+  const patchElement = (elementId, patch, options = {}) => {
+    const nextElements = mergedLayout.elements.map((element) =>
+      element.id === elementId ? { ...element, ...patch } : element
+    );
+    patchLayout({ elements: nextElements }, options);
+  };
+
+  const clearSelection = () => {
+    setSelectedElementId(null);
+    setSelectedElementIds([]);
+  };
+
+  const isElementSelected = (elementId) =>
+    multiSelectMode ? selectedElementIds.includes(elementId) : selectedElementId === elementId;
+
+  const selectElement = (elementId, additive = false) => {
+    setSelectedElementId(elementId);
+    if (!multiSelectMode) {
+      setSelectedElementIds([]);
+      return;
+    }
+
+    if (!additive) {
+      setSelectedElementIds([elementId]);
+      return;
+    }
+
+    setSelectedElementIds((prev) =>
+      prev.includes(elementId) ? prev.filter((id) => id !== elementId) : [...prev, elementId]
+    );
+  };
+
+  const getActiveSelectionIds = (elementId) => {
+    if (!multiSelectMode) return [elementId];
+    if (selectedElementIds.includes(elementId) && selectedElementIds.length > 1) return selectedElementIds;
+    return [elementId];
+  };
+
+  const beginInteractionHistory = () => {
+    setHistoryPast((prev) => [...prev.slice(-39), cloneLayout(mergedLayout)]);
+    setHistoryFuture([]);
+  };
+
+  const undo = () => {
+    if (!historyPast.length) return;
+    const previous = historyPast[historyPast.length - 1];
+    setHistoryPast((prev) => prev.slice(0, -1));
+    setHistoryFuture((prev) => [cloneLayout(mergedLayout), ...prev].slice(0, 40));
+    onLayoutChange(previous);
+    const previousIds = new Set((previous.elements || []).map((element) => element.id));
+    setSelectedElementIds((prev) => prev.filter((id) => previousIds.has(id)));
+    const prevSelected = previous.elements?.find((el) => el.id === selectedElementId);
+    if (!prevSelected) setSelectedElementId(null);
+  };
+
+  const redo = () => {
+    if (!historyFuture.length) return;
+    const [next, ...rest] = historyFuture;
+    setHistoryFuture(rest);
+    setHistoryPast((prev) => [...prev.slice(-39), cloneLayout(mergedLayout)]);
+    onLayoutChange(next);
+    const nextIds = new Set((next.elements || []).map((element) => element.id));
+    setSelectedElementIds((prev) => prev.filter((id) => nextIds.has(id)));
+    const nextSelected = next.elements?.find((el) => el.id === selectedElementId);
+    if (!nextSelected) setSelectedElementId(null);
+  };
+
+  const addElement = (type) => {
+    const id = `el-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const base = {
+      id,
+      type,
+      x: 80,
+      y: 80,
+      width: 520,
+      height: 120,
+      z: mergedLayout.elements.length,
+    };
+
+    const typed =
+      type === 'text'
+        ? {
+            ...base,
+            text: 'New text',
+            fontSize: 42,
+            color: '#2b1d18',
+            textAlign: 'center',
+            fontWeight: '700',
+          }
+        : type === 'shape'
+          ? {
+              ...base,
+              fillColor: '#fcd4b5',
+              borderRadius: 24,
+              height: 180,
+            }
+          : type === 'divider'
+            ? {
+                ...base,
+                width: 640,
+                height: 4,
+                color: '#b45309',
+              }
+            : {
+                ...base,
+                imageUrl: '',
+                width: 480,
+                height: 320,
+              };
+
+    patchLayout({ elements: [...mergedLayout.elements, typed] });
+    setSelectedElementId(id);
+    setSelectedElementIds((prev) => (multiSelectMode ? [...prev, id] : []));
+  };
+
+  const deleteSelected = () => {
+    const targetIds = multiSelectMode && selectedElementIds.length ? selectedElementIds : selectedElement ? [selectedElement.id] : [];
+    if (!targetIds.length) return;
+    patchLayout({
+      elements: mergedLayout.elements.filter((element) => !targetIds.includes(element.id)),
+    });
+    clearSelection();
+  };
+
+  const duplicateSelected = () => {
+    const sourceIds = multiSelectMode && selectedElementIds.length ? selectedElementIds : selectedElement ? [selectedElement.id] : [];
+    if (!sourceIds.length) return;
+
+    const sourceElements = mergedLayout.elements.filter((element) => sourceIds.includes(element.id));
+    if (!sourceElements.length) return;
+
+    const createdIds = [];
+    const duplicated = sourceElements.map((element, idx) => {
+      const id = `el-${Date.now()}-${Math.random().toString(36).slice(2, 6)}-${idx}`;
+      createdIds.push(id);
+      return {
+        ...element,
+        id,
+        x: numberOrFallback(element.x, 80) + 24,
+        y: numberOrFallback(element.y, 80) + 24,
+        z: mergedLayout.elements.length + idx,
+      };
+    });
+
+    patchLayout({ elements: [...mergedLayout.elements, ...duplicated] });
+    if (multiSelectMode) {
+      setSelectedElementIds(createdIds);
+      setSelectedElementId(createdIds[0] || null);
+    } else {
+      setSelectedElementId(createdIds[0] || null);
+      setSelectedElementIds([]);
+    }
+  };
+
+  const reorderSelected = (direction) => {
+    if (!selectedElement) return;
+    const ordered = mergedLayout.elements
+      .slice()
+      .sort((a, b) => numberOrFallback(a.z, 0) - numberOrFallback(b.z, 0));
+    const index = ordered.findIndex((element) => element.id === selectedElement.id);
+    if (index < 0) return;
+
+    const swapIndex = direction === 'up' ? index + 1 : index - 1;
+    if (swapIndex < 0 || swapIndex >= ordered.length) return;
+
+    const next = ordered.slice();
+    [next[index], next[swapIndex]] = [next[swapIndex], next[index]];
+    const normalized = next.map((element, idx) => ({ ...element, z: idx }));
+    patchLayout({ elements: normalized });
+  };
+
+  const onElementDragStart = (element, nativeEvent) => {
+    beginInteractionHistory();
+    if (multiSelectMode && !selectedElementIds.includes(element.id)) {
+      setSelectedElementIds([element.id]);
+    }
+    const activeIds = getActiveSelectionIds(element.id);
+    const activeSet = new Set(activeIds);
+    const startPositions = {};
+    mergedLayout.elements.forEach((item) => {
+      if (activeSet.has(item.id)) {
+        startPositions[item.id] = {
+          x: numberOrFallback(item.x, 0),
+          y: numberOrFallback(item.y, 0),
+        };
+      }
+    });
+    dragRef.current = {
+      activeElementId: element.id,
+      mode: 'move',
+      startPageX: numberOrFallback(nativeEvent?.pageX, 0),
+      startPageY: numberOrFallback(nativeEvent?.pageY, 0),
+      startX: numberOrFallback(element.x, 0),
+      startY: numberOrFallback(element.y, 0),
+      startWidth: numberOrFallback(element.width, 100),
+      startHeight: numberOrFallback(element.height, 60),
+      groupElementIds: activeIds,
+      startPositions,
+    };
+    setSelectedElementId(element.id);
+  };
+
+  const onResizeStart = (element, nativeEvent) => {
+    beginInteractionHistory();
+    dragRef.current = {
+      activeElementId: element.id,
+      mode: 'resize',
+      startPageX: numberOrFallback(nativeEvent?.pageX, 0),
+      startPageY: numberOrFallback(nativeEvent?.pageY, 0),
+      startX: numberOrFallback(element.x, 0),
+      startY: numberOrFallback(element.y, 0),
+      startWidth: numberOrFallback(element.width, 100),
+      startHeight: numberOrFallback(element.height, 60),
+      groupElementIds: [element.id],
+      startPositions: {
+        [element.id]: {
+          x: numberOrFallback(element.x, 0),
+          y: numberOrFallback(element.y, 0),
+        },
+      },
+    };
+    setSelectedElementId(element.id);
+  };
+
+  const onElementDragMove = (element, nativeEvent) => {
+    if (dragRef.current.activeElementId !== element.id) return;
+
+    const pageX = numberOrFallback(nativeEvent?.pageX, dragRef.current.startPageX);
+    const pageY = numberOrFallback(nativeEvent?.pageY, dragRef.current.startPageY);
+    const deltaPreviewX = pageX - dragRef.current.startPageX;
+    const deltaPreviewY = pageY - dragRef.current.startPageY;
+
+    const deltaCanvasX = deltaPreviewX * (canvasSize.width / previewWidth);
+    const deltaCanvasY = deltaPreviewY * (canvasSize.height / previewHeight);
+    const grid = 16;
+
+    const width = numberOrFallback(element.width, dragRef.current.startWidth || 100);
+    const height = numberOrFallback(element.height, dragRef.current.startHeight || 60);
+
+    if (dragRef.current.mode === 'resize') {
+      const maxWidth = Math.max(32, canvasSize.width - numberOrFallback(element.x, 0));
+      const maxHeight = Math.max(32, canvasSize.height - numberOrFallback(element.y, 0));
+      let nextWidth = clamp(dragRef.current.startWidth + deltaCanvasX, 32, maxWidth);
+      let nextHeight = clamp(dragRef.current.startHeight + deltaCanvasY, 32, maxHeight);
+      if (snapToGrid) {
+        nextWidth = Math.max(32, Math.round(nextWidth / grid) * grid);
+        nextHeight = Math.max(32, Math.round(nextHeight / grid) * grid);
+      }
+      patchElement(
+        element.id,
+        { width: Math.round(nextWidth), height: Math.round(nextHeight) },
+        { trackHistory: false }
+      );
+      return;
+    }
+
+    const selectedIds = dragRef.current.groupElementIds || [];
+    if (selectedIds.length > 1) {
+      let deltaX = deltaCanvasX;
+      let deltaY = deltaCanvasY;
+      if (snapToGrid) {
+        deltaX = Math.round(deltaX / grid) * grid;
+        deltaY = Math.round(deltaY / grid) * grid;
+      }
+
+      const selectedSet = new Set(selectedIds);
+      const nextElements = mergedLayout.elements.map((item) => {
+        if (!selectedSet.has(item.id)) return item;
+        const widthValue = numberOrFallback(item.width, 100);
+        const heightValue = numberOrFallback(item.height, 60);
+        const start = dragRef.current.startPositions[item.id] || {
+          x: numberOrFallback(item.x, 0),
+          y: numberOrFallback(item.y, 0),
+        };
+        const maxX = Math.max(0, canvasSize.width - widthValue);
+        const maxY = Math.max(0, canvasSize.height - heightValue);
+
+        return {
+          ...item,
+          x: Math.round(clamp(start.x + deltaX, 0, maxX)),
+          y: Math.round(clamp(start.y + deltaY, 0, maxY)),
+        };
+      });
+
+      patchLayout({ elements: nextElements }, { trackHistory: false });
+      return;
+    }
+
+    const maxX = Math.max(0, canvasSize.width - width);
+    const maxY = Math.max(0, canvasSize.height - height);
+
+    let nextX = clamp(dragRef.current.startX + deltaCanvasX, 0, maxX);
+    let nextY = clamp(dragRef.current.startY + deltaCanvasY, 0, maxY);
+    if (snapToGrid) {
+      nextX = Math.round(nextX / grid) * grid;
+      nextY = Math.round(nextY / grid) * grid;
+    }
+
+    patchElement(element.id, { x: Math.round(nextX), y: Math.round(nextY) }, { trackHistory: false });
+  };
+
+  const onElementDragEnd = (element) => {
+    if (dragRef.current.activeElementId === element.id) {
+      dragRef.current.activeElementId = null;
+      dragRef.current.mode = 'move';
+      dragRef.current.groupElementIds = [];
+      dragRef.current.startPositions = {};
+    }
+  };
+
+  const selectedMetrics = selectedElement
+    ? {
+        cx:
+          ((numberOrFallback(selectedElement.x, 0) + numberOrFallback(selectedElement.width, 100) / 2) /
+            canvasSize.width) *
+          previewWidth,
+        cy:
+          ((numberOrFallback(selectedElement.y, 0) + numberOrFallback(selectedElement.height, 60) / 2) /
+            canvasSize.height) *
+          previewHeight,
+      }
+    : null;
+
+  const showVerticalGuide = selectedMetrics && Math.abs(selectedMetrics.cx - previewWidth / 2) <= 6;
+  const showHorizontalGuide = selectedMetrics && Math.abs(selectedMetrics.cy - previewHeight / 2) <= 6;
+
+  return (
+    <View>
+      <Card style={styles.card}>
+        <Card.Content>
+          <Text style={styles.sectionTitle}>Canvas Preview</Text>
+          <Text style={styles.subtle}>Tap to select. Drag an element directly on the preview to move it.</Text>
+          <View style={styles.rowWrap}>
+            <Chip
+              selected={multiSelectMode}
+              onPress={() => {
+                setMultiSelectMode((prev) => {
+                  const next = !prev;
+                  if (!next) {
+                    setSelectedElementIds([]);
+                  }
+                  return next;
+                });
+              }}
+              style={styles.chip}
+            >
+              Multi-select
+            </Chip>
+            <Chip selected={snapToGrid} onPress={() => setSnapToGrid((prev) => !prev)} style={styles.chip}>
+              Snap to grid
+            </Chip>
+            <Chip selected={showSafeArea} onPress={() => setShowSafeArea((prev) => !prev)} style={styles.chip}>
+              Print safe area
+            </Chip>
+            <Button mode="outlined" onPress={clearSelection} disabled={!selectedElementId && !selectedElementIds.length}>
+              Clear
+            </Button>
+            <Button mode="outlined" onPress={undo} disabled={!historyPast.length}>Undo</Button>
+            <Button mode="outlined" onPress={redo} disabled={!historyFuture.length}>Redo</Button>
+          </View>
+          <View style={styles.previewWrap}>
+            <View
+              style={[
+                styles.preview,
+                {
+                  width: previewWidth,
+                  height: previewHeight,
+                  backgroundColor: mergedLayout.backgroundColor || '#fff7f2',
+                },
+              ]}
+            >
+              {mergedLayout.elements
+                .slice()
+                .sort((a, b) => numberOrFallback(a.z, 0) - numberOrFallback(b.z, 0))
+                .map((element) => {
+                  const left = (numberOrFallback(element.x, 0) / canvasSize.width) * previewWidth;
+                  const top = (numberOrFallback(element.y, 0) / canvasSize.height) * previewHeight;
+                  const width = (numberOrFallback(element.width, 100) / canvasSize.width) * previewWidth;
+                  const height = (numberOrFallback(element.height, 60) / canvasSize.height) * previewHeight;
+                  const isSelected = isElementSelected(element.id);
+
+                  return (
+                    <View
+                      key={element.id}
+                      onStartShouldSetResponder={() => true}
+                      onMoveShouldSetResponder={() => true}
+                      onResponderGrant={(evt) => onElementDragStart(element, evt.nativeEvent)}
+                      onResponderMove={(evt) => onElementDragMove(element, evt.nativeEvent)}
+                      onResponderRelease={() => onElementDragEnd(element)}
+                      onResponderTerminate={() => onElementDragEnd(element)}
+                      onResponderTerminationRequest={() => false}
+                      style={[
+                        styles.previewElement,
+                        {
+                          left,
+                          top,
+                          width,
+                          height,
+                          borderColor: isSelected ? Colors.primary : 'transparent',
+                        },
+                      ]}
+                    >
+                      {element.type === 'text' ? (
+                        <Text
+                          numberOfLines={2}
+                          style={{
+                            color: element.color || '#2b1d18',
+                            fontWeight: element.fontWeight === '400' ? '400' : '700',
+                            fontSize: 11,
+                            textAlign: element.textAlign || 'center',
+                          }}
+                        >
+                          {element.text || 'Text'}
+                        </Text>
+                      ) : null}
+
+                      {element.type === 'shape' ? (
+                        <View
+                          style={{
+                            flex: 1,
+                            borderRadius: Math.max(0, (numberOrFallback(element.borderRadius, 0) / canvasSize.width) * previewWidth),
+                            backgroundColor: element.fillColor || '#fcd4b5',
+                          }}
+                        />
+                      ) : null}
+
+                      {element.type === 'divider' ? (
+                        <View
+                          style={{
+                            marginTop: Math.max(0, height / 2 - 1),
+                            height: 2,
+                            width: '100%',
+                            backgroundColor: element.color || '#b45309',
+                          }}
+                        />
+                      ) : null}
+
+                      {element.type === 'image' ? (
+                        <View style={styles.imagePlaceholder}>
+                          <Text style={styles.imagePlaceholderText}>Image</Text>
+                        </View>
+                      ) : null}
+
+                      {isSelected ? (
+                        <View
+                          onStartShouldSetResponder={() => true}
+                          onMoveShouldSetResponder={() => true}
+                          onResponderGrant={(evt) => onResizeStart(element, evt.nativeEvent)}
+                          onResponderMove={(evt) => onElementDragMove(element, evt.nativeEvent)}
+                          onResponderRelease={() => onElementDragEnd(element)}
+                          onResponderTerminate={() => onElementDragEnd(element)}
+                          onResponderTerminationRequest={() => false}
+                          style={styles.resizeHandle}
+                          pointerEvents={multiSelectMode && selectedElementIds.length > 1 ? 'none' : 'auto'}
+                        />
+                      ) : null}
+                    </View>
+                  );
+                })}
+
+              {showVerticalGuide ? <View style={styles.guideVertical} /> : null}
+              {showHorizontalGuide ? <View style={styles.guideHorizontal} /> : null}
+              {showSafeArea ? <View style={styles.safeAreaGuide} pointerEvents="none" /> : null}
+            </View>
+          </View>
+
+          <Divider style={styles.divider} />
+
+          <Text style={styles.sectionTitle}>Add Element</Text>
+          <View style={styles.rowWrap}>
+            <Button mode="contained-tonal" onPress={() => addElement('text')}>+ Text</Button>
+            <Button mode="contained-tonal" onPress={() => addElement('shape')}>+ Shape</Button>
+            <Button mode="contained-tonal" onPress={() => addElement('divider')}>+ Divider</Button>
+            <Button mode="contained-tonal" onPress={() => addElement('image')}>+ Image</Button>
+          </View>
+        </Card.Content>
+      </Card>
+
+      <Card style={styles.card}>
+        <Card.Content>
+          <Text style={styles.sectionTitle}>Layers</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <View style={styles.rowWrap}>
+              {mergedLayout.elements.length ? (
+                mergedLayout.elements.map((element, idx) => {
+                  const label =
+                    element.type === 'text'
+                      ? `Text ${idx + 1}`
+                      : element.type === 'shape'
+                        ? `Shape ${idx + 1}`
+                        : element.type === 'divider'
+                          ? `Divider ${idx + 1}`
+                          : `Image ${idx + 1}`;
+                  return (
+                    <Chip
+                      key={element.id}
+                      selected={isElementSelected(element.id)}
+                      style={styles.chip}
+                      onPress={() => selectElement(element.id, multiSelectMode)}
+                    >
+                      {label}
+                    </Chip>
+                  );
+                })
+              ) : (
+                <Text style={styles.subtle}>No elements yet.</Text>
+              )}
+            </View>
+          </ScrollView>
+
+          {selectedElement ? (
+            <View>
+              <Divider style={styles.divider} />
+              <Text style={styles.sectionTitle}>Element Properties</Text>
+
+              <View style={styles.grid2}>
+                <TextInput
+                  mode="outlined"
+                  label="X"
+                  keyboardType="numeric"
+                  value={String(selectedElement.x ?? 0)}
+                  onChangeText={(value) => patchElement(selectedElement.id, { x: numberOrFallback(value, 0) })}
+                  style={styles.input}
+                />
+                <TextInput
+                  mode="outlined"
+                  label="Y"
+                  keyboardType="numeric"
+                  value={String(selectedElement.y ?? 0)}
+                  onChangeText={(value) => patchElement(selectedElement.id, { y: numberOrFallback(value, 0) })}
+                  style={styles.input}
+                />
+                <TextInput
+                  mode="outlined"
+                  label="Width"
+                  keyboardType="numeric"
+                  value={String(selectedElement.width ?? 100)}
+                  onChangeText={(value) => patchElement(selectedElement.id, { width: numberOrFallback(value, 100) })}
+                  style={styles.input}
+                />
+                <TextInput
+                  mode="outlined"
+                  label="Height"
+                  keyboardType="numeric"
+                  value={String(selectedElement.height ?? 60)}
+                  onChangeText={(value) => patchElement(selectedElement.id, { height: numberOrFallback(value, 60) })}
+                  style={styles.input}
+                />
+              </View>
+
+              {selectedElement.type === 'text' ? (
+                <View>
+                  <TextInput
+                    mode="outlined"
+                    label="Text"
+                    value={selectedElement.text || ''}
+                    onChangeText={(value) => patchElement(selectedElement.id, { text: value })}
+                    multiline
+                    style={styles.input}
+                  />
+                  <View style={styles.grid2}>
+                    <TextInput
+                      mode="outlined"
+                      label="Font Size"
+                      keyboardType="numeric"
+                      value={String(selectedElement.fontSize ?? 42)}
+                      onChangeText={(value) => patchElement(selectedElement.id, { fontSize: numberOrFallback(value, 42) })}
+                      style={styles.input}
+                    />
+                    <TextInput
+                      mode="outlined"
+                      label="Color (#hex)"
+                      value={selectedElement.color || '#2b1d18'}
+                      onChangeText={(value) => patchElement(selectedElement.id, { color: value })}
+                      style={styles.input}
+                    />
+                  </View>
+                </View>
+              ) : null}
+
+              {selectedElement.type === 'shape' ? (
+                <View style={styles.grid2}>
+                  <TextInput
+                    mode="outlined"
+                    label="Fill (#hex)"
+                    value={selectedElement.fillColor || '#fcd4b5'}
+                    onChangeText={(value) => patchElement(selectedElement.id, { fillColor: value })}
+                    style={styles.input}
+                  />
+                  <TextInput
+                    mode="outlined"
+                    label="Radius"
+                    keyboardType="numeric"
+                    value={String(selectedElement.borderRadius ?? 24)}
+                    onChangeText={(value) => patchElement(selectedElement.id, { borderRadius: numberOrFallback(value, 24) })}
+                    style={styles.input}
+                  />
+                </View>
+              ) : null}
+
+              {selectedElement.type === 'divider' ? (
+                <TextInput
+                  mode="outlined"
+                  label="Color (#hex)"
+                  value={selectedElement.color || '#b45309'}
+                  onChangeText={(value) => patchElement(selectedElement.id, { color: value })}
+                  style={styles.input}
+                />
+              ) : null}
+
+              {selectedElement.type === 'image' ? (
+                <TextInput
+                  mode="outlined"
+                  label="Image URL"
+                  value={selectedElement.imageUrl || ''}
+                  onChangeText={(value) => patchElement(selectedElement.id, { imageUrl: value })}
+                  style={styles.input}
+                />
+              ) : null}
+
+              <View style={styles.rowWrap}>
+                <Button mode="contained-tonal" onPress={() => reorderSelected('up')}>Bring Forward</Button>
+                <Button mode="contained-tonal" onPress={() => reorderSelected('down')}>Send Backward</Button>
+                <Button mode="contained-tonal" onPress={duplicateSelected}>Duplicate</Button>
+                <Button mode="contained-tonal" buttonColor="#fde8e8" textColor="#991b1b" onPress={deleteSelected}>
+                  Delete
+                </Button>
+              </View>
+            </View>
+          ) : null}
+        </Card.Content>
+      </Card>
+
+      <Card style={styles.card}>
+        <Card.Content>
+          <Text style={styles.sectionTitle}>Canvas Settings</Text>
+          <View style={styles.rowWrap}>
+            {['1080x1920', '1080x1080', '1920x1080'].map((size) => (
+              <Chip
+                key={size}
+                selected={mergedLayout.canvasSize === size}
+                style={styles.chip}
+                onPress={() => patchLayout({ canvasSize: size })}
+              >
+                {size}
+              </Chip>
+            ))}
+          </View>
+          <TextInput
+            mode="outlined"
+            label="Background Color (#hex)"
+            value={mergedLayout.backgroundColor || '#fff7f2'}
+            onChangeText={(value) => patchLayout({ backgroundColor: value })}
+            style={styles.input}
+          />
+        </Card.Content>
+      </Card>
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  card: {
+    borderRadius: Radius.lg,
+    marginBottom: Spacing.md,
+    backgroundColor: Colors.surface,
+  },
+  sectionTitle: {
+    fontWeight: '700',
+    marginBottom: 8,
+    color: Colors.textPrimary,
+  },
+  subtle: {
+    color: Colors.textSecondary,
+  },
+  divider: {
+    marginVertical: 12,
+  },
+  previewWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+  },
+  preview: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#f1d9c8',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  previewElement: {
+    position: 'absolute',
+    borderWidth: 1,
+    borderRadius: 4,
+    padding: 2,
+    overflow: 'hidden',
+  },
+  resizeHandle: {
+    position: 'absolute',
+    width: 14,
+    height: 14,
+    right: -7,
+    bottom: -7,
+    borderRadius: 7,
+    backgroundColor: Colors.primary,
+    borderWidth: 2,
+    borderColor: '#ffffff',
+  },
+  guideVertical: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: '50%',
+    width: 1,
+    backgroundColor: '#3b82f6',
+    opacity: 0.5,
+  },
+  guideHorizontal: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: '50%',
+    height: 1,
+    backgroundColor: '#3b82f6',
+    opacity: 0.5,
+  },
+  safeAreaGuide: {
+    position: 'absolute',
+    top: '6%',
+    left: '6%',
+    right: '6%',
+    bottom: '6%',
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: '#f59e0b',
+    borderRadius: 10,
+    opacity: 0.7,
+  },
+  imagePlaceholder: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f3f4f6',
+  },
+  imagePlaceholderText: {
+    color: '#6b7280',
+    fontSize: 10,
+  },
+  rowWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    alignItems: 'center',
+  },
+  chip: {
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  input: {
+    marginBottom: 10,
+    backgroundColor: Colors.surface,
+  },
+  grid2: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+});
+
+export default InviteDesignCanvas;

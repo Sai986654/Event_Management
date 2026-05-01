@@ -15,6 +15,7 @@ import {
   Tag,
   Typography,
   message,
+  Tabs,
 } from 'antd';
 import {
   ArrowLeftOutlined,
@@ -24,12 +25,15 @@ import {
   SendOutlined,
   PlusOutlined,
   ReloadOutlined,
+  CodeOutlined,
+  BgColorsOutlined,
 } from '@ant-design/icons';
 import { eventService } from '../services/eventService';
 import { guestService } from '../services/guestService';
 import { inviteDesignService } from '../services/inviteDesignService';
 import { getErrorMessage, getPaymentRequirement } from '../utils/helpers';
 import { paymentService } from '../services/paymentService';
+import InviteDesignCanvas from './InviteDesignCanvas';
 import './InviteDesignStudio.css';
 
 const { Text, Title } = Typography;
@@ -52,6 +56,8 @@ const InviteDesignStudio = () => {
   const [designStatus, setDesignStatus] = useState('draft');
   const [designLanguage, setDesignLanguage] = useState('en');
   const [layoutText, setLayoutText] = useState('{}');
+  const [canvasLayout, setCanvasLayout] = useState({});
+  const [editorMode, setEditorMode] = useState('canvas'); // 'canvas' or 'json'
 
   const [sendVia, setSendVia] = useState('email');
 
@@ -101,6 +107,7 @@ const InviteDesignStudio = () => {
       setSelectedDesignId(null);
       setSelectedDesign(null);
       setExportsList([]);
+      setCanvasLayout({});
       return;
     }
 
@@ -117,6 +124,7 @@ const InviteDesignStudio = () => {
       setDesignStatus(design.status || 'draft');
       setDesignLanguage(design.language || 'en');
       setLayoutText(JSON.stringify(design.jsonLayout || {}, null, 2));
+      setCanvasLayout(design.jsonLayout || {});
       setExportsList(exportRes.exports || []);
     } catch (error) {
       message.error(getErrorMessage(error));
@@ -172,12 +180,21 @@ const InviteDesignStudio = () => {
       return;
     }
 
-    let parsedLayout;
-    try {
-      parsedLayout = JSON.parse(layoutText || '{}');
-    } catch (_error) {
-      message.error('Layout JSON is invalid.');
-      return;
+    let finalLayout;
+    
+    if (editorMode === 'canvas') {
+      // Use canvas layout
+      finalLayout = canvasLayout;
+      setLayoutText(JSON.stringify(finalLayout, null, 2));
+    } else {
+      // Use JSON editor
+      try {
+        finalLayout = JSON.parse(layoutText || '{}');
+      } catch (_error) {
+        message.error('Layout JSON is invalid.');
+        return;
+      }
+      setCanvasLayout(finalLayout);
     }
 
     setSaving(true);
@@ -186,7 +203,7 @@ const InviteDesignStudio = () => {
         name: designName.trim() || selectedDesign?.name,
         status: designStatus,
         language: designLanguage,
-        jsonLayout: parsedLayout,
+        jsonLayout: finalLayout,
       });
       message.success('Design saved');
 
@@ -426,19 +443,51 @@ const InviteDesignStudio = () => {
                   </Col>
                 </Row>
 
-                <div>
-                  <Text strong>Layout JSON</Text>
-                  <Text type="secondary" style={{ marginLeft: 8 }}>
-                    This powers your design blocks and can be expanded by your upcoming canvas editor.
-                  </Text>
-                  <TextArea
-                    value={layoutText}
-                    onChange={(e) => setLayoutText(e.target.value)}
-                    rows={16}
-                    className="invite-studio-json"
-                    style={{ marginTop: 8 }}
-                  />
-                </div>
+                <Tabs
+                  value={editorMode}
+                  onChange={setEditorMode}
+                  items={[
+                    {
+                      key: 'canvas',
+                      label: (
+                        <span>
+                          <BgColorsOutlined /> Canvas Editor
+                        </span>
+                      ),
+                      children: (
+                        <div style={{ paddingTop: 16 }}>
+                          <InviteDesignCanvas
+                            layout={canvasLayout}
+                            templateMeta={selectedTemplateMeta}
+                            onLayoutChange={setCanvasLayout}
+                          />
+                        </div>
+                      ),
+                    },
+                    {
+                      key: 'json',
+                      label: (
+                        <span>
+                          <CodeOutlined /> JSON Editor
+                        </span>
+                      ),
+                      children: (
+                        <div style={{ paddingTop: 16 }}>
+                          <Text type="secondary">
+                            Edit the raw JSON layout. Changes here will be synced to the canvas editor.
+                          </Text>
+                          <TextArea
+                            value={layoutText}
+                            onChange={(e) => setLayoutText(e.target.value)}
+                            rows={20}
+                            className="invite-studio-json"
+                            style={{ marginTop: 8 }}
+                          />
+                        </div>
+                      ),
+                    },
+                  ]}
+                />
 
                 <Space wrap>
                   <Button icon={<SaveOutlined />} type="primary" onClick={handleSaveDesign} loading={saving}>

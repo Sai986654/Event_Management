@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, View, Linking, Share } from 'react-native';
 import { Button, Card, Chip, Divider, Text, TextInput } from 'react-native-paper';
 import { inviteDesignService } from '../services/inviteDesignService';
 import { eventService } from '../services/eventService';
 import { getErrorMessage } from '../utils/helpers';
 import { Colors, Radius, Spacing } from '../theme';
 import { runWithPaymentRetry } from '../utils/paymentRetry';
+import InviteDesignCanvas from '../components/InviteDesignCanvas';
 
 const InviteDesignStudioScreen = ({ route }) => {
   const { eventId } = route.params;
@@ -22,6 +23,8 @@ const InviteDesignStudioScreen = ({ route }) => {
   const [designName, setDesignName] = useState('');
   const [designStatus, setDesignStatus] = useState('draft');
   const [layoutText, setLayoutText] = useState('{}');
+  const [canvasLayout, setCanvasLayout] = useState({});
+  const [editorMode, setEditorMode] = useState('canvas');
   const [sendVia, setSendVia] = useState('email');
 
   const [loading, setLoading] = useState(true);
@@ -38,6 +41,7 @@ const InviteDesignStudioScreen = ({ route }) => {
       setDesignName(design.name || '');
       setDesignStatus(design.status || 'draft');
       setLayoutText(JSON.stringify(design.jsonLayout || {}, null, 2));
+      setCanvasLayout(design.jsonLayout || {});
       setExportsList(exportRes.exports || []);
     } catch (err) {
       Alert.alert('Error', getErrorMessage(err));
@@ -117,11 +121,17 @@ const InviteDesignStudioScreen = ({ route }) => {
     }
 
     let parsedLayout = {};
-    try {
-      parsedLayout = JSON.parse(layoutText || '{}');
-    } catch (_err) {
-      Alert.alert('Invalid JSON', 'Layout JSON is not valid.');
-      return;
+    if (editorMode === 'canvas') {
+      parsedLayout = canvasLayout || {};
+      setLayoutText(JSON.stringify(parsedLayout, null, 2));
+    } else {
+      try {
+        parsedLayout = JSON.parse(layoutText || '{}');
+      } catch (_err) {
+        Alert.alert('Invalid JSON', 'Layout JSON is not valid.');
+        return;
+      }
+      setCanvasLayout(parsedLayout);
     }
 
     setBusy(true);
@@ -210,6 +220,39 @@ const InviteDesignStudioScreen = ({ route }) => {
     }
   };
 
+  const openExportUrl = async (fileUrl) => {
+    const url = String(fileUrl || '').trim();
+    if (!url) {
+      Alert.alert('No URL', 'This export does not have a valid file URL.');
+      return;
+    }
+
+    try {
+      const supported = await Linking.canOpenURL(url);
+      if (!supported) {
+        Alert.alert('Cannot Open', 'No app available to open this PDF URL on this device.');
+        return;
+      }
+      await Linking.openURL(url);
+    } catch (_err) {
+      Alert.alert('Open Failed', 'Could not open this export URL.');
+    }
+  };
+
+  const shareExportUrl = async (fileUrl) => {
+    const url = String(fileUrl || '').trim();
+    if (!url) {
+      Alert.alert('No URL', 'This export does not have a valid file URL.');
+      return;
+    }
+
+    try {
+      await Share.share({ message: url });
+    } catch (_err) {
+      Alert.alert('Share Failed', 'Could not share this export URL.');
+    }
+  };
+
   if (loading) {
     return (
       <View style={styles.centered}>
@@ -285,15 +328,34 @@ const InviteDesignStudioScreen = ({ route }) => {
                 </Chip>
               ))}
             </View>
-            <TextInput
-              mode="outlined"
-              label="Layout JSON"
-              value={layoutText}
-              onChangeText={setLayoutText}
-              multiline
-              numberOfLines={10}
-              style={styles.input}
-            />
+
+            <View style={styles.rowWrap}>
+              <Chip selected={editorMode === 'canvas'} onPress={() => setEditorMode('canvas')} style={styles.chip}>
+                Canvas Editor
+              </Chip>
+              <Chip selected={editorMode === 'json'} onPress={() => setEditorMode('json')} style={styles.chip}>
+                JSON Editor
+              </Chip>
+            </View>
+
+            {editorMode === 'canvas' ? (
+              <InviteDesignCanvas
+                layout={canvasLayout}
+                onLayoutChange={(nextLayout) => {
+                  setCanvasLayout(nextLayout || {});
+                }}
+              />
+            ) : (
+              <TextInput
+                mode="outlined"
+                label="Layout JSON"
+                value={layoutText}
+                onChangeText={setLayoutText}
+                multiline
+                numberOfLines={10}
+                style={styles.input}
+              />
+            )}
 
             <View style={styles.rowWrap}>
               <Button mode="contained" onPress={saveDesign} loading={busy} disabled={busy}>Save</Button>
@@ -318,9 +380,20 @@ const InviteDesignStudioScreen = ({ route }) => {
             <Divider style={{ marginVertical: 12 }} />
             <Text variant="titleSmall" style={styles.sectionTitle}>Exports</Text>
             {exportsList.length ? exportsList.map((item) => (
-              <Text key={item.id} style={{ marginBottom: 6 }}>
-                {item.format.toUpperCase()}: {item.fileUrl}
-              </Text>
+              <Card key={item.id} style={styles.exportCard}>
+                <Card.Content>
+                  <Text style={styles.exportTitle}>{item.format.toUpperCase()} export</Text>
+                  <Text numberOfLines={3} style={styles.exportUrl}>{item.fileUrl}</Text>
+                  <View style={styles.rowWrap}>
+                    <Button mode="contained-tonal" icon="open-in-new" onPress={() => openExportUrl(item.fileUrl)}>
+                      Open
+                    </Button>
+                    <Button mode="outlined" icon="share-variant" onPress={() => shareExportUrl(item.fileUrl)}>
+                      Share URL
+                    </Button>
+                  </View>
+                </Card.Content>
+              </Card>
             )) : <Text style={styles.subtitle}>No exports yet.</Text>}
           </Card.Content>
         </Card>
@@ -338,6 +411,9 @@ const styles = StyleSheet.create({
   input: { marginBottom: 10, backgroundColor: Colors.surface },
   rowWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'center' },
   chip: { marginRight: 8, marginBottom: 8 },
+  exportCard: { marginBottom: 8, borderRadius: Radius.md, backgroundColor: Colors.surfaceVariant },
+  exportTitle: { fontWeight: '700', color: Colors.textPrimary, marginBottom: 4 },
+  exportUrl: { color: Colors.textSecondary, marginBottom: 8 },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.background },
 });
 
