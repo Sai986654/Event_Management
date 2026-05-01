@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useState, useCallback, useLayoutEffect } from 'react';
-import { View, StyleSheet, ScrollView, RefreshControl, Linking } from 'react-native';
+import { View, StyleSheet, ScrollView, RefreshControl, Linking, TouchableOpacity } from 'react-native';
 import { Text, Card, Button, Chip, FAB, ActivityIndicator, IconButton } from 'react-native-paper';
 import { AuthContext } from '../context/AuthContext';
 import { eventService } from '../services/eventService';
@@ -59,11 +59,12 @@ const EventsDashboard = ({ user, navigation }) => {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [activeTab, setActiveTab] = useState('active');
   const [fabOpen, setFabOpen] = useState(false);
 
   const fetchEvents = useCallback(async () => {
     try {
-      const data = await eventService.getEvents({ limit: 10 });
+      const data = await eventService.getEvents({ limit: 'all' });
       setEvents(data.events || []);
     } catch (err) {
       console.warn(getErrorMessage(err));
@@ -75,7 +76,13 @@ const EventsDashboard = ({ user, navigation }) => {
 
   useEffect(() => { fetchEvents(); }, [fetchEvents]);
 
+  // Segregate events: active = at least 1 vendor booking, drafts = 0 bookings
+  const activeEvents = events.filter((e) => (e._count?.bookings || 0) > 0);
+  const draftEvents = events.filter((e) => (e._count?.bookings || 0) === 0);
+  const visibleEvents = activeTab === 'active' ? activeEvents : draftEvents;
+
   const upcoming = events.filter((e) => new Date(e.date) > new Date()).length;
+  // Budget computed across ALL events regardless of tab
   const totalBudget = events.reduce((s, e) => s + (parseFloat(e.budget) || 0), 0);
 
   if (loading) return <ActivityIndicator style={styles.loader} size="large" color={Colors.primary} />;
@@ -100,16 +107,39 @@ const EventsDashboard = ({ user, navigation }) => {
           <StatCard label="Total Budget" value={formatCurrency(totalBudget)} color={Colors.success} />
         </View>
 
-        {/* Event List */}
+        {/* Event Tabs */}
         <Text variant="titleMedium" style={styles.sectionTitle}>Your Events</Text>
-        {events.length === 0 ? (
+        <View style={tabStyles.tabRow}>
+          <TouchableOpacity
+            style={[tabStyles.tab, activeTab === 'active' && tabStyles.tabActive]}
+            onPress={() => setActiveTab('active')}
+          >
+            <Text style={[tabStyles.tabText, activeTab === 'active' && tabStyles.tabTextActive]}>
+              Active ({activeEvents.length})
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[tabStyles.tab, activeTab === 'drafts' && tabStyles.tabActive]}
+            onPress={() => setActiveTab('drafts')}
+          >
+            <Text style={[tabStyles.tabText, activeTab === 'drafts' && tabStyles.tabTextActive]}>
+              Drafts ({draftEvents.length})
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {visibleEvents.length === 0 ? (
           <Card style={styles.emptyCard}>
             <Card.Content>
-              <Text style={styles.emptyText}>No events yet. Tap + to create your first event!</Text>
+              <Text style={styles.emptyText}>
+                {activeTab === 'active'
+                  ? 'No active events yet. Book a vendor to move events here!'
+                  : 'No draft events. Tap + to create your first event!'}
+              </Text>
             </Card.Content>
           </Card>
         ) : (
-          events.map((event) => (
+          visibleEvents.map((event) => (
             <Card
               key={event.id}
               style={styles.eventCard}
@@ -442,6 +472,35 @@ const styles = StyleSheet.create({
   emptyCard: { marginHorizontal: Spacing.lg, borderRadius: Radius.lg, backgroundColor: Colors.surface },
   emptyText: { textAlign: 'center', color: Colors.textMuted, paddingVertical: 20 },
   fab: { backgroundColor: Colors.primary, borderRadius: Radius.lg },
+});
+
+const tabStyles = StyleSheet.create({
+  tabRow: {
+    flexDirection: 'row',
+    marginHorizontal: Spacing.lg,
+    marginBottom: Spacing.sm,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.surfaceVariant,
+    padding: 4,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: 'center',
+    borderRadius: Radius.sm,
+  },
+  tabActive: {
+    backgroundColor: Colors.primary,
+    elevation: 2,
+  },
+  tabText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.textSecondary,
+  },
+  tabTextActive: {
+    color: '#fff',
+  },
 });
 
 export default DashboardScreen;

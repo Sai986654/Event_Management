@@ -83,12 +83,18 @@ exports.getEvents = asyncHandler(async (req, res) => {
   if (req.query.status) where.status = req.query.status;
   if (req.query.type) where.type = req.query.type;
 
+  // Support fetching all events when limit=all (e.g. dashboard tab view)
+  const fetchAll = req.query.limit === 'all';
+
   const [events, total] = await Promise.all([
     prisma.event.findMany({
       where,
       orderBy: { date: 'desc' },
-      skip,
-      take: limit,
+      skip: fetchAll ? undefined : skip,
+      take: fetchAll ? undefined : limit,
+      include: {
+        _count: { select: { bookings: true } },
+      },
     }),
     prisma.event.count({ where }),
   ]);

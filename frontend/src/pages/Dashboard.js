@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useState } from 'react';
-import { Layout, Button, Card, Row, Col, Statistic, Table, Tag, message, Empty, Spin, Space } from 'antd';
+import { Layout, Button, Card, Row, Col, Statistic, Table, Tag, Tabs, message, Empty, Spin, Space, Badge } from 'antd';
 import { PlusOutlined, CalendarOutlined, TeamOutlined, ShopOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
@@ -18,7 +18,7 @@ const OrganizerDashboard = ({ user }) => {
     (async () => {
       try {
         setLoading(true);
-        const data = await eventService.getEvents({ limit: 10 });
+        const data = await eventService.getEvents({ limit: 'all' });
         const evts = data.events || [];
         setEvents(evts);
         const upcoming = evts.filter((e) => new Date(e.date) > new Date()).length;
@@ -36,6 +36,10 @@ const OrganizerDashboard = ({ user }) => {
     })();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Segregate: active = at least 1 vendor booking, drafts = 0 bookings
+  const activeEvents = events.filter((e) => (e._count?.bookings || 0) > 0);
+  const draftEvents = events.filter((e) => (e._count?.bookings || 0) === 0);
+
   const columns = [
     { title: 'Event Name', dataIndex: 'title', key: 'title', render: (t, r) => <Link to={`/events/${r.id}`}>{t}</Link> },
     { title: 'Date', dataIndex: 'date', key: 'date', render: (d) => formatDate(d) },
@@ -46,7 +50,42 @@ const OrganizerDashboard = ({ user }) => {
     },
     { title: 'Budget', dataIndex: 'budget', key: 'budget', render: (b) => formatCurrency(b) },
     { title: 'Guests', dataIndex: 'guestCount', key: 'guestCount' },
+    {
+      title: 'Vendors',
+      key: 'vendors',
+      render: (_, r) => {
+        const count = r._count?.bookings || 0;
+        return count > 0
+          ? <Tag color="green">{count} booked</Tag>
+          : <Tag color="default">None</Tag>;
+      },
+    },
     { title: 'Action', key: 'action', render: (_, r) => <Link to={`/events/${r.id}`}><Button type="link">View</Button></Link> },
+  ];
+
+  const tabItems = [
+    {
+      key: 'active',
+      label: (
+        <span>
+          Active Events <Badge count={activeEvents.length} style={{ backgroundColor: '#52c41a' }} showZero />
+        </span>
+      ),
+      children: activeEvents.length === 0
+        ? <Empty description="No active events yet. Book a vendor to see events here!" />
+        : <Table dataSource={activeEvents} columns={columns} pagination={{ pageSize: 10 }} rowKey="id" />,
+    },
+    {
+      key: 'drafts',
+      label: (
+        <span>
+          Drafts <Badge count={draftEvents.length} style={{ backgroundColor: '#d9d9d9', color: '#666' }} showZero />
+        </span>
+      ),
+      children: draftEvents.length === 0
+        ? <Empty description="No draft events." />
+        : <Table dataSource={draftEvents} columns={columns} pagination={{ pageSize: 10 }} rowKey="id" />,
+    },
   ];
 
   return (
@@ -74,10 +113,8 @@ const OrganizerDashboard = ({ user }) => {
         </Col>
       </Row>
 
-      <Card title="Recent Events" className="events-card" style={{ marginTop: 24 }}>
-        {events.length === 0
-          ? <Empty description="No events yet. Create your first event!" />
-          : <Table dataSource={events} columns={columns} pagination={false} rowKey="id" />}
+      <Card style={{ marginTop: 24 }}>
+        <Tabs defaultActiveKey="active" items={tabItems} />
       </Card>
 
       <Card className="quick-actions" style={{ marginTop: 24 }}>
