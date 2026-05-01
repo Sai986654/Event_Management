@@ -44,6 +44,9 @@
 .invite-studio-placeholder-tag {
   cursor: pointer;
   user-select: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 @media (max-width: 768px) {

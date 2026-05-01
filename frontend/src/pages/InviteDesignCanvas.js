@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   Card,
   Row,
@@ -33,12 +33,24 @@ const InviteDesignCanvas = ({
   onLayoutChange = () => {},
   placeholderTokens = [],
   previewMergeContext = null,
+  quickTextBlocks = [],
+  sectionBlocks = [],
 }) => {
   const [elements, setElements] = useState(layout.elements || []);
   const [selectedElementId, setSelectedElementId] = useState(null);
   const [canvasSize, setCanvasSize] = useState(layout.canvasSize || '1080x1920');
   const [backgroundColor, setBackgroundColor] = useState(layout.backgroundColor || '#ffffff');
   const [showGrid, setShowGrid] = useState(false);
+  const [sectionGuide, setSectionGuide] = useState({ show: false, topYCanvas: 0, centerV: false });
+  const [placeholderAutocomplete, setPlaceholderAutocomplete] = useState({
+    active: false,
+    start: -1,
+    cursor: -1,
+    query: '',
+    suggestions: [],
+  });
+  const textAreaRef = useRef(null);
+  const guideTimerRef = useRef(null);
 
   const selectedElement = elements.find((el) => el.id === selectedElementId);
 
@@ -47,6 +59,14 @@ const InviteDesignCanvas = ({
     setCanvasSize(layout.canvasSize || '1080x1920');
     setBackgroundColor(layout.backgroundColor || '#ffffff');
   }, [layout.backgroundColor, layout.canvasSize, layout.elements]);
+
+  useEffect(() => {
+    return () => {
+      if (guideTimerRef.current) {
+        clearTimeout(guideTimerRef.current);
+      }
+    };
+  }, []);
 
   // Generate unique ID
   const generateId = useCallback(() => `element-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`, []);
@@ -119,6 +139,155 @@ const InviteDesignCanvas = ({
       updateLayout(newElements);
     },
     [elements, updateLayout]
+  );
+
+  const handleAddQuickTextBlock = useCallback(
+    (text) => {
+      const newElement = {
+        id: generateId(),
+        type: 'text',
+        locked: false,
+        x: 24,
+        y: 24 + elements.length * 18,
+        width: 360,
+        height: 'auto',
+        z: elements.length,
+        text,
+        fontSize: 24,
+        fontWeight: 'normal',
+        color: '#000000',
+        textAlign: 'left',
+        fontFamily: 'Arial',
+      };
+      const newElements = [...elements, newElement];
+      setElements(newElements);
+      setSelectedElementId(newElement.id);
+      updateLayout(newElements);
+    },
+    [elements, generateId, updateLayout]
+  );
+
+  const handleAddSectionBlock = useCallback(
+    (block) => {
+      if (!block?.elements?.length) return;
+
+      const [rawCanvasWidth] = String(canvasSize || '1080x1920').split('x').map(Number);
+      const safeCanvasWidth = Number.isFinite(rawCanvasWidth) && rawCanvasWidth > 0 ? rawCanvasWidth : 1080;
+
+      const maxBottom = elements.reduce((max, element) => {
+        const y = Number(element.y || 0);
+        const h = Number(element.height) || 80;
+        return Math.max(max, y + h);
+      }, 0);
+      const baseYRaw = Math.min(1600, maxBottom > 0 ? maxBottom + 24 : 24);
+      const baseY = Math.round(baseYRaw / 16) * 16;
+
+      const newItems = block.elements.map((template, index) => {
+        const templateY = Number(template.y || 0);
+        const normalizedY = Math.max(20, Math.min(1800, baseY + templateY - 40));
+        const elementWidth = Number(template.width || 300);
+        const centeredX = Math.max(0, (safeCanvasWidth - elementWidth) / 2);
+        const rawX = Number(template.x || 20);
+        const snapToCenter = Math.abs(rawX - centeredX) <= 40;
+        const normalizedX = snapToCenter ? centeredX : Math.round(rawX / 16) * 16;
+
+        return {
+          ...template,
+          id: generateId(),
+          locked: false,
+          x: Math.max(0, normalizedX),
+          y: normalizedY,
+          z: elements.length + index,
+          width: template.width || 300,
+          height: template.height ?? 'auto',
+        };
+      });
+
+      const newElements = [...elements, ...newItems];
+      setElements(newElements);
+      setSelectedElementId(newItems[newItems.length - 1]?.id || null);
+      updateLayout(newElements);
+
+      setSectionGuide({ show: true, topYCanvas: baseY, centerV: true });
+      if (guideTimerRef.current) {
+        clearTimeout(guideTimerRef.current);
+      }
+      guideTimerRef.current = setTimeout(() => {
+        setSectionGuide({ show: false, topYCanvas: 0, centerV: false });
+      }, 1400);
+    },
+    [canvasSize, elements, generateId, updateLayout]
+  );
+
+  const refreshAutocomplete = useCallback(
+    (textValue, cursorPos) => {
+      const text = String(textValue || '');
+      const cursor = Number.isInteger(cursorPos) ? cursorPos : text.length;
+      const start = text.lastIndexOf('{{', Math.max(0, cursor - 1));
+      if (start < 0) {
+        setPlaceholderAutocomplete({ active: false, start: -1, cursor: -1, query: '', suggestions: [] });
+        return;
+      }
+      const closedIndex = text.indexOf('}}', start);
+      if (closedIndex !== -1 && closedIndex < cursor) {
+        setPlaceholderAutocomplete({ active: false, start: -1, cursor: -1, query: '', suggestions: [] });
+        return;
+      }
+
+      const query = text.slice(start + 2, cursor).trim().toLowerCase();
+      const suggestions = placeholderTokens
+        .filter((token) => token.toLowerCase().includes(query))
+        .slice(0, 8);
+
+      if (!suggestions.length) {
+        setPlaceholderAutocomplete({ active: false, start: -1, cursor: -1, query: '', suggestions: [] });
+        return;
+      }
+
+      setPlaceholderAutocomplete({
+        active: true,
+        start,
+        cursor,
+        query,
+        suggestions,
+      });
+    },
+    [placeholderTokens]
+  );
+
+  const getTextAreaCursor = useCallback(() => {
+    const el = textAreaRef.current?.resizableTextArea?.textArea;
+    if (!el) return null;
+    return el.selectionStart;
+  }, []);
+
+  const handleTextChange = useCallback(
+    (event) => {
+      if (!selectedElement || selectedElement.type !== 'text') return;
+      const nextText = event?.target?.value || '';
+      handleUpdateElement(selectedElement.id, { text: nextText });
+      const cursor = getTextAreaCursor();
+      refreshAutocomplete(nextText, cursor);
+    },
+    [getTextAreaCursor, handleUpdateElement, refreshAutocomplete, selectedElement]
+  );
+
+  const handleAutocompleteSelect = useCallback(
+    (token) => {
+      if (!selectedElement || selectedElement.type !== 'text') return;
+      const source = String(selectedElement.text || '');
+      if (!placeholderAutocomplete.active) {
+        handleInsertPlaceholder(token);
+        return;
+      }
+
+      const start = Math.max(0, placeholderAutocomplete.start);
+      const cursor = Math.max(start, placeholderAutocomplete.cursor);
+      const nextText = `${source.slice(0, start)}${token}${source.slice(cursor)}`;
+      handleUpdateElement(selectedElement.id, { text: nextText });
+      setPlaceholderAutocomplete({ active: false, start: -1, cursor: -1, query: '', suggestions: [] });
+    },
+    [handleInsertPlaceholder, handleUpdateElement, placeholderAutocomplete, selectedElement]
   );
 
   const handleInsertPlaceholder = useCallback(
@@ -218,6 +387,32 @@ const InviteDesignCanvas = ({
                   </Button>
                 </Space>
               </div>
+
+              {quickTextBlocks.length ? (
+                <div>
+                  <div style={{ marginBottom: 8, marginTop: 4, fontWeight: 600 }}>Quick Text Blocks</div>
+                  <Space wrap size="small">
+                    {quickTextBlocks.map((block) => (
+                      <Button key={block.key} size="small" type="dashed" onClick={() => handleAddQuickTextBlock(block.text)}>
+                        + {block.label}
+                      </Button>
+                    ))}
+                  </Space>
+                </div>
+              ) : null}
+
+              {sectionBlocks.length ? (
+                <div>
+                  <div style={{ marginBottom: 8, marginTop: 4, fontWeight: 600 }}>Insert Section Layout</div>
+                  <Space wrap size="small">
+                    {sectionBlocks.map((block) => (
+                      <Button key={block.key} size="small" onClick={() => handleAddSectionBlock(block)}>
+                        + {block.label}
+                      </Button>
+                    ))}
+                  </Space>
+                </div>
+              ) : null}
 
               <Divider style={{ margin: '8px 0' }} />
 
@@ -357,6 +552,36 @@ const InviteDesignCanvas = ({
                       </div>
                     );
                   })}
+
+                  {sectionGuide.show && sectionGuide.centerV ? (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        bottom: 0,
+                        left: '50%',
+                        width: 1,
+                        transform: 'translateX(-0.5px)',
+                        backgroundColor: '#0ea5e9',
+                        opacity: 0.45,
+                        pointerEvents: 'none',
+                      }}
+                    />
+                  ) : null}
+                  {sectionGuide.show ? (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        left: 0,
+                        right: 0,
+                        top: Math.max(0, (sectionGuide.topYCanvas / canvasHeight) * previewHeight),
+                        height: 1,
+                        backgroundColor: '#0ea5e9',
+                        opacity: 0.45,
+                        pointerEvents: 'none',
+                      }}
+                    />
+                  ) : null}
                 </div>
               </div>
 
@@ -437,12 +662,34 @@ const InviteDesignCanvas = ({
                     <div>
                       <div style={{ fontWeight: 600, marginBottom: 8 }}>Text Content</div>
                       <Input.TextArea
+                        ref={textAreaRef}
                         value={selectedElement.text}
-                        onChange={(e) => handleUpdateElement(selectedElement.id, { text: e.target.value })}
+                        onChange={handleTextChange}
+                        onSelect={(e) => refreshAutocomplete(e.target.value, e.target.selectionStart)}
+                        onKeyUp={(e) => refreshAutocomplete(e.target.value, e.target.selectionStart)}
                         rows={3}
                         size="small"
                         disabled={selectedElement.locked}
                       />
+                      {placeholderAutocomplete.active ? (
+                        <div style={{ marginTop: 8, border: '1px solid #e2e8f0', borderRadius: 8, padding: 8, backgroundColor: '#f8fafc' }}>
+                          <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>
+                            Suggestions for {`{{${placeholderAutocomplete.query}}}`}
+                          </div>
+                          <Space wrap>
+                            {placeholderAutocomplete.suggestions.map((token) => (
+                              <Tag
+                                key={token}
+                                color="cyan"
+                                style={{ cursor: 'pointer', marginInlineEnd: 0 }}
+                                onClick={() => handleAutocompleteSelect(token)}
+                              >
+                                {token}
+                              </Tag>
+                            ))}
+                          </Space>
+                        </div>
+                      ) : null}
                       {placeholderTokens.length ? (
                         <div style={{ marginTop: 10 }}>
                           <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>Placeholders</div>

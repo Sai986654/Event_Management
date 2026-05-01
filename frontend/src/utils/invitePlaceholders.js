@@ -52,6 +52,81 @@ const EVENT_CONFIG = {
       { token: '{{hosts.blessingLine}}', label: 'Blessings Line' },
     ],
   },
+  engagement: {
+    label: 'Engagement',
+    hostFields: [
+      { key: 'brideName', label: 'Bride Name', placeholder: 'Saanvi' },
+      { key: 'groomName', label: 'Groom Name', placeholder: 'Nikhil' },
+      { key: 'familyNames', label: 'Family Names', placeholder: 'Sharma & Rao Families' },
+      { key: 'blessingLine', label: 'Blessings Line', placeholder: 'Seek your blessings for our new beginning' },
+    ],
+    placeholders: [
+      { token: '{{hosts.brideName}}', label: 'Bride Name' },
+      { token: '{{hosts.groomName}}', label: 'Groom Name' },
+      { token: '{{hosts.familyNames}}', label: 'Family Names' },
+      { token: '{{hosts.blessingLine}}', label: 'Blessings Line' },
+    ],
+  },
+  anniversary: {
+    label: 'Anniversary',
+    hostFields: [
+      { key: 'coupleNames', label: 'Couple Names', placeholder: 'Asha & Raj' },
+      { key: 'familyNames', label: 'Family Names', placeholder: 'Nair Family' },
+      { key: 'milestone', label: 'Milestone', placeholder: '25th Anniversary' },
+      { key: 'blessingLine', label: 'Blessings Line', placeholder: 'Celebrate this milestone with us' },
+    ],
+    placeholders: [
+      { token: '{{hosts.coupleNames}}', label: 'Couple Names' },
+      { token: '{{hosts.familyNames}}', label: 'Family Names' },
+      { token: '{{hosts.milestone}}', label: 'Milestone' },
+      { token: '{{hosts.blessingLine}}', label: 'Blessings Line' },
+    ],
+  },
+  babyshower: {
+    label: 'Baby Shower',
+    hostFields: [
+      { key: 'momName', label: 'Mother Name', placeholder: 'Meera' },
+      { key: 'dadName', label: 'Father Name', placeholder: 'Vikram' },
+      { key: 'familyNames', label: 'Family Names', placeholder: 'Iyer Family' },
+      { key: 'blessingLine', label: 'Blessings Line', placeholder: 'Join us to bless the little one' },
+    ],
+    placeholders: [
+      { token: '{{hosts.momName}}', label: 'Mother Name' },
+      { token: '{{hosts.dadName}}', label: 'Father Name' },
+      { token: '{{hosts.familyNames}}', label: 'Family Names' },
+      { token: '{{hosts.blessingLine}}', label: 'Blessings Line' },
+    ],
+  },
+  housewarming: {
+    label: 'Housewarming',
+    hostFields: [
+      { key: 'hostNames', label: 'Host Names', placeholder: 'Kavya & Rahul' },
+      { key: 'familyName', label: 'Family Name', placeholder: 'Reddy Family' },
+      { key: 'homeName', label: 'Home Name', placeholder: 'Sri Nivasam' },
+      { key: 'blessingLine', label: 'Blessings Line', placeholder: 'Please grace our home with your presence' },
+    ],
+    placeholders: [
+      { token: '{{hosts.hostNames}}', label: 'Host Names' },
+      { token: '{{hosts.familyName}}', label: 'Family Name' },
+      { token: '{{hosts.homeName}}', label: 'Home Name' },
+      { token: '{{hosts.blessingLine}}', label: 'Blessings Line' },
+    ],
+  },
+  corporate: {
+    label: 'Corporate',
+    hostFields: [
+      { key: 'companyName', label: 'Company Name', placeholder: 'Vedika Labs' },
+      { key: 'hostName', label: 'Host / Speaker', placeholder: 'Rohit Varma' },
+      { key: 'designation', label: 'Designation', placeholder: 'CEO' },
+      { key: 'blessingLine', label: 'Closing Line', placeholder: 'We look forward to your participation' },
+    ],
+    placeholders: [
+      { token: '{{hosts.companyName}}', label: 'Company Name' },
+      { token: '{{hosts.hostName}}', label: 'Host / Speaker' },
+      { token: '{{hosts.designation}}', label: 'Designation' },
+      { token: '{{hosts.blessingLine}}', label: 'Closing Line' },
+    ],
+  },
   other: {
     label: 'General Event',
     hostFields: [
@@ -71,9 +146,26 @@ const normalizeEventType = (eventType) => {
   const value = String(eventType || '').toLowerCase();
   if (value === 'wedding') return 'wedding';
   if (value === 'birthday') return 'birthday';
+  if (value === 'corporate' || value === 'conference') return 'corporate';
+  if (value === 'engagement') return 'engagement';
+  if (value === 'anniversary') return 'anniversary';
+  if (value === 'babyshower' || value === 'baby_shower' || value.includes('baby')) return 'babyshower';
+  if (value === 'housewarming' || value.includes('house')) return 'housewarming';
   if (value.includes('matur') || value.includes('half') || value.includes('puberty')) return 'maturity';
   return 'other';
 };
+
+export const EVENT_TYPE_OPTIONS = [
+  { value: 'wedding', label: 'Wedding' },
+  { value: 'engagement', label: 'Engagement' },
+  { value: 'birthday', label: 'Birthday' },
+  { value: 'maturity', label: 'Maturity Function' },
+  { value: 'anniversary', label: 'Anniversary' },
+  { value: 'babyshower', label: 'Baby Shower' },
+  { value: 'housewarming', label: 'Housewarming' },
+  { value: 'corporate', label: 'Corporate / Conference' },
+  { value: 'other', label: 'Other Event' },
+];
 
 export const getPlaceholderConfig = (eventType) => {
   const key = normalizeEventType(eventType);
@@ -89,6 +181,284 @@ export const getInvitePlaceholderGroups = (eventType) => {
 };
 
 export const getHostFieldConfig = (eventType) => getPlaceholderConfig(eventType).hostFields;
+
+export const getQuickTextBlocks = (eventType) => {
+  const type = normalizeEventType(eventType);
+  const base = [
+    { key: 'greeting', label: 'Greeting', text: 'Dear {{guest.name}},' },
+    { key: 'eventline', label: 'Event Line', text: 'You are invited to {{event.title}} at {{event.venue}} on {{event.dateText}} {{event.timeText}}.' },
+    { key: 'blessing', label: 'Blessing', text: '{{hosts.blessingLine}}' },
+  ];
+
+  if (type === 'wedding') {
+    return [
+      { key: 'couple', label: 'Couple Line', text: '{{hosts.brideName}} & {{hosts.groomName}}' },
+      ...base,
+      { key: 'parents', label: 'Parents Line', text: '{{hosts.brideParents}} | {{hosts.groomParents}}' },
+    ];
+  }
+
+  if (type === 'engagement') {
+    return [
+      { key: 'couple', label: 'Couple Line', text: '{{hosts.brideName}} & {{hosts.groomName}}' },
+      ...base,
+      { key: 'family', label: 'Family Line', text: '{{hosts.familyNames}}' },
+    ];
+  }
+
+  if (type === 'birthday' || type === 'maturity' || type === 'babyshower') {
+    return [
+      { key: 'celebrant', label: 'Celebrant', text: '{{hosts.celebrantName}}' },
+      ...base,
+      { key: 'parents', label: 'Family Line', text: '{{hosts.parentNames}}' },
+    ];
+  }
+
+  if (type === 'corporate') {
+    return [
+      { key: 'company', label: 'Company', text: '{{hosts.companyName}}' },
+      { key: 'host', label: 'Host Intro', text: 'Hosted by {{hosts.hostName}}, {{hosts.designation}}' },
+      ...base,
+    ];
+  }
+
+  return base;
+};
+
+export const getSectionBlocks = (eventType) => {
+  const type = normalizeEventType(eventType);
+
+  const header = {
+    key: 'header',
+    label: 'Header Section',
+    elements: [
+      {
+        type: 'shape',
+        x: 40,
+        y: 40,
+        width: 1000,
+        height: 220,
+        shapeType: 'rectangle',
+        fillColor: '#f8fafc',
+        strokeColor: '#cbd5e1',
+        strokeWidth: 2,
+        borderRadius: 16,
+      },
+      {
+        type: 'text',
+        x: 80,
+        y: 84,
+        width: 920,
+        height: 60,
+        text: '{{event.title}}',
+        fontSize: 54,
+        fontWeight: 'bold',
+        color: '#0f172a',
+        textAlign: 'center',
+        fontFamily: 'Georgia',
+      },
+      {
+        type: 'text',
+        x: 80,
+        y: 156,
+        width: 920,
+        height: 42,
+        text: '{{event.dateText}} • {{event.timeText}} • {{event.venue}}',
+        fontSize: 30,
+        fontWeight: 'normal',
+        color: '#334155',
+        textAlign: 'center',
+        fontFamily: 'Arial',
+      },
+    ],
+  };
+
+  const footer = {
+    key: 'footer',
+    label: 'Footer Section',
+    elements: [
+      {
+        type: 'divider',
+        x: 90,
+        y: 1680,
+        width: 900,
+        height: 10,
+        thickness: 3,
+        color: '#cbd5e1',
+        orientation: 'horizontal',
+      },
+      {
+        type: 'text',
+        x: 100,
+        y: 1710,
+        width: 880,
+        height: 48,
+        text: 'Dear {{guest.name}},',
+        fontSize: 34,
+        fontWeight: 'normal',
+        color: '#1f2937',
+        textAlign: 'center',
+        fontFamily: 'Arial',
+      },
+      {
+        type: 'text',
+        x: 100,
+        y: 1762,
+        width: 880,
+        height: 48,
+        text: '{{hosts.blessingLine}}',
+        fontSize: 30,
+        fontWeight: 'normal',
+        color: '#334155',
+        textAlign: 'center',
+        fontFamily: 'Arial',
+      },
+    ],
+  };
+
+  const weddingBody = {
+    key: 'wedding-body',
+    label: 'Wedding Couple Block',
+    elements: [
+      {
+        type: 'text',
+        x: 140,
+        y: 520,
+        width: 800,
+        height: 80,
+        text: '{{hosts.brideName}}  ♥  {{hosts.groomName}}',
+        fontSize: 62,
+        fontWeight: 'bold',
+        color: '#7c2d12',
+        textAlign: 'center',
+        fontFamily: 'Georgia',
+      },
+      {
+        type: 'text',
+        x: 140,
+        y: 612,
+        width: 800,
+        height: 44,
+        text: '{{hosts.brideParents}} | {{hosts.groomParents}}',
+        fontSize: 28,
+        fontWeight: 'normal',
+        color: '#475569',
+        textAlign: 'center',
+        fontFamily: 'Arial',
+      },
+    ],
+  };
+
+  const celebrantBody = {
+    key: 'celebrant-body',
+    label: 'Celebrant Block',
+    elements: [
+      {
+        type: 'text',
+        x: 140,
+        y: 540,
+        width: 800,
+        height: 80,
+        text: '{{hosts.celebrantName}}',
+        fontSize: 64,
+        fontWeight: 'bold',
+        color: '#7c2d12',
+        textAlign: 'center',
+        fontFamily: 'Georgia',
+      },
+      {
+        type: 'text',
+        x: 140,
+        y: 632,
+        width: 800,
+        height: 44,
+        text: '{{hosts.parentNames}}',
+        fontSize: 28,
+        fontWeight: 'normal',
+        color: '#475569',
+        textAlign: 'center',
+        fontFamily: 'Arial',
+      },
+    ],
+  };
+
+  const corporateBody = {
+    key: 'corporate-body',
+    label: 'Corporate Speaker Block',
+    elements: [
+      {
+        type: 'text',
+        x: 120,
+        y: 540,
+        width: 840,
+        height: 74,
+        text: '{{hosts.companyName}}',
+        fontSize: 56,
+        fontWeight: 'bold',
+        color: '#0f172a',
+        textAlign: 'center',
+        fontFamily: 'Georgia',
+      },
+      {
+        type: 'text',
+        x: 120,
+        y: 626,
+        width: 840,
+        height: 44,
+        text: 'Hosted by {{hosts.hostName}}, {{hosts.designation}}',
+        fontSize: 28,
+        fontWeight: 'normal',
+        color: '#334155',
+        textAlign: 'center',
+        fontFamily: 'Arial',
+      },
+    ],
+  };
+
+  const genericBody = {
+    key: 'generic-body',
+    label: 'Body Section',
+    elements: [
+      {
+        type: 'text',
+        x: 110,
+        y: 560,
+        width: 860,
+        height: 64,
+        text: 'You are invited to {{event.title}}',
+        fontSize: 44,
+        fontWeight: 'bold',
+        color: '#0f172a',
+        textAlign: 'center',
+        fontFamily: 'Georgia',
+      },
+      {
+        type: 'text',
+        x: 120,
+        y: 640,
+        width: 840,
+        height: 80,
+        text: '{{hosts.blessingLine}}',
+        fontSize: 30,
+        fontWeight: 'normal',
+        color: '#334155',
+        textAlign: 'center',
+        fontFamily: 'Arial',
+      },
+    ],
+  };
+
+  if (type === 'wedding' || type === 'engagement') {
+    return [header, weddingBody, footer];
+  }
+  if (type === 'birthday' || type === 'maturity' || type === 'anniversary' || type === 'babyshower') {
+    return [header, celebrantBody, footer];
+  }
+  if (type === 'corporate') {
+    return [header, corporateBody, footer];
+  }
+  return [header, genericBody, footer];
+};
 
 export const buildDefaultMergeData = (eventType, existing = {}) => {
   const config = getPlaceholderConfig(eventType);
@@ -141,5 +511,37 @@ export const buildPreviewMergeContext = ({ event, guest, mergeData }) => {
     },
     hosts: safeMerge.hosts,
     custom: safeMerge.custom,
+  };
+};
+
+export const buildStarterLayout = ({
+  eventType,
+  event,
+  templateKey = null,
+  mergeData,
+  canvasSize = '1080x1920',
+  backgroundColor = '#fffaf6',
+}) => {
+  const normalizedMerge = buildDefaultMergeData(eventType, mergeData);
+  const sectionBlocks = getSectionBlocks(eventType);
+  const starterElements = sectionBlocks.flatMap((block) => block.elements || []);
+
+  const withIds = starterElements.map((element, index) => ({
+    ...element,
+    id: `starter-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 7)}`,
+    locked: false,
+    z: index,
+  }));
+
+  return {
+    templateKey,
+    canvasSize,
+    backgroundColor,
+    title: event?.title || '',
+    venue: event?.venue || '',
+    date: event?.date || null,
+    eventType,
+    mergeData: normalizedMerge,
+    elements: withIds,
   };
 };

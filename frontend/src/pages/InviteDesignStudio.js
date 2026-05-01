@@ -35,10 +35,14 @@ import { getErrorMessage, getPaymentRequirement } from '../utils/helpers';
 import { paymentService } from '../services/paymentService';
 import InviteDesignCanvas from './InviteDesignCanvas';
 import {
+  EVENT_TYPE_OPTIONS,
+  buildStarterLayout,
   buildDefaultMergeData,
   buildPreviewMergeContext,
   getHostFieldConfig,
   getInvitePlaceholderGroups,
+  getQuickTextBlocks,
+  getSectionBlocks,
 } from '../utils/invitePlaceholders';
 import './InviteDesignStudio.css';
 
@@ -66,6 +70,9 @@ const InviteDesignStudio = () => {
   const [editorMode, setEditorMode] = useState('canvas'); // 'canvas' or 'json'
 
   const [sendVia, setSendVia] = useState('email');
+  const [previewGuestId, setPreviewGuestId] = useState(null);
+  const [customKey, setCustomKey] = useState('');
+  const [customValue, setCustomValue] = useState('');
 
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -78,20 +85,30 @@ const InviteDesignStudio = () => {
     () => templates.find((template) => template.key === selectedTemplate) || null,
     [templates, selectedTemplate]
   );
-  const inviteEventType = event?.type || selectedDesign?.category || 'other';
+  const inviteEventType = canvasLayout.eventType || event?.type || selectedDesign?.category || 'other';
   const placeholderGroups = useMemo(() => getInvitePlaceholderGroups(inviteEventType), [inviteEventType]);
   const hostFieldConfig = useMemo(() => getHostFieldConfig(inviteEventType), [inviteEventType]);
+  const quickTextBlocks = useMemo(() => getQuickTextBlocks(inviteEventType), [inviteEventType]);
+  const sectionBlocks = useMemo(() => getSectionBlocks(inviteEventType), [inviteEventType]);
+  const previewGuest = useMemo(
+    () => guests.find((guest) => guest.id === previewGuestId) || guests[0] || null,
+    [guests, previewGuestId]
+  );
   const flatPlaceholderTokens = useMemo(
-    () => placeholderGroups.flatMap((group) => group.items.map((item) => item.token)),
-    [placeholderGroups]
+    () => {
+      const base = placeholderGroups.flatMap((group) => group.items.map((item) => item.token));
+      const dynamicCustom = Object.keys(mergeData.custom || {}).map((key) => `{{custom.${key}}}`);
+      return [...base, ...dynamicCustom];
+    },
+    [placeholderGroups, mergeData.custom]
   );
   const mergeData = useMemo(
     () => buildDefaultMergeData(inviteEventType, canvasLayout.mergeData),
     [inviteEventType, canvasLayout.mergeData]
   );
   const previewMergeContext = useMemo(
-    () => buildPreviewMergeContext({ event, guest: guests[0], mergeData }),
-    [event, guests, mergeData]
+    () => buildPreviewMergeContext({ event, guest: previewGuest, mergeData }),
+    [event, previewGuest, mergeData]
   );
 
   const patchMergeData = useMemo(
@@ -113,6 +130,40 @@ const InviteDesignStudio = () => {
     [inviteEventType]
   );
 
+  const setEventProfile = (nextType) => {
+    setCanvasLayout((prev) => ({
+      ...prev,
+      eventType: nextType,
+      mergeData: buildDefaultMergeData(nextType, prev.mergeData),
+    }));
+  };
+
+  const addOrUpdateCustomField = () => {
+    const key = customKey.trim().replace(/\s+/g, '_');
+    if (!key) {
+      message.warning('Enter a custom key');
+      return;
+    }
+    patchMergeData('custom', key, customValue);
+    setCustomKey('');
+    setCustomValue('');
+  };
+
+  const removeCustomField = (key) => {
+    setCanvasLayout((prev) => {
+      const current = buildDefaultMergeData(inviteEventType, prev.mergeData);
+      const nextCustom = { ...(current.custom || {}) };
+      delete nextCustom[key];
+      return {
+        ...prev,
+        mergeData: {
+          ...current,
+          custom: nextCustom,
+        },
+      };
+    });
+  };
+
   const handleCopyPlaceholder = async (token) => {
     try {
       await navigator.clipboard.writeText(token);
@@ -120,6 +171,27 @@ const InviteDesignStudio = () => {
     } catch (_error) {
       message.info(token);
     }
+  };
+
+  const handleApplyStarterLayout = () => {
+    if (!selectedDesignId) {
+      message.warning('Select a design first.');
+      return;
+    }
+
+    const nextLayout = buildStarterLayout({
+      eventType: inviteEventType,
+      event,
+      templateKey: selectedTemplate || canvasLayout.templateKey || null,
+      mergeData,
+      canvasSize: canvasLayout.canvasSize || '1080x1920',
+      backgroundColor: canvasLayout.backgroundColor || '#fffaf6',
+    });
+
+    setCanvasLayout(nextLayout);
+    setLayoutText(JSON.stringify(nextLayout, null, 2));
+    setEditorMode('canvas');
+    message.success(`Starter ${inviteEventType} layout applied`);
   };
 
   const loadStudioData = async () => {
@@ -189,6 +261,12 @@ const InviteDesignStudio = () => {
     loadStudioData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventId]);
+
+  useEffect(() => {
+    if (!previewGuestId && guests.length) {
+      setPreviewGuestId(guests[0].id);
+    }
+  }, [guests, previewGuestId]);
 
   const handleCreateDesign = async () => {
     const trimmedName = newDesignName.trim();
@@ -508,6 +586,38 @@ const InviteDesignStudio = () => {
                   </Col>
                 </Row>
 
+                <Row gutter={12}>
+                  <Col span={8}>
+                    <Text strong>Event Profile</Text>
+                    <Select
+                      value={inviteEventType}
+                      onChange={setEventProfile}
+                      style={{ width: '100%', marginTop: 6 }}
+                      options={EVENT_TYPE_OPTIONS}
+                    />
+                  </Col>
+                  <Col span={8}>
+                    <Text strong>Preview Guest</Text>
+                    <Select
+                      value={previewGuest?.id}
+                      onChange={setPreviewGuestId}
+                      style={{ width: '100%', marginTop: 6 }}
+                      options={guests.map((guest) => ({ value: guest.id, label: `${guest.name}${guest.relationship ? ` (${guest.relationship})` : ''}` }))}
+                      placeholder="Select preview guest"
+                    />
+                  </Col>
+                  <Col span={8}>
+                    <Text strong>Quick Compose</Text>
+                    <Button
+                      type="default"
+                      onClick={handleApplyStarterLayout}
+                      style={{ width: '100%', marginTop: 6 }}
+                    >
+                      Apply Full Starter Layout
+                    </Button>
+                  </Col>
+                </Row>
+
                 <Tabs
                   value={editorMode}
                   onChange={setEditorMode}
@@ -527,6 +637,8 @@ const InviteDesignStudio = () => {
                             onLayoutChange={setCanvasLayout}
                             placeholderTokens={flatPlaceholderTokens}
                             previewMergeContext={previewMergeContext}
+                            quickTextBlocks={quickTextBlocks}
+                            sectionBlocks={sectionBlocks}
                           />
                         </div>
                       ),
@@ -597,6 +709,58 @@ const InviteDesignStudio = () => {
                             </Space>
                           </div>
                         ))}
+                        <div className="invite-studio-placeholder-group">
+                          <Text strong>Custom Fields</Text>
+                          <Row gutter={8} style={{ marginTop: 6 }}>
+                            <Col span={10}>
+                              <Input
+                                placeholder="key (e.g. dressCode)"
+                                value={customKey}
+                                onChange={(eventInput) => setCustomKey(eventInput.target.value)}
+                              />
+                            </Col>
+                            <Col span={10}>
+                              <Input
+                                placeholder="value"
+                                value={customValue}
+                                onChange={(eventInput) => setCustomValue(eventInput.target.value)}
+                              />
+                            </Col>
+                            <Col span={4}>
+                              <Button type="primary" onClick={addOrUpdateCustomField} style={{ width: '100%' }}>
+                                Add
+                              </Button>
+                            </Col>
+                          </Row>
+                          {Object.keys(mergeData.custom || {}).length ? (
+                            <Space wrap style={{ marginTop: 8 }}>
+                              {Object.entries(mergeData.custom || {}).map(([key, value]) => (
+                                <Tag
+                                  key={key}
+                                  color="geekblue"
+                                  className="invite-studio-placeholder-tag"
+                                  onClick={() => handleCopyPlaceholder(`{{custom.${key}}}`)}
+                                >
+                                  {`{{custom.${key}}}`} = {String(value || '')}
+                                  <Button
+                                    type="link"
+                                    size="small"
+                                    onClick={(eventInput) => {
+                                      eventInput.stopPropagation();
+                                      removeCustomField(key);
+                                    }}
+                                  >
+                                    x
+                                  </Button>
+                                </Tag>
+                              ))}
+                            </Space>
+                          ) : (
+                            <Text type="secondary" style={{ marginTop: 8, display: 'block' }}>
+                              No custom fields yet.
+                            </Text>
+                          )}
+                        </div>
                       </div>
                     </Card>
                   </Col>
