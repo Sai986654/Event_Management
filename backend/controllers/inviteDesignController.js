@@ -161,6 +161,213 @@ const fetchImageBuffer = async (source) => {
   return Buffer.from(arrayBuffer);
 };
 
+const resolveLottieSourceUrl = (source) => {
+  if (!source) return '';
+  if (typeof source === 'string') return source.trim();
+  if (typeof source === 'object' && typeof source.uri === 'string') return source.uri.trim();
+  return '';
+};
+
+const LOTTIE_FALLBACK_THEMES = [
+  {
+    id: 'confetti',
+    matches: ['obhph3t0', 'confetti'],
+    title: 'CONFETTI',
+    icon: '🎊',
+    bg: '#ecfeff',
+    stroke: '#06b6d4',
+    badge: '#cffafe',
+    titleColor: '#0e7490',
+    bodyColor: '#155e75',
+  },
+  {
+    id: 'birthday',
+    matches: ['nt4ypxj4', 'birthday'],
+    title: 'BIRTHDAY',
+    icon: '🎂',
+    bg: '#fff7ed',
+    stroke: '#f97316',
+    badge: '#ffedd5',
+    titleColor: '#9a3412',
+    bodyColor: '#7c2d12',
+  },
+  {
+    id: 'hearts',
+    matches: ['gtgjbk', 'heart', 'hearts'],
+    title: 'HEARTS',
+    icon: '❤️',
+    bg: '#fff1f2',
+    stroke: '#f43f5e',
+    badge: '#ffe4e6',
+    titleColor: '#9f1239',
+    bodyColor: '#881337',
+  },
+  {
+    id: 'fireworks',
+    matches: ['m9p23l', 'firework'],
+    title: 'FIREWORKS',
+    icon: '🎆',
+    bg: '#eef2ff',
+    stroke: '#6366f1',
+    badge: '#e0e7ff',
+    titleColor: '#3730a3',
+    bodyColor: '#312e81',
+  },
+  {
+    id: 'stars',
+    matches: ['aztdd5', 'stars', 'star'],
+    title: 'STARS',
+    icon: '⭐',
+    bg: '#fffbeb',
+    stroke: '#f59e0b',
+    badge: '#fef3c7',
+    titleColor: '#92400e',
+    bodyColor: '#78350f',
+  },
+  {
+    id: 'wedding',
+    matches: ['jbb5pqtg', 'wedding'],
+    title: 'WEDDING',
+    icon: '💍',
+    bg: '#fdf2f8',
+    stroke: '#db2777',
+    badge: '#fce7f3',
+    titleColor: '#9d174d',
+    bodyColor: '#831843',
+  },
+  {
+    id: 'balloons',
+    matches: ['touohxv0', 'balloon'],
+    title: 'BALLOONS',
+    icon: '🎈',
+    bg: '#eff6ff',
+    stroke: '#3b82f6',
+    badge: '#dbeafe',
+    titleColor: '#1d4ed8',
+    bodyColor: '#1e40af',
+  },
+  {
+    id: 'celebrate',
+    matches: ['u4yrau84', 'celebrat'],
+    title: 'CELEBRATE',
+    icon: '🥳',
+    bg: '#f0fdf4',
+    stroke: '#22c55e',
+    badge: '#dcfce7',
+    titleColor: '#166534',
+    bodyColor: '#14532d',
+  },
+];
+
+const getLottieFallbackTheme = (sourceUrl) => {
+  const value = String(sourceUrl || '').toLowerCase();
+  const matched = LOTTIE_FALLBACK_THEMES.find((theme) =>
+    theme.matches.some((token) => value.includes(String(token || '').toLowerCase()))
+  );
+
+  if (matched) return matched;
+  return {
+    id: 'generic',
+    title: 'ANIMATED STICKER',
+    icon: '🎬',
+    bg: '#f5f3ff',
+    stroke: '#a78bfa',
+    badge: '#ede9fe',
+    titleColor: '#5b21b6',
+    bodyColor: '#6d28d9',
+  };
+};
+
+const compactSourceText = (sourceUrl) => {
+  if (!sourceUrl) return 'Source: Lottie animation';
+  try {
+    const parsed = new URL(sourceUrl);
+    const path = String(parsed.pathname || '').split('/').filter(Boolean);
+    const leaf = path[path.length - 1] || parsed.hostname;
+    return `Source: ${leaf}`;
+  } catch (_error) {
+    const compact = String(sourceUrl).slice(0, 60);
+    return `Source: ${compact}${String(sourceUrl).length > 60 ? '...' : ''}`;
+  }
+};
+
+const drawLottieFallback = (doc, { x, y, width, height, sourceUrl }) => {
+  const safeWidth = Math.max(1, width);
+  const safeHeight = Math.max(1, height);
+  const theme = getLottieFallbackTheme(sourceUrl);
+
+  doc.save();
+  doc.roundedRect(x, y, safeWidth, safeHeight, Math.max(4, Math.min(safeWidth, safeHeight) * 0.06));
+  doc.fillAndStroke(theme.bg, theme.stroke);
+
+  const badgeHeight = Math.max(20, safeHeight * 0.2);
+  doc.roundedRect(x + 6, y + 6, Math.max(80, safeWidth - 12), badgeHeight, 6).fill(theme.badge);
+  doc.fillColor(theme.titleColor).font('Helvetica-Bold').fontSize(Math.max(8, badgeHeight * 0.38));
+  doc.text(`${theme.icon} ${theme.title}`, x + 12, y + 6 + badgeHeight * 0.22, {
+    width: Math.max(40, safeWidth - 24),
+    align: 'left',
+    lineBreak: false,
+  });
+
+  const sourceText = compactSourceText(sourceUrl);
+  doc.fillColor(theme.bodyColor).font('Helvetica').fontSize(Math.max(7, Math.min(11, safeHeight * 0.1)));
+  doc.text(sourceText, x + 12, y + badgeHeight + 14, {
+    width: Math.max(40, safeWidth - 24),
+    height: Math.max(20, safeHeight - badgeHeight - 24),
+    ellipsis: true,
+  });
+
+  doc.restore();
+};
+
+const collectLottieLegendItems = (elements) => {
+  const items = [];
+  const seen = new Set();
+
+  for (const element of Array.isArray(elements) ? elements : []) {
+    if (!element || element.type !== 'lottie') continue;
+    const sourceUrl = resolveLottieSourceUrl(element.lottieSource);
+    const theme = getLottieFallbackTheme(sourceUrl);
+    const key = String(theme.id || theme.title || 'generic');
+    if (seen.has(key)) continue;
+    seen.add(key);
+    items.push({ id: key, title: String(theme.title || 'ANIMATED STICKER') });
+  }
+
+  return items;
+};
+
+const drawLottieLegend = (doc, { pageWidth, pageHeight, items }) => {
+  const legendItems = (items || []).slice(0, 6);
+  if (!legendItems.length) return;
+
+  const boxWidth = Math.max(170, Math.min(240, pageWidth * 0.42));
+  const lineHeight = 12;
+  const headerHeight = 18;
+  const padding = 8;
+  const boxHeight = padding * 2 + headerHeight + legendItems.length * lineHeight + 4;
+  const x = Math.max(8, pageWidth - boxWidth - 10);
+  const y = Math.max(8, pageHeight - boxHeight - 10);
+
+  doc.save();
+  doc.roundedRect(x, y, boxWidth, boxHeight, 8).fillAndStroke('#ffffff', '#cbd5e1');
+  doc.fillColor('#334155').font('Helvetica-Bold').fontSize(9);
+  doc.text('Animated stickers in this invite', x + padding, y + padding, {
+    width: boxWidth - padding * 2,
+    lineBreak: false,
+  });
+
+  doc.fillColor('#475569').font('Helvetica').fontSize(8);
+  legendItems.forEach((item, index) => {
+    const rowY = y + padding + headerHeight + index * lineHeight;
+    doc.text(`- ${item.title}`, x + padding, rowY, {
+      width: boxWidth - padding * 2,
+      lineBreak: false,
+    });
+  });
+  doc.restore();
+};
+
 const deriveInviteMessage = ({ guest, event, resolvedLayout, fallbackMessage }) => {
   if (fallbackMessage) return fallbackMessage;
   const textCandidates = Array.isArray(resolvedLayout.elements)
@@ -187,6 +394,7 @@ const buildRenderedDesignPdfBuffer = async ({ design, event, guest = null, layou
   const pageWidth = Math.round(canvasWidth * scale);
   const pageHeight = Math.round(canvasHeight * scale);
   const imageCache = new Map();
+  const showAnimationLegend = resolvedLayout.showAnimationLegend !== false;
 
   const pdfBuffer = await new Promise((resolve, reject) => {
     const chunks = [];
@@ -252,7 +460,26 @@ const buildRenderedDesignPdfBuffer = async ({ design, event, guest = null, layou
           align: element.textAlign || 'left',
         });
         doc.restore();
+        continue;
       }
+
+      if (element.type === 'lottie') {
+        drawLottieFallback(doc, {
+          x,
+          y,
+          width,
+          height,
+          sourceUrl: resolveLottieSourceUrl(element.lottieSource),
+        });
+      }
+    }
+
+    if (showAnimationLegend) {
+      drawLottieLegend(doc, {
+        pageWidth,
+        pageHeight,
+        items: collectLottieLegendItems(orderedElements),
+      });
     }
 
     doc.end();
@@ -357,7 +584,26 @@ const buildRenderedDesignPdfBuffer = async ({ design, event, guest = null, layou
           align: element.textAlign || 'left',
         });
         doc.restore();
+        continue;
       }
+
+      if (element.type === 'lottie') {
+        drawLottieFallback(doc, {
+          x,
+          y,
+          width,
+          height,
+          sourceUrl: resolveLottieSourceUrl(element.lottieSource),
+        });
+      }
+    }
+
+    if (showAnimationLegend) {
+      drawLottieLegend(doc, {
+        pageWidth,
+        pageHeight,
+        items: collectLottieLegendItems(orderedElements),
+      });
     }
 
     doc.end();

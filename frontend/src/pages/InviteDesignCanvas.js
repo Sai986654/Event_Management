@@ -126,6 +126,7 @@ const InviteDesignCanvas = ({
   const [showGrid, setShowGrid] = useState(false);
   const [snapToGrid, setSnapToGrid] = useState(true);
   const [gridSize, setGridSize] = useState(16);
+  const [isShiftSnapBypass, setIsShiftSnapBypass] = useState(false);
   const [sectionGuide, setSectionGuide] = useState({ show: false, topYCanvas: 0, centerV: false });
   const [dragGuide, setDragGuide] = useState({ show: false, xCanvas: null, yCanvas: null });
   const [lottieDataMap, setLottieDataMap] = useState({});
@@ -531,11 +532,11 @@ const InviteDesignCanvas = ({
   );
 
   const nudgeSelected = useCallback(
-    (dx, dy) => {
+    (dx, dy, stepOverride = null) => {
       if (!selectedElement || selectedElement.locked) return;
-      const step = Math.max(1, Number(gridSize) || 1);
-      const nextX = snapValue(Number(selectedElement.x || 0) + dx * step);
-      const nextY = snapValue(Number(selectedElement.y || 0) + dy * step);
+      const resolvedStep = stepOverride === null ? Math.max(1, Number(gridSize) || 1) : Math.max(1, Number(stepOverride) || 1);
+      const nextX = snapValue(Number(selectedElement.x || 0) + dx * resolvedStep);
+      const nextY = snapValue(Number(selectedElement.y || 0) + dy * resolvedStep);
       handleUpdateElement(selectedElement.id, { x: nextX, y: nextY });
     },
     [gridSize, handleUpdateElement, selectedElement, snapValue]
@@ -552,7 +553,19 @@ const InviteDesignCanvas = ({
   );
 
   const getAlignedPosition = useCallback(
-    (targetElementId, rawX, rawY, width, height) => {
+    (targetElementId, rawX, rawY, width, height, enableAlignSnap = true) => {
+      if (!enableAlignSnap) {
+        return {
+          x: rawX,
+          y: rawY,
+          guide: {
+            show: false,
+            xCanvas: null,
+            yCanvas: null,
+          },
+        };
+      }
+
       const sourceElements = elementsRef.current || [];
       const targetWidth = Number(width) || 0;
       const targetHeight = Number(height) || 0;
@@ -656,18 +669,21 @@ const InviteDesignCanvas = ({
       const viewport = canvasRef.current;
       if (!dragState || !viewport) return;
 
+      const shouldSnap = snapToGrid && !event.shiftKey;
+      setIsShiftSnapBypass(!shouldSnap && snapToGrid);
+
       const deltaX = (event.clientX - dragState.startClientX) / dragState.scaleX;
       const deltaY = (event.clientY - dragState.startClientY) / dragState.scaleY;
 
       let nextX = dragState.startX + deltaX;
       let nextY = dragState.startY + deltaY;
 
-      if (snapToGrid) {
+      if (shouldSnap) {
         nextX = snapValue(nextX);
         nextY = snapValue(nextY);
       }
 
-      const aligned = getAlignedPosition(dragState.elementId, nextX, nextY, dragState.width, dragState.height);
+      const aligned = getAlignedPosition(dragState.elementId, nextX, nextY, dragState.width, dragState.height, shouldSnap);
       nextX = aligned.x;
       nextY = aligned.y;
 
@@ -681,13 +697,14 @@ const InviteDesignCanvas = ({
       elementsRef.current = nextElements;
       setElements(nextElements);
       updateLayout(nextElements);
-      setDragGuide(aligned.guide);
+      setDragGuide(shouldSnap ? aligned.guide : { show: false, xCanvas: null, yCanvas: null });
     },
     [canvasHeight, canvasWidth, getAlignedPosition, snapToGrid, snapValue, updateLayout]
   );
 
   const handleDragEnd = useCallback(() => {
     dragStateRef.current = null;
+    setIsShiftSnapBypass(false);
     setDragGuide({ show: false, xCanvas: null, yCanvas: null });
     window.removeEventListener('mousemove', handleDragMove);
     window.removeEventListener('mouseup', handleDragEnd);
@@ -736,6 +753,46 @@ const InviteDesignCanvas = ({
     },
     [elements, updateLayout]
   );
+
+  useEffect(() => {
+    const onKeyDown = (event) => {
+      const target = event.target;
+      const isEditable = target && (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable
+      );
+      if (isEditable) return;
+
+      if (!selectedElement || selectedElement.locked) return;
+
+      const fineStep = 1;
+      const coarseStep = Math.max(1, Number(gridSize) || 1);
+      const step = event.shiftKey ? fineStep : coarseStep;
+
+      if (event.key === 'ArrowLeft') {
+        event.preventDefault();
+        nudgeSelected(-1, 0, step);
+      } else if (event.key === 'ArrowRight') {
+        event.preventDefault();
+        nudgeSelected(1, 0, step);
+      } else if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        nudgeSelected(0, -1, step);
+      } else if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        nudgeSelected(0, 1, step);
+      } else if ((event.key === 'Delete' || event.key === 'Backspace') && selectedElement?.id) {
+        event.preventDefault();
+        handleDeleteElement(selectedElement.id);
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [gridSize, handleDeleteElement, nudgeSelected, selectedElement]);
 
   // Duplicate element
   const handleDuplicateElement = useCallback(
@@ -1083,6 +1140,9 @@ const InviteDesignCanvas = ({
                 <Switch checked={showGrid} onChange={setShowGrid} /> Grid
                 <span style={{ margin: '0 10px' }} />
                 <Switch checked={snapToGrid} onChange={setSnapToGrid} /> Snap
+                <div style={{ marginTop: 8, color: isShiftSnapBypass ? '#b45309' : '#64748b' }}>
+                  Hold Shift while dragging to temporarily disable snap. Arrow keys move selected item.
+                </div>
               </div>
             </div>
           </Card>
