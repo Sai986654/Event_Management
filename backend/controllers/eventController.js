@@ -86,10 +86,18 @@ exports.getEvents = asyncHandler(async (req, res) => {
   // Support fetching all events when limit=all (e.g. dashboard tab view)
   const fetchAll = req.query.limit === 'all';
 
+  // Sort support: date | budget | createdAt | distance
+  const sortBy = req.query.sortBy || 'date';
+  const sortOrder = req.query.sortOrder === 'asc' ? 'asc' : 'desc';
+  const dbSortFields = { date: 'date', budget: 'budget', createdAt: 'createdAt' };
+  const orderBy = dbSortFields[sortBy]
+    ? { [dbSortFields[sortBy]]: sortOrder }
+    : { date: 'desc' }; // distance is sorted post-fetch
+
   const [events, total] = await Promise.all([
     prisma.event.findMany({
       where,
-      orderBy: { date: 'desc' },
+      orderBy,
       skip: fetchAll ? undefined : skip,
       take: fetchAll ? undefined : limit,
       include: {
@@ -99,7 +107,32 @@ exports.getEvents = asyncHandler(async (req, res) => {
     prisma.event.count({ where }),
   ]);
 
-  res.json({ events, page, totalPages: Math.ceil(total / limit), total });
+  // Distance sort: requires userLat and userLng query params
+  let result = events;
+  if (sortBy === 'distance') {
+    const userLat = parseFloat(req.query.userLat);
+    const userLng = parseFloat(req.query.userLng);
+    if (!isNaN(userLat) && !isNaN(userLng)) {
+      const haversine = (lat1, lng1, lat2, lng2) => {
+        const R = 6371;
+        const dLat = ((lat2 - lat1) * Math.PI) / 180;
+        const dLng = ((lng2 - lng1) * Math.PI) / 180;
+        const a = Math.sin(dLat / 2) ** 2 +
+          Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      };
+      result = events
+        .map((e) => ({
+          ...e,
+          distanceKm: e.lat != null && e.lng != null
+            ? haversine(userLat, userLng, e.lat, e.lng)
+            : Infinity,
+        }))
+        .sort((a, b) => sortOrder === 'asc' ? a.distanceKm - b.distanceKm : b.distanceKm - a.distanceKm);
+    }
+  }
+
+  res.json({ events: result, page, totalPages: Math.ceil(total / limit), total });
 });
 
 // GET /api/events/:id

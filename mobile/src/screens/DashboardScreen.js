@@ -1,6 +1,7 @@
 import React, { useContext, useEffect, useState, useCallback, useLayoutEffect } from 'react';
-import { View, StyleSheet, ScrollView, RefreshControl, Linking, TouchableOpacity } from 'react-native';
-import { Text, Card, Button, Chip, FAB, ActivityIndicator, IconButton } from 'react-native-paper';
+import { View, StyleSheet, ScrollView, RefreshControl, Linking, TouchableOpacity, Alert } from 'react-native';
+import { Text, Card, Button, Chip, FAB, ActivityIndicator, IconButton, Menu } from 'react-native-paper';
+import * as Location from 'expo-location';
 import { AuthContext } from '../context/AuthContext';
 import { eventService } from '../services/eventService';
 import { bookingService } from '../services/bookingService';
@@ -55,12 +56,35 @@ const qStyles = StyleSheet.create({
 });
 
 /* ── Organizer / Admin / Customer Dashboard ── */
+const SORT_OPTIONS = [
+  { key: 'date', label: 'Event Date' },
+  { key: 'budget', label: 'Budget' },
+  { key: 'createdAt', label: 'Listed Date' },
+  { key: 'distance', label: 'Distance' },
+];
+
+// Haversine distance in km
+const haversine = (lat1, lng1, lat2, lng2) => {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+};
+
 const EventsDashboard = ({ user, navigation }) => {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState('active');
   const [fabOpen, setFabOpen] = useState(false);
+  const [sortBy, setSortBy] = useState('date');
+  const [sortOrder, setSortOrder] = useState('asc');
+  const [userLocation, setUserLocation] = useState(null); // { latitude, longitude }
+  const [locLoading, setLocLoading] = useState(false);
+  const [sortMenuVisible, setSortMenuVisible] = useState(false);
 
   const fetchEvents = useCallback(async () => {
     try {
@@ -76,9 +100,57 @@ const EventsDashboard = ({ user, navigation }) => {
 
   useEffect(() => { fetchEvents(); }, [fetchEvents]);
 
+  const requestLocation = useCallback(async () => {
+    setLocLoading(true);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Location Permission', 'Enable location to sort events by distance.');
+        setSortBy('date');
+        return;
+      }
+      const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      setUserLocation({ latitude: pos.coords.latitude, longitude: pos.coords.longitude });
+    } catch {
+      Alert.alert('Location Error', 'Could not get your current location.');
+      setSortBy('date');
+    } finally {
+      setLocLoading(false);
+    }
+  }, []);
+
+  const handleSortChange = useCallback((key) => {
+    setSortBy(key);
+    setSortMenuVisible(false);
+    if (key === 'distance' && !userLocation) {
+      requestLocation();
+    }
+  }, [userLocation, requestLocation]);
+
+  const toggleSortOrder = useCallback(() => {
+    setSortOrder((o) => (o === 'asc' ? 'desc' : 'asc'));
+  }, []);
+
+  // Apply client-side sort to any event array
+  const applySortToList = useCallback((list) => {
+    const dir = sortOrder === 'asc' ? 1 : -1;
+    return [...list].sort((a, b) => {
+      if (sortBy === 'budget') return dir * ((parseFloat(a.budget) || 0) - (parseFloat(b.budget) || 0));
+      if (sortBy === 'createdAt') return dir * (new Date(a.createdAt) - new Date(b.createdAt));
+      if (sortBy === 'distance') {
+        if (!userLocation) return 0;
+        const da = a.lat != null && a.lng != null ? haversine(userLocation.latitude, userLocation.longitude, a.lat, a.lng) : Infinity;
+        const db = b.lat != null && b.lng != null ? haversine(userLocation.latitude, userLocation.longitude, b.lat, b.lng) : Infinity;
+        return dir * (da - db);
+      }
+      // date (default)
+      return dir * (new Date(a.date) - new Date(b.date));
+    });
+  }, [sortBy, sortOrder, userLocation]);
+
   // Segregate events: active = at least 1 vendor booking, drafts = 0 bookings
-  const activeEvents = events.filter((e) => (e._count?.bookings || 0) > 0);
-  const draftEvents = events.filter((e) => (e._count?.bookings || 0) === 0);
+  const activeEvents = applySortToList(events.filter((e) => (e._count?.bookings || 0) > 0));
+  const draftEvents = applySortToList(events.filter((e) => (e._count?.bookings || 0) === 0));
   const visibleEvents = activeTab === 'active' ? activeEvents : draftEvents;
 
   const upcoming = events.filter((e) => new Date(e.date) > new Date()).length;
@@ -108,7 +180,42 @@ const EventsDashboard = ({ user, navigation }) => {
         </View>
 
         {/* Event Tabs */}
-        <Text variant="titleMedium" style={styles.sectionTitle}>Your Events</Text>
+        <View style={sortStyles.headerRow}>
+          <Text variant="titleMedium" style={[styles.sectionTitle, { marginTop: 0, marginBottom: 0 }]}>Your Events</Text>
+          <View style={sortStyles.controls}>
+            <Menu
+              visible={sortMenuVisible}
+              onDismiss={() => setSortMenuVisible(false)}
+              anchor={
+                <TouchableOpacity style={sortStyles.sortBtn} onPress={() => setSortMenuVisible(true)}>
+                  {locLoading
+                    ? <ActivityIndicator size={14} color={Colors.primary} style={{ marginRight: 4 }} />
+                    : <IconButton icon="sort" size={16} iconColor={Colors.primary} style={{ margin: 0, padding: 0 }} />}
+                  <Text style={sortStyles.sortBtnText}>
+                    {SORT_OPTIONS.find((o) => o.key === sortBy)?.label || 'Sort'}
+                  </Text>
+                </TouchableOpacity>
+              }
+            >
+              {SORT_OPTIONS.map((opt) => (
+                <Menu.Item
+                  key={opt.key}
+                  onPress={() => handleSortChange(opt.key)}
+                  title={opt.label}
+                  leadingIcon={sortBy === opt.key ? 'check' : undefined}
+                />
+              ))}
+            </Menu>
+            <TouchableOpacity style={sortStyles.orderBtn} onPress={toggleSortOrder}>
+              <IconButton
+                icon={sortOrder === 'asc' ? 'sort-ascending' : 'sort-descending'}
+                size={18}
+                iconColor={Colors.primary}
+                style={{ margin: 0 }}
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
         <View style={tabStyles.tabRow}>
           <TouchableOpacity
             style={[tabStyles.tab, activeTab === 'active' && tabStyles.tabActive]}
@@ -472,6 +579,39 @@ const styles = StyleSheet.create({
   emptyCard: { marginHorizontal: Spacing.lg, borderRadius: Radius.lg, backgroundColor: Colors.surface },
   emptyText: { textAlign: 'center', color: Colors.textMuted, paddingVertical: 20 },
   fab: { backgroundColor: Colors.primary, borderRadius: Radius.lg },
+});
+
+const sortStyles = StyleSheet.create({
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginHorizontal: Spacing.lg,
+    marginTop: Spacing.lg,
+    marginBottom: Spacing.sm,
+  },
+  controls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  sortBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: Radius.sm,
+    backgroundColor: Colors.surfaceVariant,
+  },
+  sortBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: Colors.primary,
+  },
+  orderBtn: {
+    marginLeft: 4,
+    borderRadius: Radius.sm,
+    backgroundColor: Colors.surfaceVariant,
+  },
 });
 
 const tabStyles = StyleSheet.create({

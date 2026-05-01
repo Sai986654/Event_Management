@@ -1,6 +1,6 @@
-import React, { useContext, useEffect, useState } from 'react';
-import { Layout, Button, Card, Row, Col, Statistic, Table, Tag, Tabs, message, Empty, Spin, Space, Badge } from 'antd';
-import { PlusOutlined, CalendarOutlined, TeamOutlined, ShopOutlined, CheckCircleOutlined } from '@ant-design/icons';
+import React, { useContext, useEffect, useState, useCallback, useMemo } from 'react';
+import { Layout, Button, Card, Row, Col, Statistic, Table, Tag, Tabs, Select, Tooltip, message, Empty, Spin, Space, Badge } from 'antd';
+import { PlusOutlined, CalendarOutlined, TeamOutlined, SortAscendingOutlined, SortDescendingOutlined, AimOutlined } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { eventService } from '../services/eventService';
@@ -8,11 +8,25 @@ import { bookingService } from '../services/bookingService';
 import { formatDate, formatCurrency, getErrorMessage } from '../utils/helpers';
 import './Dashboard.css';
 
+// Haversine distance in km
+const haversineKm = (lat1, lng1, lat2, lng2) => {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a = Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+};
+
 /* ─── Organizer / Admin dashboard ─── */
 const OrganizerDashboard = ({ user }) => {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({ totalEvents: 0, upcomingEvents: 0, totalGuests: 0, totalBudget: 0 });
+  const [sortBy, setSortBy] = useState('date');
+  const [sortOrder, setSortOrder] = useState('desc');
+  const [userCoords, setUserCoords] = useState(null); // { lat, lng }
+  const [geoLoading, setGeoLoading] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -36,9 +50,46 @@ const OrganizerDashboard = ({ user }) => {
     })();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const requestLocation = useCallback(() => {
+    if (!navigator.geolocation) { message.error('Geolocation not supported'); return; }
+    setGeoLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setUserCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setGeoLoading(false);
+      },
+      () => {
+        message.warning('Could not get location. Switching to date sort.');
+        setSortBy('date');
+        setGeoLoading(false);
+      },
+      { timeout: 8000 }
+    );
+  }, []);
+
+  const handleSortByChange = useCallback((val) => {
+    setSortBy(val);
+    if (val === 'distance' && !userCoords) requestLocation();
+  }, [userCoords, requestLocation]);
+
+  const applySort = useCallback((list) => {
+    const dir = sortOrder === 'asc' ? 1 : -1;
+    return [...list].sort((a, b) => {
+      if (sortBy === 'budget') return dir * ((parseFloat(a.budget) || 0) - (parseFloat(b.budget) || 0));
+      if (sortBy === 'createdAt') return dir * (new Date(a.createdAt) - new Date(b.createdAt));
+      if (sortBy === 'distance') {
+        if (!userCoords) return 0;
+        const da = a.lat != null ? haversineKm(userCoords.lat, userCoords.lng, a.lat, a.lng) : Infinity;
+        const db = b.lat != null ? haversineKm(userCoords.lat, userCoords.lng, b.lat, b.lng) : Infinity;
+        return dir * (da - db);
+      }
+      return dir * (new Date(a.date) - new Date(b.date));
+    });
+  }, [sortBy, sortOrder, userCoords]);
+
   // Segregate: active = at least 1 vendor booking, drafts = 0 bookings
-  const activeEvents = events.filter((e) => (e._count?.bookings || 0) > 0);
-  const draftEvents = events.filter((e) => (e._count?.bookings || 0) === 0);
+  const activeEvents = useMemo(() => applySort(events.filter((e) => (e._count?.bookings || 0) > 0)), [events, applySort]);
+  const draftEvents = useMemo(() => applySort(events.filter((e) => (e._count?.bookings || 0) === 0)), [events, applySort]);
 
   const columns = [
     { title: 'Event Name', dataIndex: 'title', key: 'title', render: (t, r) => <Link to={`/events/${r.id}`}>{t}</Link> },
@@ -88,6 +139,38 @@ const OrganizerDashboard = ({ user }) => {
     },
   ];
 
+  const sortBar = (
+    <Space>
+      <Select
+        value={sortBy}
+        onChange={handleSortByChange}
+        style={{ width: 150 }}
+        options={[
+          { value: 'date', label: 'Event Date' },
+          { value: 'budget', label: 'Budget' },
+          { value: 'createdAt', label: 'Listed Date' },
+          { value: 'distance', label: 'Distance' },
+        ]}
+      />
+      <Tooltip title={sortOrder === 'asc' ? 'Ascending' : 'Descending'}>
+        <Button
+          icon={sortOrder === 'asc' ? <SortAscendingOutlined /> : <SortDescendingOutlined />}
+          onClick={() => setSortOrder((o) => (o === 'asc' ? 'desc' : 'asc'))}
+        />
+      </Tooltip>
+      {sortBy === 'distance' && (
+        <Tooltip title={userCoords ? `Location acquired` : 'Click to use my location'}>
+          <Button
+            icon={<AimOutlined />}
+            loading={geoLoading}
+            type={userCoords ? 'primary' : 'default'}
+            onClick={requestLocation}
+          />
+        </Tooltip>
+      )}
+    </Space>
+  );
+
   return (
     <Spin spinning={loading}>
       <div className="dashboard-header">
@@ -113,7 +196,10 @@ const OrganizerDashboard = ({ user }) => {
         </Col>
       </Row>
 
-      <Card style={{ marginTop: 24 }}>
+      <Card
+        style={{ marginTop: 24 }}
+        extra={sortBar}
+      >
         <Tabs defaultActiveKey="active" items={tabItems} />
       </Card>
 
