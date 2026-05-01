@@ -1,6 +1,6 @@
 import React, { useContext, useEffect, useState, useCallback, useMemo } from 'react';
-import { Layout, Button, Card, Row, Col, Statistic, Table, Tag, Tabs, Select, Tooltip, message, Empty, Spin, Space, Badge } from 'antd';
-import { PlusOutlined, CalendarOutlined, TeamOutlined, SortAscendingOutlined, SortDescendingOutlined, AimOutlined, ShopOutlined, CheckCircleOutlined } from '@ant-design/icons';
+import { Layout, Button, Card, Row, Col, Statistic, Table, Tag, Tabs, Select, Tooltip, message, Empty, Spin, Space, Badge, Segmented } from 'antd';
+import { PlusOutlined, CalendarOutlined, TeamOutlined, SortAscendingOutlined, SortDescendingOutlined, AimOutlined, ShopOutlined, CheckCircleOutlined, RiseOutlined, FallOutlined, MinusOutlined } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { eventService } from '../services/eventService';
@@ -25,6 +25,7 @@ const OrganizerDashboard = ({ user }) => {
   const [stats, setStats] = useState({ totalEvents: 0, upcomingEvents: 0, totalGuests: 0, totalBudget: 0 });
   const [sortBy, setSortBy] = useState('date');
   const [sortOrder, setSortOrder] = useState('desc');
+  const [eventViewMode, setEventViewMode] = useState('table');
   const [userCoords, setUserCoords] = useState(null); // { lat, lng }
   const [geoLoading, setGeoLoading] = useState(false);
 
@@ -87,9 +88,19 @@ const OrganizerDashboard = ({ user }) => {
     });
   }, [sortBy, sortOrder, userCoords]);
 
-  // Segregate: active = at least 1 vendor booking, drafts = 0 bookings
-  const activeEvents = useMemo(() => applySort(events.filter((e) => (e._count?.bookings || 0) > 0)), [events, applySort]);
-  const draftEvents = useMemo(() => applySort(events.filter((e) => (e._count?.bookings || 0) === 0)), [events, applySort]);
+  // Segregate events like mobile: completed by status, active/drafts exclude completed.
+  const completedEvents = useMemo(
+    () => applySort(events.filter((e) => String(e.status || '').toLowerCase() === 'completed')),
+    [events, applySort]
+  );
+  const activeEvents = useMemo(
+    () => applySort(events.filter((e) => (e._count?.bookings || 0) > 0 && String(e.status || '').toLowerCase() !== 'completed')),
+    [events, applySort]
+  );
+  const draftEvents = useMemo(
+    () => applySort(events.filter((e) => (e._count?.bookings || 0) === 0 && String(e.status || '').toLowerCase() !== 'completed')),
+    [events, applySort]
+  );
 
   const columns = [
     { title: 'Event Name', dataIndex: 'title', key: 'title', render: (t, r) => <Link to={`/events/${r.id}`}>{t}</Link> },
@@ -114,6 +125,188 @@ const OrganizerDashboard = ({ user }) => {
     { title: 'Action', key: 'action', render: (_, r) => <Link to={`/events/${r.id}`}><Button type="link">View</Button></Link> },
   ];
 
+  const trendStats = useMemo(() => {
+    const DAY = 24 * 60 * 60 * 1000;
+    const now = Date.now();
+    const currentStart = now - 30 * DAY;
+    const previousStart = now - 60 * DAY;
+
+    const inCurrentCreatedWindow = (event) => {
+      const ts = new Date(event.createdAt || event.date || 0).getTime();
+      return Number.isFinite(ts) && ts >= currentStart && ts < now;
+    };
+    const inPreviousCreatedWindow = (event) => {
+      const ts = new Date(event.createdAt || event.date || 0).getTime();
+      return Number.isFinite(ts) && ts >= previousStart && ts < currentStart;
+    };
+    const inUpcomingCurrentWindow = (event) => {
+      const ts = new Date(event.date || 0).getTime();
+      return Number.isFinite(ts) && ts >= now && ts < now + 30 * DAY;
+    };
+    const inUpcomingPreviousWindow = (event) => {
+      const ts = new Date(event.date || 0).getTime();
+      return Number.isFinite(ts) && ts >= now - 30 * DAY && ts < now;
+    };
+
+    const currentCreated = events.filter(inCurrentCreatedWindow);
+    const previousCreated = events.filter(inPreviousCreatedWindow);
+
+    const toTrend = (current, previous) => {
+      const delta = current - previous;
+      const pct = previous > 0 ? Math.round((Math.abs(delta) / previous) * 100) : (current > 0 ? 100 : 0);
+      return {
+        delta,
+        pct,
+        direction: delta > 0 ? 'up' : delta < 0 ? 'down' : 'flat',
+      };
+    };
+
+    return {
+      totalEvents: toTrend(currentCreated.length, previousCreated.length),
+      upcomingEvents: toTrend(events.filter(inUpcomingCurrentWindow).length, events.filter(inUpcomingPreviousWindow).length),
+      totalGuests: toTrend(
+        currentCreated.reduce((sum, event) => sum + Number(event.guestCount || 0), 0),
+        previousCreated.reduce((sum, event) => sum + Number(event.guestCount || 0), 0)
+      ),
+      totalBudget: toTrend(
+        currentCreated.reduce((sum, event) => sum + (parseFloat(event.budget) || 0), 0),
+        previousCreated.reduce((sum, event) => sum + (parseFloat(event.budget) || 0), 0)
+      ),
+    };
+  }, [events]);
+
+  const kpiSparklineSeries = useMemo(() => {
+    const DAY = 24 * 60 * 60 * 1000;
+    const WEEK = 7 * DAY;
+    const bins = 8;
+    const now = Date.now();
+    const createdStart = now - bins * WEEK;
+
+    const totalEventsSeries = Array.from({ length: bins }, () => 0);
+    const guestsSeries = Array.from({ length: bins }, () => 0);
+    const budgetSeries = Array.from({ length: bins }, () => 0);
+    const upcomingSeries = Array.from({ length: bins }, () => 0);
+
+    events.forEach((event) => {
+      const createdTs = new Date(event.createdAt || event.date || 0).getTime();
+      if (Number.isFinite(createdTs) && createdTs >= createdStart && createdTs < now) {
+        const idx = Math.floor((createdTs - createdStart) / WEEK);
+        if (idx >= 0 && idx < bins) {
+          totalEventsSeries[idx] += 1;
+          guestsSeries[idx] += Number(event.guestCount || 0);
+          budgetSeries[idx] += parseFloat(event.budget) || 0;
+        }
+      }
+
+      const eventDateTs = new Date(event.date || 0).getTime();
+      if (Number.isFinite(eventDateTs) && eventDateTs >= now) {
+        const idx = Math.floor((eventDateTs - now) / WEEK);
+        if (idx >= 0 && idx < bins) {
+          upcomingSeries[idx] += 1;
+        }
+      }
+    });
+
+    return {
+      totalEvents: totalEventsSeries,
+      upcomingEvents: upcomingSeries,
+      totalGuests: guestsSeries,
+      totalBudget: budgetSeries,
+    };
+  }, [events]);
+
+  const renderTrendChip = useCallback((trend) => {
+    const direction = trend?.direction || 'flat';
+    const icon = direction === 'up' ? <RiseOutlined /> : direction === 'down' ? <FallOutlined /> : <MinusOutlined />;
+    const text = direction === 'flat'
+      ? 'No change vs last 30d'
+      : `${direction === 'up' ? '+' : '-'}${Math.abs(trend.delta)} (${trend.pct}%) vs last 30d`;
+
+    return (
+      <span className={`kpi-trend-chip kpi-trend-chip--${direction}`}>
+        {icon} {text}
+      </span>
+    );
+  }, []);
+
+  const renderSparkline = useCallback((values, tone = 'blue') => {
+    const width = 120;
+    const height = 34;
+    const pad = 3;
+    const points = Array.isArray(values) && values.length ? values : [0, 0, 0, 0];
+    const min = Math.min(...points);
+    const max = Math.max(...points);
+    const range = max - min;
+    const stepX = points.length > 1 ? (width - pad * 2) / (points.length - 1) : 0;
+
+    const colorMap = {
+      blue: { stroke: '#2563eb', fill: 'rgba(37,99,235,0.14)' },
+      cyan: { stroke: '#0891b2', fill: 'rgba(8,145,178,0.14)' },
+      purple: { stroke: '#7c3aed', fill: 'rgba(124,58,237,0.14)' },
+      green: { stroke: '#16a34a', fill: 'rgba(22,163,74,0.14)' },
+    };
+    const palette = colorMap[tone] || colorMap.blue;
+
+    const xy = points.map((value, index) => {
+      const x = pad + index * stepX;
+      const normalized = range === 0 ? 0.5 : (value - min) / range;
+      const y = pad + (1 - normalized) * (height - pad * 2);
+      return [x, y];
+    });
+
+    const line = xy.map(([x, y]) => `${x},${y}`).join(' ');
+    const area = `${pad},${height - pad} ${line} ${width - pad},${height - pad}`;
+    const [endX, endY] = xy[xy.length - 1];
+
+    return (
+      <div className="kpi-sparkline-wrap">
+        <svg className="kpi-sparkline" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" role="img" aria-label="KPI trend sparkline">
+          <polygon points={area} fill={palette.fill} />
+          <polyline points={line} fill="none" stroke={palette.stroke} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+          <circle cx={endX} cy={endY} r="2.8" fill={palette.stroke} />
+        </svg>
+      </div>
+    );
+  }, []);
+
+  const renderEventPanelContent = useCallback((eventList, emptyDescription) => {
+    if (!eventList.length) return <Empty description={emptyDescription} />;
+
+    if (eventViewMode === 'compact') {
+      return (
+        <div className="events-compact-list">
+          {eventList.map((event) => {
+            const vendorCount = event._count?.bookings || 0;
+            return (
+              <div className="events-compact-item" key={event.id}>
+                <div className="events-compact-item-main">
+                  <div className="events-compact-item-title-row">
+                    <Link to={`/events/${event.id}`} className="events-compact-item-title">{event.title}</Link>
+                    <Tag color={String(event.status || '').toLowerCase() === 'completed' ? 'blue' : 'green'}>
+                      {event.status || 'active'}
+                    </Tag>
+                  </div>
+                  <div className="events-compact-item-meta">
+                    <span>{formatDate(event.date)}</span>
+                    <span>{event.venue || [event.city, event.state].filter(Boolean).join(', ') || '—'}</span>
+                    <span>{formatCurrency(event.budget)}</span>
+                    <span>{Number(event.guestCount || 0)} guests</span>
+                    <span>{vendorCount} vendors</span>
+                  </div>
+                </div>
+                <Link to={`/events/${event.id}`}>
+                  <Button type="link">View</Button>
+                </Link>
+              </div>
+            );
+          })}
+        </div>
+      );
+    }
+
+    return <Table dataSource={eventList} columns={columns} pagination={{ pageSize: 10 }} rowKey="id" scroll={{ x: 900 }} />;
+  }, [columns, eventViewMode]);
+
   const tabItems = [
     {
       key: 'active',
@@ -122,9 +315,7 @@ const OrganizerDashboard = ({ user }) => {
           Active Events <Badge count={activeEvents.length} style={{ backgroundColor: '#52c41a' }} showZero />
         </span>
       ),
-      children: activeEvents.length === 0
-        ? <Empty description="No active events yet. Book a vendor to see events here!" />
-        : <Table dataSource={activeEvents} columns={columns} pagination={{ pageSize: 10 }} rowKey="id" scroll={{ x: 900 }} />,
+      children: renderEventPanelContent(activeEvents, 'No active events yet. Book a vendor to see events here!'),
     },
     {
       key: 'drafts',
@@ -133,9 +324,16 @@ const OrganizerDashboard = ({ user }) => {
           Drafts <Badge count={draftEvents.length} style={{ backgroundColor: '#d9d9d9', color: '#666' }} showZero />
         </span>
       ),
-      children: draftEvents.length === 0
-        ? <Empty description="No draft events." />
-        : <Table dataSource={draftEvents} columns={columns} pagination={{ pageSize: 10 }} rowKey="id" scroll={{ x: 900 }} />,
+      children: renderEventPanelContent(draftEvents, 'No draft events.'),
+    },
+    {
+      key: 'completed',
+      label: (
+        <span>
+          Completed <Badge count={completedEvents.length} style={{ backgroundColor: '#1677ff' }} showZero />
+        </span>
+      ),
+      children: renderEventPanelContent(completedEvents, 'No completed events yet.'),
     },
   ];
 
@@ -212,9 +410,9 @@ const OrganizerDashboard = ({ user }) => {
       </Card>
 
       <Row gutter={[16, 16]} className="stats-grid">
-        <Col xs={24} sm={12} lg={6}><Card className="dashboard-stat-card"><Statistic title="Total Events" value={stats.totalEvents} prefix={<CalendarOutlined />} /></Card></Col>
-        <Col xs={24} sm={12} lg={6}><Card className="dashboard-stat-card"><Statistic title="Upcoming Events" value={stats.upcomingEvents} valueStyle={{ color: '#0ea5e9' }} /></Card></Col>
-        <Col xs={24} sm={12} lg={6}><Card className="dashboard-stat-card"><Statistic title="Total Guests" value={stats.totalGuests} prefix={<TeamOutlined />} /></Card></Col>
+        <Col xs={24} sm={12} lg={6}><Card className="dashboard-stat-card"><Statistic title="Total Events" value={stats.totalEvents} prefix={<CalendarOutlined />} />{renderSparkline(kpiSparklineSeries.totalEvents, 'blue')}{renderTrendChip(trendStats.totalEvents)}</Card></Col>
+        <Col xs={24} sm={12} lg={6}><Card className="dashboard-stat-card"><Statistic title="Upcoming Events" value={stats.upcomingEvents} valueStyle={{ color: '#0ea5e9' }} />{renderSparkline(kpiSparklineSeries.upcomingEvents, 'cyan')}{renderTrendChip(trendStats.upcomingEvents)}</Card></Col>
+        <Col xs={24} sm={12} lg={6}><Card className="dashboard-stat-card"><Statistic title="Total Guests" value={stats.totalGuests} prefix={<TeamOutlined />} />{renderSparkline(kpiSparklineSeries.totalGuests, 'purple')}{renderTrendChip(trendStats.totalGuests)}</Card></Col>
         <Col xs={24} sm={12} lg={6}>
           <Card className="dashboard-stat-card">
             <Statistic
@@ -223,6 +421,8 @@ const OrganizerDashboard = ({ user }) => {
               formatter={(v) => formatCurrency(v)}
               valueStyle={{ color: '#52c41a' }}
             />
+            {renderSparkline(kpiSparklineSeries.totalBudget, 'green')}
+            {renderTrendChip(trendStats.totalBudget)}
           </Card>
         </Col>
       </Row>
@@ -230,8 +430,18 @@ const OrganizerDashboard = ({ user }) => {
       <Card
         className="events-card"
         style={{ marginTop: 20 }}
-        extra={sortBar}
       >
+        <div className="events-toolbar">
+          <div className="events-toolbar-controls">{sortBar}</div>
+          <Segmented
+            value={eventViewMode}
+            onChange={setEventViewMode}
+            options={[
+              { label: 'Table', value: 'table' },
+              { label: 'Compact', value: 'compact' },
+            ]}
+          />
+        </div>
         <Tabs defaultActiveKey="active" items={tabItems} />
       </Card>
     </Spin>
