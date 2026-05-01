@@ -71,7 +71,7 @@ router.post(
 router.post(
   '/designs/:id/send',
   [
-    body('sendVia').optional().isIn(['email', 'whatsapp', 'both']).withMessage('sendVia must be email, whatsapp, or both'),
+    body('sendVia').optional().isIn(['none', 'email', 'whatsapp', 'both']).withMessage('sendVia must be none, email, whatsapp, or both'),
     body('guestIds').optional().isArray().withMessage('guestIds must be an array'),
   ],
   validate,

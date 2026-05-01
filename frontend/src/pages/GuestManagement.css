@@ -33,6 +33,15 @@
   align-items: center;
 }
 
+.invite-design-mode-note {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #ecfeff 0%, #fdf2f8 100%);
+  border: 1px solid #bae6fd;
+  color: #164e63;
+}
+
 .invite-live-preview-wrap {
   margin-top: 14px;
 }

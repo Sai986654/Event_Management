@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { Card, Table, Button, Modal, Form, Input, Select, Upload, message, Spin, Row, Col, Statistic, Badge, Typography } from 'antd';
 import { PlusOutlined, UploadOutlined } from '@ant-design/icons';
 import { guestService } from '../services/guestService';
+import { inviteDesignService } from '../services/inviteDesignService';
 import { useEventSocket } from '../hooks/useEventSocket';
 import { getErrorMessage } from '../utils/helpers';
 import './GuestManagement.css';
@@ -13,6 +14,9 @@ const GuestManagement = () => {
   const [loading, setLoading] = useState(true);
   const [loadingTemplates, setLoadingTemplates] = useState(false);
   const [inviteTemplates, setInviteTemplates] = useState([]);
+  const [loadingDesigns, setLoadingDesigns] = useState(false);
+  const [inviteDesigns, setInviteDesigns] = useState([]);
+  const [selectedDesignId, setSelectedDesignId] = useState(undefined);
   const [selectedTemplateKey, setSelectedTemplateKey] = useState('royal-maroon');
   const [selectedTone, setSelectedTone] = useState('friendly');
   const [selectedLanguage, setSelectedLanguage] = useState('en');
@@ -51,6 +55,7 @@ const GuestManagement = () => {
     inviteTemplates.find((template) => template.key === selectedTemplateKey) ||
     inviteTemplates[0] ||
     null;
+  const selectedDesign = inviteDesigns.find((design) => design.id === selectedDesignId) || null;
 
   const selectedGuests = guests.filter((guest) => selectedGuestIds.includes(guest.id));
   const previewGuest = selectedGuests[0] || guests[0] || null;
@@ -102,6 +107,7 @@ const GuestManagement = () => {
   useEffect(() => {
     fetchGuests();
     fetchInviteTemplates();
+    fetchInviteDesigns();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventId]);
 
@@ -130,6 +136,18 @@ const GuestManagement = () => {
       message.error(getErrorMessage(error));
     } finally {
       setLoadingTemplates(false);
+    }
+  };
+
+  const fetchInviteDesigns = async () => {
+    try {
+      setLoadingDesigns(true);
+      const data = await inviteDesignService.listDesigns(eventId);
+      setInviteDesigns(Array.isArray(data?.designs) ? data.designs : []);
+    } catch (error) {
+      message.error(getErrorMessage(error));
+    } finally {
+      setLoadingDesigns(false);
     }
   };
 
@@ -216,6 +234,17 @@ const GuestManagement = () => {
   const handleGenerateInvite = async (guest) => {
     try {
       setGeneratingGuestId(guest.id);
+      if (selectedDesignId) {
+        await inviteDesignService.generateAndSend(selectedDesignId, {
+          sendVia: 'none',
+          guestIds: [guest.id],
+          defaultLanguage: selectedLanguage,
+        });
+        message.success(`Design PDF generated for ${guest.name}`);
+        fetchGuests();
+        return;
+      }
+
       await guestService.generatePersonalizedInvite(guest.id, {
         language: selectedLanguage,
         tone: selectedTone,
@@ -233,6 +262,22 @@ const GuestManagement = () => {
   const handleGenerateBulkInvites = async () => {
     try {
       setBulkGenerating(true);
+      if (selectedDesignId) {
+        const payload = {
+          sendVia: 'none',
+          defaultLanguage: selectedLanguage,
+        };
+
+        if (selectedGuestIds.length) {
+          payload.guestIds = selectedGuestIds;
+        }
+
+        const result = await inviteDesignService.generateAndSend(selectedDesignId, payload);
+        message.success(`Generated ${result.generated}/${result.total} design PDF invite(s)`);
+        fetchGuests();
+        return;
+      }
+
       const payload = {
         defaultLanguage: selectedLanguage,
         defaultTone: selectedTone,
@@ -256,6 +301,24 @@ const GuestManagement = () => {
   const handleGenerateAndSendInvites = async () => {
     try {
       setSendingInvites(true);
+      if (selectedDesignId) {
+        const payload = {
+          sendVia: selectedSendChannel,
+          defaultLanguage: selectedLanguage,
+        };
+
+        if (selectedGuestIds.length) {
+          payload.guestIds = selectedGuestIds;
+        }
+
+        const result = await inviteDesignService.generateAndSend(selectedDesignId, payload);
+        const failureCount = Array.isArray(result.failures) ? result.failures.length : 0;
+        message.success(`Processed ${result.generated || 0} design invite(s)${failureCount ? `, ${failureCount} failed` : ''}`);
+        setIsSendModalVisible(false);
+        fetchGuests();
+        return;
+      }
+
       const payload = {
         sendVia: selectedSendChannel,
         defaultLanguage: selectedLanguage,
@@ -394,16 +457,28 @@ const GuestManagement = () => {
             </Upload>
           </div>
 
-          <Card className="invite-generator-card" loading={loadingTemplates}>
+          <Card className="invite-generator-card" loading={loadingTemplates || loadingDesigns}>
             <Typography.Title level={5} style={{ marginBottom: 12 }}>
               Personalized Invite Generator
             </Typography.Title>
             <div className="invite-generator-controls">
               <Select
+                value={selectedDesignId}
+                onChange={setSelectedDesignId}
+                allowClear
+                placeholder="Use Invite Studio design"
+                style={{ minWidth: 240 }}
+                options={inviteDesigns.map((design) => ({
+                  value: design.id,
+                  label: `${design.name} (${design.status})`,
+                }))}
+              />
+              <Select
                 value={selectedTemplateKey}
                 onChange={setSelectedTemplateKey}
                 placeholder="Select template"
                 style={{ minWidth: 220 }}
+                disabled={Boolean(selectedDesignId)}
                 options={inviteTemplates.map((template) => ({
                   value: template.key,
                   title: template.name,
@@ -424,6 +499,7 @@ const GuestManagement = () => {
                 value={selectedTone}
                 onChange={setSelectedTone}
                 style={{ minWidth: 160 }}
+                disabled={Boolean(selectedDesignId)}
                 options={[
                   { value: 'friendly', label: 'Friendly' },
                   { value: 'formal', label: 'Formal' },
@@ -432,8 +508,8 @@ const GuestManagement = () => {
               />
               <Button type="primary" loading={bulkGenerating} onClick={handleGenerateBulkInvites}>
                 {selectedGuestIds.length
-                  ? `Generate for Selected (${selectedGuestIds.length})`
-                  : 'Generate for All Guests'}
+                  ? `${selectedDesignId ? 'Generate PDFs' : 'Generate'} for Selected (${selectedGuestIds.length})`
+                  : selectedDesignId ? 'Generate PDFs for All Guests' : 'Generate for All Guests'}
               </Button>
               <Button onClick={() => setIsSendModalVisible(true)} disabled={!guests.length} loading={sendingInvites}>
                 {selectedGuestIds.length
@@ -442,26 +518,40 @@ const GuestManagement = () => {
               </Button>
             </div>
 
+            {selectedDesign ? (
+              <div className="invite-design-mode-note">
+                Using saved design <strong>{selectedDesign.name}</strong>. Guest PDFs will be rendered from the Invite Studio canvas with placeholders and host data.
+              </div>
+            ) : null}
+
             <div className="invite-live-preview-wrap">
               <div
                 className="invite-live-preview"
                 style={{
-                  background:
+                  background: selectedDesign
+                    ? 'linear-gradient(135deg, #e0f2fe 0%, #fdf2f8 100%)'
+                    :
                     selectedTemplate?.preview?.gradient ||
                     'linear-gradient(135deg, #7c2d12 0%, #9a3412 100%)',
-                  borderColor: selectedTemplate?.preview?.frame || '#7c2d12',
+                  borderColor: selectedDesign ? '#0f766e' : selectedTemplate?.preview?.frame || '#7c2d12',
                 }}
               >
                 <div className="invite-live-preview-inner">
                   <div className="invite-live-preview-top">Vedika 360</div>
                   <div className="invite-live-preview-title">
-                    {selectedTemplate?.name || 'Template Preview'}
+                    {selectedDesign?.name || selectedTemplate?.name || 'Template Preview'}
                   </div>
                   <div className="invite-live-preview-meta">
-                    {selectedLanguage === 'te' ? 'Telugu' : 'English'} • {selectedTone} • {previewRelationship}
+                    {selectedDesign
+                      ? `Invite Studio Design • ${previewRelationship}`
+                      : `${selectedLanguage === 'te' ? 'Telugu' : 'English'} • ${selectedTone} • ${previewRelationship}`}
                   </div>
                   <div className="invite-live-preview-salutation">{previewSalutation}</div>
-                  <div className="invite-live-preview-body">{previewBody}</div>
+                  <div className="invite-live-preview-body">
+                    {selectedDesign
+                      ? 'This mode renders the saved Invite Studio layout for each guest and fills placeholder tokens like guest name, event date, bride or groom names, and blessing lines.'
+                      : previewBody}
+                  </div>
                   <div className="invite-live-preview-footer">
                     Preview guest: {previewGuestName}
                     {extraSelectedCount > 0 ? ` +${extraSelectedCount} more selected` : ''}
@@ -578,9 +668,9 @@ const GuestManagement = () => {
           </div>
 
           <div className="guest-send-summary-card">
-            <div><strong>Template:</strong> {selectedTemplate?.name || 'Not selected'}</div>
+            <div><strong>Template:</strong> {selectedDesign?.name || selectedTemplate?.name || 'Not selected'}</div>
             <div><strong>Language:</strong> {selectedLanguage === 'te' ? 'Telugu' : 'English'}</div>
-            <div><strong>Tone:</strong> {selectedTone}</div>
+            <div><strong>Mode:</strong> {selectedDesign ? 'Invite Studio design PDF' : `Classic ${selectedTone} template`}</div>
             <div><strong>Recipients:</strong> {selectedGuestIds.length || guests.length}</div>
           </div>
         </Modal>

@@ -34,6 +34,12 @@ import { inviteDesignService } from '../services/inviteDesignService';
 import { getErrorMessage, getPaymentRequirement } from '../utils/helpers';
 import { paymentService } from '../services/paymentService';
 import InviteDesignCanvas from './InviteDesignCanvas';
+import {
+  buildDefaultMergeData,
+  buildPreviewMergeContext,
+  getHostFieldConfig,
+  getInvitePlaceholderGroups,
+} from '../utils/invitePlaceholders';
 import './InviteDesignStudio.css';
 
 const { Text, Title } = Typography;
@@ -72,6 +78,49 @@ const InviteDesignStudio = () => {
     () => templates.find((template) => template.key === selectedTemplate) || null,
     [templates, selectedTemplate]
   );
+  const inviteEventType = event?.type || selectedDesign?.category || 'other';
+  const placeholderGroups = useMemo(() => getInvitePlaceholderGroups(inviteEventType), [inviteEventType]);
+  const hostFieldConfig = useMemo(() => getHostFieldConfig(inviteEventType), [inviteEventType]);
+  const flatPlaceholderTokens = useMemo(
+    () => placeholderGroups.flatMap((group) => group.items.map((item) => item.token)),
+    [placeholderGroups]
+  );
+  const mergeData = useMemo(
+    () => buildDefaultMergeData(inviteEventType, canvasLayout.mergeData),
+    [inviteEventType, canvasLayout.mergeData]
+  );
+  const previewMergeContext = useMemo(
+    () => buildPreviewMergeContext({ event, guest: guests[0], mergeData }),
+    [event, guests, mergeData]
+  );
+
+  const patchMergeData = useMemo(
+    () => (scope, key, value) => {
+      setCanvasLayout((prev) => {
+        const current = buildDefaultMergeData(inviteEventType, prev.mergeData);
+        return {
+          ...prev,
+          mergeData: {
+            ...current,
+            [scope]: {
+              ...(current[scope] || {}),
+              [key]: value,
+            },
+          },
+        };
+      });
+    },
+    [inviteEventType]
+  );
+
+  const handleCopyPlaceholder = async (token) => {
+    try {
+      await navigator.clipboard.writeText(token);
+      message.success(`${token} copied`);
+    } catch (_error) {
+      message.info(token);
+    }
+  };
 
   const loadStudioData = async () => {
     try {
@@ -118,13 +167,18 @@ const InviteDesignStudio = () => {
       ]);
 
       const design = designRes.design;
+      const nextLayout = {
+        ...(design.jsonLayout || {}),
+        eventType: event?.type || design.category || 'other',
+        mergeData: buildDefaultMergeData(event?.type || design.category || 'other', design.jsonLayout?.mergeData),
+      };
       setSelectedDesignId(design.id);
       setSelectedDesign(design);
       setDesignName(design.name || '');
       setDesignStatus(design.status || 'draft');
       setDesignLanguage(design.language || 'en');
-      setLayoutText(JSON.stringify(design.jsonLayout || {}, null, 2));
-      setCanvasLayout(design.jsonLayout || {});
+      setLayoutText(JSON.stringify(nextLayout, null, 2));
+      setCanvasLayout(nextLayout);
       setExportsList(exportRes.exports || []);
     } catch (error) {
       message.error(getErrorMessage(error));
@@ -156,6 +210,8 @@ const InviteDesignStudio = () => {
           title: event?.title || '',
           venue: event?.venue || '',
           date: event?.date || null,
+          eventType: event?.type || 'other',
+          mergeData: buildDefaultMergeData(event?.type || 'other'),
           notes: 'Edit this layout JSON to match your final invitation design.',
         },
       };
@@ -184,7 +240,11 @@ const InviteDesignStudio = () => {
     
     if (editorMode === 'canvas') {
       // Use canvas layout
-      finalLayout = canvasLayout;
+      finalLayout = {
+        ...canvasLayout,
+        eventType: inviteEventType,
+        mergeData,
+      };
       setLayoutText(JSON.stringify(finalLayout, null, 2));
     } else {
       // Use JSON editor
@@ -194,6 +254,11 @@ const InviteDesignStudio = () => {
         message.error('Layout JSON is invalid.');
         return;
       }
+      finalLayout = {
+        ...finalLayout,
+        eventType: inviteEventType,
+        mergeData: buildDefaultMergeData(inviteEventType, finalLayout.mergeData),
+      };
       setCanvasLayout(finalLayout);
     }
 
@@ -460,6 +525,8 @@ const InviteDesignStudio = () => {
                             layout={canvasLayout}
                             templateMeta={selectedTemplateMeta}
                             onLayoutChange={setCanvasLayout}
+                            placeholderTokens={flatPlaceholderTokens}
+                            previewMergeContext={previewMergeContext}
                           />
                         </div>
                       ),
@@ -488,6 +555,52 @@ const InviteDesignStudio = () => {
                     },
                   ]}
                 />
+
+                <Row gutter={[12, 12]}>
+                  <Col xs={24} xl={12}>
+                    <Card size="small" title={`Host Data · ${inviteEventType}`}>
+                      <Space direction="vertical" style={{ width: '100%' }} size={8}>
+                        {hostFieldConfig.map((field) => (
+                          <div key={field.key}>
+                            <Text strong>{field.label}</Text>
+                            <Input
+                              value={mergeData.hosts[field.key] || ''}
+                              onChange={(eventInput) => patchMergeData('hosts', field.key, eventInput.target.value)}
+                              placeholder={field.placeholder}
+                              style={{ marginTop: 6 }}
+                            />
+                          </div>
+                        ))}
+                      </Space>
+                    </Card>
+                  </Col>
+                  <Col xs={24} xl={12}>
+                    <Card size="small" title="Placeholder Catalog">
+                      <Text type="secondary">
+                        Click a token to copy it, then paste it into any text element. The canvas preview resolves these using sample guest data.
+                      </Text>
+                      <div className="invite-studio-placeholder-groups">
+                        {placeholderGroups.map((group) => (
+                          <div key={group.label} className="invite-studio-placeholder-group">
+                            <Text strong>{group.label}</Text>
+                            <Space wrap style={{ marginTop: 8 }}>
+                              {group.items.map((item) => (
+                                <Tag
+                                  key={item.token}
+                                  color="purple"
+                                  className="invite-studio-placeholder-tag"
+                                  onClick={() => handleCopyPlaceholder(item.token)}
+                                >
+                                  {item.label}: {item.token}
+                                </Tag>
+                              ))}
+                            </Space>
+                          </div>
+                        ))}
+                      </div>
+                    </Card>
+                  </Col>
+                </Row>
 
                 <Space wrap>
                   <Button icon={<SaveOutlined />} type="primary" onClick={handleSaveDesign} loading={saving}>

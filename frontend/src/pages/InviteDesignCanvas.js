@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   Card,
   Row,
@@ -25,8 +25,15 @@ import {
   UnlockOutlined,
 } from '@ant-design/icons';
 import './InviteDesignCanvas.css';
+import { resolveTemplateString } from '../utils/invitePlaceholders';
 
-const InviteDesignCanvas = ({ layout = {}, templateMeta = null, onLayoutChange = () => {} }) => {
+const InviteDesignCanvas = ({
+  layout = {},
+  templateMeta = null,
+  onLayoutChange = () => {},
+  placeholderTokens = [],
+  previewMergeContext = null,
+}) => {
   const [elements, setElements] = useState(layout.elements || []);
   const [selectedElementId, setSelectedElementId] = useState(null);
   const [canvasSize, setCanvasSize] = useState(layout.canvasSize || '1080x1920');
@@ -34,6 +41,12 @@ const InviteDesignCanvas = ({ layout = {}, templateMeta = null, onLayoutChange =
   const [showGrid, setShowGrid] = useState(false);
 
   const selectedElement = elements.find((el) => el.id === selectedElementId);
+
+  useEffect(() => {
+    setElements(layout.elements || []);
+    setCanvasSize(layout.canvasSize || '1080x1920');
+    setBackgroundColor(layout.backgroundColor || '#ffffff');
+  }, [layout.backgroundColor, layout.canvasSize, layout.elements]);
 
   // Generate unique ID
   const generateId = useCallback(() => `element-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`, []);
@@ -45,8 +58,10 @@ const InviteDesignCanvas = ({ layout = {}, templateMeta = null, onLayoutChange =
       canvasSize,
       backgroundColor,
       templateKey: layout.templateKey || null,
+      mergeData: layout.mergeData || {},
+      eventType: layout.eventType || null,
     });
-  }, [onLayoutChange, canvasSize, backgroundColor, layout.templateKey]);
+  }, [onLayoutChange, canvasSize, backgroundColor, layout.templateKey, layout.mergeData, layout.eventType]);
 
   // Add new element
   const handleAddElement = useCallback(
@@ -104,6 +119,16 @@ const InviteDesignCanvas = ({ layout = {}, templateMeta = null, onLayoutChange =
       updateLayout(newElements);
     },
     [elements, updateLayout]
+  );
+
+  const handleInsertPlaceholder = useCallback(
+    (token) => {
+      if (!selectedElement || selectedElement.type !== 'text' || selectedElement.locked) return;
+      const currentText = String(selectedElement.text || '');
+      const separator = currentText && !/\s$/.test(currentText) ? ' ' : '';
+      handleUpdateElement(selectedElement.id, { text: `${currentText}${separator}${token}`.trim() });
+    },
+    [handleUpdateElement, selectedElement]
   );
 
   // Delete element
@@ -295,7 +320,7 @@ const InviteDesignCanvas = ({ layout = {}, templateMeta = null, onLayoutChange =
                               wordWrap: 'break-word',
                             }}
                           >
-                            {element.text}
+                            {resolveTemplateString(element.text, previewMergeContext || {})}
                           </span>
                         )}
                         {element.type === 'image' && (
@@ -418,6 +443,23 @@ const InviteDesignCanvas = ({ layout = {}, templateMeta = null, onLayoutChange =
                         size="small"
                         disabled={selectedElement.locked}
                       />
+                      {placeholderTokens.length ? (
+                        <div style={{ marginTop: 10 }}>
+                          <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>Placeholders</div>
+                          <Space wrap>
+                            {placeholderTokens.map((token) => (
+                              <Tag
+                                key={token}
+                                color="blue"
+                                style={{ cursor: selectedElement.locked ? 'not-allowed' : 'pointer', marginInlineEnd: 0 }}
+                                onClick={() => handleInsertPlaceholder(token)}
+                              >
+                                {token}
+                              </Tag>
+                            ))}
+                          </Space>
+                        </div>
+                      ) : null}
                     </div>
 
                     <div style={{ fontWeight: 600, marginBottom: 8 }}>Typography</div>

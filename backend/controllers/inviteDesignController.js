@@ -1,5 +1,7 @@
 const PDFDocument = require('pdfkit');
 const { PutObjectCommand } = require('@aws-sdk/client-s3');
+const QRCode = require('qrcode');
+const crypto = require('crypto');
 const { prisma } = require('../config/db');
 const asyncHandler = require('../utils/asyncHandler');
 const { listInviteTemplates, generatePersonalizedInvite } = require('../services/personalizedInviteService');
@@ -22,6 +24,350 @@ const normalizeFormat = (value) => {
 const parsePositiveInt = (value) => {
   const num = Number(value);
   return Number.isInteger(num) && num > 0 ? num : null;
+};
+
+const numberOrFallback = (value, fallback) => {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : fallback;
+};
+
+const parseCanvasSize = (value, fallback = '1080x1920') => {
+  const [wRaw, hRaw] = String(value || fallback).split('x');
+  return {
+    width: Math.max(320, numberOrFallback(wRaw, 1080)),
+    height: Math.max(320, numberOrFallback(hRaw, 1920)),
+  };
+};
+
+const coerceObject = (value) => (value && typeof value === 'object' && !Array.isArray(value) ? value : {});
+
+const deepMerge = (base, override) => {
+  if (Array.isArray(base) && Array.isArray(override)) {
+    return override.map((item, index) => deepMerge(base[index], item));
+  }
+  if (base && typeof base === 'object' && override && typeof override === 'object' && !Array.isArray(base) && !Array.isArray(override)) {
+    const keys = new Set([...Object.keys(base), ...Object.keys(override)]);
+    const merged = {};
+    for (const key of keys) {
+      if (override[key] === undefined) {
+        merged[key] = base[key];
+      } else if (base[key] === undefined) {
+        merged[key] = override[key];
+      } else {
+        merged[key] = deepMerge(base[key], override[key]);
+      }
+    }
+    return merged;
+  }
+  return override === undefined ? base : override;
+};
+
+const formatEventDate = (value) => {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleDateString('en-IN', { dateStyle: 'medium' });
+};
+
+const formatEventTime = (value) => {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleTimeString('en-IN', { timeStyle: 'short' });
+};
+
+const buildMergeContext = ({ guest, event, layout }) => {
+  const mergeData = coerceObject(layout.mergeData);
+  const hosts = coerceObject(mergeData.hosts);
+  const custom = coerceObject(mergeData.custom);
+  const guestData = coerceObject(guest);
+  const eventData = coerceObject(event);
+
+  return {
+    guest: {
+      id: guestData.id || '',
+      name: guestData.name || '',
+      email: guestData.email || '',
+      phone: guestData.phone || '',
+      tableAssignment: guestData.tableAssignment || '',
+      plusOnes: guestData.plusOnes ?? 0,
+      rsvpStatus: guestData.rsvpStatus || '',
+      relationship: guestData.relationship || '',
+    },
+    event: {
+      id: eventData.id || '',
+      title: eventData.title || '',
+      venue: eventData.venue || '',
+      slug: eventData.slug || '',
+      type: eventData.type || layout.eventType || '',
+      date: eventData.date || '',
+      dateText: formatEventDate(eventData.date),
+      timeText: formatEventTime(eventData.date),
+      city: eventData.city || '',
+    },
+    hosts,
+    custom,
+  };
+};
+
+const getPathValue = (source, path) => {
+  return String(path || '')
+    .split('.')
+    .filter(Boolean)
+    .reduce((acc, segment) => (acc && acc[segment] !== undefined ? acc[segment] : undefined), source);
+};
+
+const resolveTemplateText = (value, context) => {
+  return String(value || '').replace(/\{\{\s*([\w.]+)\s*\}\}/g, (_match, token) => {
+    const resolved = getPathValue(context, token);
+    return resolved === undefined || resolved === null ? '' : String(resolved);
+  });
+};
+
+const resolveLayoutValue = (value, context) => {
+  if (typeof value === 'string') return resolveTemplateText(value, context);
+  if (Array.isArray(value)) return value.map((item) => resolveLayoutValue(item, context));
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [key, resolveLayoutValue(entry, context)])
+    );
+  }
+  return value;
+};
+
+const buildInviteUrl = ({ clientBaseUrl, event, guest, inviteToken }) => {
+  if (!event?.slug || !inviteToken) return '';
+  const base = String(clientBaseUrl || '').replace(/\/$/, '');
+  return `${base}/public/${event.slug}?guest=${guest.id}&token=${inviteToken}`;
+};
+
+const fetchImageBuffer = async (source) => {
+  const value = String(source || '').trim();
+  if (!value) return null;
+
+  if (/^data:image\//i.test(value)) {
+    const commaIndex = value.indexOf(',');
+    if (commaIndex < 0) return null;
+    return Buffer.from(value.slice(commaIndex + 1), 'base64');
+  }
+
+  if (!/^https?:\/\//i.test(value)) return null;
+
+  const response = await fetch(value);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch image asset: ${response.status}`);
+  }
+  const arrayBuffer = await response.arrayBuffer();
+  return Buffer.from(arrayBuffer);
+};
+
+const deriveInviteMessage = ({ guest, event, resolvedLayout, fallbackMessage }) => {
+  if (fallbackMessage) return fallbackMessage;
+  const textCandidates = Array.isArray(resolvedLayout.elements)
+    ? resolvedLayout.elements
+        .filter((element) => element?.type === 'text' && String(element.text || '').trim())
+        .sort((a, b) => numberOrFallback(a.z, 0) - numberOrFallback(b.z, 0))
+        .map((element) => String(element.text || '').trim())
+    : [];
+
+  if (textCandidates.length) {
+    return textCandidates.slice(0, 3).join(' ');
+  }
+
+  return `${guest?.name || 'Guest'}, you are invited to ${event?.title || 'our event'}.`;
+};
+
+const buildRenderedDesignPdfBuffer = async ({ design, event, guest = null, layoutOverrides = {}, fallbackMessage = '' }) => {
+  const baseLayout = coerceObject(design.jsonLayout);
+  const mergedLayout = deepMerge(baseLayout, coerceObject(layoutOverrides));
+  const mergeContext = buildMergeContext({ guest, event, layout: mergedLayout });
+  const resolvedLayout = resolveLayoutValue(mergedLayout, mergeContext);
+  const { width: canvasWidth, height: canvasHeight } = parseCanvasSize(resolvedLayout.canvasSize || design.canvasSize);
+  const scale = Math.min(1, 900 / Math.max(canvasWidth, canvasHeight));
+  const pageWidth = Math.round(canvasWidth * scale);
+  const pageHeight = Math.round(canvasHeight * scale);
+  const imageCache = new Map();
+
+  const pdfBuffer = await new Promise((resolve, reject) => {
+    const chunks = [];
+    const doc = new PDFDocument({ size: [pageWidth, pageHeight], margin: 0 });
+
+    doc.on('data', (chunk) => chunks.push(chunk));
+    doc.on('end', () => resolve(Buffer.concat(chunks)));
+    doc.on('error', reject);
+
+    doc.rect(0, 0, pageWidth, pageHeight).fill(String(resolvedLayout.backgroundColor || '#ffffff'));
+
+    const orderedElements = Array.isArray(resolvedLayout.elements)
+      ? resolvedLayout.elements.slice().sort((a, b) => numberOrFallback(a?.z, 0) - numberOrFallback(b?.z, 0))
+      : [];
+
+    for (const element of orderedElements) {
+      if (!element || typeof element !== 'object') continue;
+
+      const x = numberOrFallback(element.x, 0) * scale;
+      const y = numberOrFallback(element.y, 0) * scale;
+      const width = Math.max(1, numberOrFallback(element.width, 120) * scale);
+      const height = Math.max(1, numberOrFallback(element.height, 60) * scale);
+
+      if (element.type === 'shape') {
+        const radius = Math.max(0, numberOrFallback(element.borderRadius, 0) * scale);
+        const fillColor = String(element.fillColor || '#f3f4f6');
+        const strokeColor = String(element.strokeColor || '');
+        const strokeWidth = Math.max(0, numberOrFallback(element.strokeWidth, 0) * scale);
+        if (radius > 0) {
+          doc.roundedRect(x, y, width, height, radius);
+        } else {
+          doc.rect(x, y, width, height);
+        }
+        if (strokeWidth > 0) {
+          doc.fillAndStroke(fillColor, strokeColor || fillColor);
+        } else {
+          doc.fill(fillColor);
+        }
+        continue;
+      }
+
+      if (element.type === 'divider') {
+        doc.save();
+        doc.lineWidth(Math.max(1, numberOrFallback(element.thickness, 2) * scale));
+        doc.strokeColor(String(element.color || '#b45309'));
+        if (element.orientation === 'vertical') {
+          doc.moveTo(x + width / 2, y).lineTo(x + width / 2, y + height).stroke();
+        } else {
+          doc.moveTo(x, y + height / 2).lineTo(x + width, y + height / 2).stroke();
+        }
+        doc.restore();
+        continue;
+      }
+
+      if (element.type === 'text') {
+        doc.save();
+        doc.fillColor(String(element.color || '#111827'));
+        doc.font(element.fontWeight === 'bold' || element.fontWeight === '700' ? 'Helvetica-Bold' : 'Helvetica');
+        doc.fontSize(Math.max(8, numberOrFallback(element.fontSize, 24) * scale));
+        doc.text(String(element.text || ''), x, y, {
+          width,
+          height,
+          align: element.textAlign || 'left',
+        });
+        doc.restore();
+      }
+    }
+
+    doc.end();
+  });
+
+  for (const element of Array.isArray(resolvedLayout.elements) ? resolvedLayout.elements : []) {
+    if (!element || element.type !== 'image') continue;
+    const src = String(element.src || element.imageUrl || '').trim();
+    if (!src) continue;
+
+    if (!imageCache.has(src)) {
+      try {
+        imageCache.set(src, await fetchImageBuffer(src));
+      } catch (_error) {
+        imageCache.set(src, null);
+      }
+    }
+  }
+
+  const finalBuffer = await new Promise((resolve, reject) => {
+    const chunks = [];
+    const doc = new PDFDocument({ size: [pageWidth, pageHeight], margin: 0 });
+
+    doc.on('data', (chunk) => chunks.push(chunk));
+    doc.on('end', () => resolve(Buffer.concat(chunks)));
+    doc.on('error', reject);
+
+    doc.rect(0, 0, pageWidth, pageHeight).fill(String(resolvedLayout.backgroundColor || '#ffffff'));
+
+    const orderedElements = Array.isArray(resolvedLayout.elements)
+      ? resolvedLayout.elements.slice().sort((a, b) => numberOrFallback(a?.z, 0) - numberOrFallback(b?.z, 0))
+      : [];
+
+    for (const element of orderedElements) {
+      if (!element || typeof element !== 'object') continue;
+
+      const x = numberOrFallback(element.x, 0) * scale;
+      const y = numberOrFallback(element.y, 0) * scale;
+      const width = Math.max(1, numberOrFallback(element.width, 120) * scale);
+      const height = Math.max(1, numberOrFallback(element.height, 60) * scale);
+
+      if (element.type === 'shape') {
+        const radius = Math.max(0, numberOrFallback(element.borderRadius, 0) * scale);
+        const fillColor = String(element.fillColor || '#f3f4f6');
+        const strokeColor = String(element.strokeColor || '');
+        const strokeWidth = Math.max(0, numberOrFallback(element.strokeWidth, 0) * scale);
+        doc.save();
+        if (radius > 0) {
+          doc.roundedRect(x, y, width, height, radius);
+        } else {
+          doc.rect(x, y, width, height);
+        }
+        if (strokeWidth > 0) {
+          doc.lineWidth(strokeWidth);
+          doc.fillAndStroke(fillColor, strokeColor || fillColor);
+        } else {
+          doc.fill(fillColor);
+        }
+        doc.restore();
+        continue;
+      }
+
+      if (element.type === 'divider') {
+        doc.save();
+        doc.lineWidth(Math.max(1, numberOrFallback(element.thickness, 2) * scale));
+        doc.strokeColor(String(element.color || '#b45309'));
+        if (element.orientation === 'vertical') {
+          doc.moveTo(x + width / 2, y).lineTo(x + width / 2, y + height).stroke();
+        } else {
+          doc.moveTo(x, y + height / 2).lineTo(x + width, y + height / 2).stroke();
+        }
+        doc.restore();
+        continue;
+      }
+
+      if (element.type === 'image') {
+        const src = String(element.src || element.imageUrl || '').trim();
+        const imageBuffer = imageCache.get(src);
+        if (imageBuffer) {
+          doc.save();
+          const objectFit = String(element.objectFit || 'cover');
+          if (objectFit === 'contain') {
+            doc.image(imageBuffer, x, y, { fit: [width, height], align: 'center', valign: 'center' });
+          } else if (objectFit === 'fill') {
+            doc.image(imageBuffer, x, y, { width, height });
+          } else {
+            doc.image(imageBuffer, x, y, { cover: [width, height], align: 'center', valign: 'center' });
+          }
+          doc.restore();
+        }
+        continue;
+      }
+
+      if (element.type === 'text') {
+        doc.save();
+        doc.fillColor(String(element.color || '#111827'));
+        doc.font(element.fontWeight === 'bold' || element.fontWeight === '700' ? 'Helvetica-Bold' : 'Helvetica');
+        doc.fontSize(Math.max(8, numberOrFallback(element.fontSize, 24) * scale));
+        doc.text(String(element.text || ''), x, y, {
+          width,
+          height,
+          align: element.textAlign || 'left',
+        });
+        doc.restore();
+      }
+    }
+
+    doc.end();
+  });
+
+  return {
+    pdfBuffer: finalBuffer || pdfBuffer,
+    resolvedLayout,
+    inviteMessage: deriveInviteMessage({ guest, event, resolvedLayout, fallbackMessage }),
+  };
 };
 
 const inviteDesignTablesReady = async () => {
@@ -47,47 +393,6 @@ const ensureInviteDesignTablesReady = async (res) => {
   });
   return false;
 };
-
-const buildBasicDesignPdfBuffer = ({ design, event }) =>
-  new Promise((resolve, reject) => {
-    const chunks = [];
-    const doc = new PDFDocument({ size: 'A4', margin: 40 });
-
-    doc.on('data', (chunk) => chunks.push(chunk));
-    doc.on('end', () => resolve(Buffer.concat(chunks)));
-    doc.on('error', reject);
-
-    const layout = design.jsonLayout && typeof design.jsonLayout === 'object' ? design.jsonLayout : {};
-
-    doc.font('Helvetica-Bold').fontSize(24).text(design.name || 'Invitation Design', { align: 'center' });
-    doc.moveDown(0.5);
-    doc.font('Helvetica').fontSize(12).text(`Event: ${event.title}`, { align: 'center' });
-    doc.text(`Venue: ${event.venue || 'TBD'}`, { align: 'center' });
-    doc.text(
-      `Date: ${event.date ? new Date(event.date).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : 'TBD'}`,
-      { align: 'center' }
-    );
-
-    doc.moveDown(1.2);
-    doc.font('Helvetica-Bold').fontSize(13).text('Design Metadata');
-    doc.moveDown(0.4);
-    doc.font('Helvetica').fontSize(10);
-    doc.text(`Category: ${design.category || 'general'}`);
-    doc.text(`Canvas: ${design.canvasSize}`);
-    doc.text(`Language: ${design.language}`);
-    doc.text(`Version: ${design.version}`);
-
-    doc.moveDown(0.8);
-    doc.font('Helvetica-Bold').fontSize(13).text('Layout Snapshot');
-    doc.moveDown(0.4);
-    doc.font('Courier').fontSize(9).text(JSON.stringify(layout, null, 2), {
-      width: doc.page.width - 80,
-      height: 420,
-      ellipsis: true,
-    });
-
-    doc.end();
-  });
 
 const uploadBufferToR2 = async ({ buffer, key, contentType }) => {
   if (!R2_BUCKET || !R2_PUBLIC_URL || !process.env.R2_ENDPOINT) {
@@ -335,7 +640,7 @@ exports.exportInviteDesign = asyncHandler(async (req, res) => {
   let fileKey = req.body.fileKey ? String(req.body.fileKey).trim() : null;
 
   if (format === 'pdf') {
-    const pdfBuffer = await buildBasicDesignPdfBuffer({ design, event: design.event });
+    const { pdfBuffer } = await buildRenderedDesignPdfBuffer({ design, event: design.event });
     const key = `invites/design-exports/event-${design.eventId}/design-${design.id}/v${design.version}-${Date.now()}.pdf`;
     fileUrl = await uploadBufferToR2({
       buffer: pdfBuffer,
@@ -433,15 +738,15 @@ exports.generateAndSendFromDesign = asyncHandler(async (req, res) => {
   const sendVia = String(req.body.sendVia || 'email').toLowerCase();
 
   if (!designId) return res.status(400).json({ message: 'Invalid design id' });
-  if (!['email', 'whatsapp', 'both'].includes(sendVia)) {
-    return res.status(400).json({ message: 'sendVia must be email, whatsapp, or both' });
+  if (!['none', 'email', 'whatsapp', 'both'].includes(sendVia)) {
+    return res.status(400).json({ message: 'sendVia must be none, email, whatsapp, or both' });
   }
 
   const design = await prisma.inviteDesign.findUnique({
     where: { id: designId },
     include: {
       event: {
-        select: { id: true, organizerId: true, title: true, date: true, venue: true, slug: true },
+        select: { id: true, organizerId: true, title: true, date: true, venue: true, slug: true, type: true, city: true },
       },
     },
   });
@@ -481,6 +786,29 @@ exports.generateAndSendFromDesign = asyncHandler(async (req, res) => {
         },
       });
 
+      const { pdfBuffer, inviteMessage } = await buildRenderedDesignPdfBuffer({
+        design,
+        event: design.event,
+        guest,
+        layoutOverrides: guest.personalizedLayoutOverrides,
+        fallbackMessage: generated.inviteMessage,
+      });
+
+      const personalizedPdfKey = `invites/design-exports/event-${design.eventId}/design-${design.id}/guest-${guest.id}-${Date.now()}.pdf`;
+      const personalizedPdfUrl = await uploadBufferToR2({
+        buffer: pdfBuffer,
+        key: personalizedPdfKey,
+        contentType: 'application/pdf',
+      });
+
+      const inviteUrl = generated.inviteUrl || buildInviteUrl({
+        clientBaseUrl,
+        event: design.event,
+        guest,
+        inviteToken: generated.inviteToken || guest.inviteToken || crypto.randomBytes(16).toString('hex'),
+      });
+      const qrCodeDataUrl = generated.qrCodeDataUrl || (inviteUrl ? await QRCode.toDataURL(inviteUrl) : null);
+
       await prisma.guest.update({
         where: { id: guest.id },
         data: {
@@ -488,12 +816,12 @@ exports.generateAndSendFromDesign = asyncHandler(async (req, res) => {
           inviteTone: generated.inviteTone,
           inviteLanguage: generated.inviteLanguage,
           inviteTemplateKey: generated.inviteTemplateKey,
-          personalizedInviteMessage: generated.inviteMessage,
-          personalizedInvitePdfUrl: generated.personalizedInvitePdfUrl,
-          personalizedInvitePdfKey: generated.personalizedInvitePdfKey,
+          personalizedInviteMessage: inviteMessage,
+          personalizedInvitePdfUrl: personalizedPdfUrl,
+          personalizedInvitePdfKey: personalizedPdfKey,
           inviteToken: generated.inviteToken,
           invitationGeneratedAt: new Date(),
-          qrCode: generated.qrCodeDataUrl,
+          qrCode: qrCodeDataUrl,
         },
       });
 
@@ -504,8 +832,8 @@ exports.generateAndSendFromDesign = asyncHandler(async (req, res) => {
           channel: 'email',
           guestName: guest.name,
           eventTitle: design.event.title,
-          inviteUrl: generated.inviteUrl,
-          inviteMessage: generated.inviteMessage,
+          inviteUrl,
+          inviteMessage,
         });
       }
       if ((sendVia === 'whatsapp' || sendVia === 'both') && guest.phone) {
@@ -514,8 +842,8 @@ exports.generateAndSendFromDesign = asyncHandler(async (req, res) => {
           channel: 'whatsapp',
           guestName: guest.name,
           eventTitle: design.event.title,
-          inviteUrl: generated.inviteUrl,
-          inviteMessage: generated.inviteMessage,
+          inviteUrl,
+          inviteMessage,
         });
       }
 
@@ -524,7 +852,8 @@ exports.generateAndSendFromDesign = asyncHandler(async (req, res) => {
         name: guest.name,
         email: guest.email,
         phone: guest.phone,
-        inviteUrl: generated.inviteUrl,
+        inviteUrl,
+        pdfUrl: personalizedPdfUrl,
         sent,
       });
     } catch (error) {

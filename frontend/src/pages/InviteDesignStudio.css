@@ -30,6 +30,22 @@
   line-height: 1.4;
 }
 
+.invite-studio-placeholder-groups {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.invite-studio-placeholder-group {
+  display: grid;
+  gap: 6px;
+}
+
+.invite-studio-placeholder-tag {
+  cursor: pointer;
+  user-select: none;
+}
+
 @media (max-width: 768px) {
   .invite-studio-page {
     padding: 12px;
