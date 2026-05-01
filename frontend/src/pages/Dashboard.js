@@ -102,28 +102,31 @@ const OrganizerDashboard = ({ user }) => {
     [events, applySort]
   );
 
-  const columns = [
-    { title: 'Event Name', dataIndex: 'title', key: 'title', render: (t, r) => <Link to={`/events/${r.id}`}>{t}</Link> },
-    { title: 'Date', dataIndex: 'date', key: 'date', render: (d) => formatDate(d) },
-    {
-      title: 'Location',
-      key: 'location',
-      render: (_, r) => r.venue || [r.city, r.state].filter(Boolean).join(', ') || '—',
-    },
-    { title: 'Budget', dataIndex: 'budget', key: 'budget', render: (b) => formatCurrency(b) },
-    { title: 'Guests', dataIndex: 'guestCount', key: 'guestCount' },
-    {
-      title: 'Vendors',
-      key: 'vendors',
-      render: (_, r) => {
-        const count = r._count?.bookings || 0;
-        return count > 0
-          ? <Tag color="green">{count} booked</Tag>
-          : <Tag color="default">None</Tag>;
+  const columns = useMemo(
+    () => [
+      { title: 'Event Name', dataIndex: 'title', key: 'title', render: (t, r) => <Link to={`/events/${r.id}`}>{t}</Link> },
+      { title: 'Date', dataIndex: 'date', key: 'date', render: (d) => formatDate(d) },
+      {
+        title: 'Location',
+        key: 'location',
+        render: (_, r) => r.venue || [r.city, r.state].filter(Boolean).join(', ') || '—',
       },
-    },
-    { title: 'Action', key: 'action', render: (_, r) => <Link to={`/events/${r.id}`}><Button type="link">View</Button></Link> },
-  ];
+      { title: 'Budget', dataIndex: 'budget', key: 'budget', render: (b) => formatCurrency(b) },
+      { title: 'Guests', dataIndex: 'guestCount', key: 'guestCount' },
+      {
+        title: 'Vendors',
+        key: 'vendors',
+        render: (_, r) => {
+          const count = r._count?.bookings || 0;
+          return count > 0
+            ? <Tag color="green">{count} booked</Tag>
+            : <Tag color="default">None</Tag>;
+        },
+      },
+      { title: 'Action', key: 'action', render: (_, r) => <Link to={`/events/${r.id}`}><Button type="link">View</Button></Link> },
+    ],
+    []
+  );
 
   const trendStats = useMemo(() => {
     const DAY = 24 * 60 * 60 * 1000;
