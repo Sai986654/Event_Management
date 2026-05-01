@@ -94,6 +94,10 @@ const InviteDesignStudio = () => {
     () => guests.find((guest) => guest.id === previewGuestId) || guests[0] || null,
     [guests, previewGuestId]
   );
+  const mergeData = useMemo(
+    () => buildDefaultMergeData(inviteEventType, canvasLayout.mergeData),
+    [inviteEventType, canvasLayout.mergeData]
+  );
   const flatPlaceholderTokens = useMemo(
     () => {
       const base = placeholderGroups.flatMap((group) => group.items.map((item) => item.token));
@@ -101,10 +105,6 @@ const InviteDesignStudio = () => {
       return [...base, ...dynamicCustom];
     },
     [placeholderGroups, mergeData.custom]
-  );
-  const mergeData = useMemo(
-    () => buildDefaultMergeData(inviteEventType, canvasLayout.mergeData),
-    [inviteEventType, canvasLayout.mergeData]
   );
   const previewMergeContext = useMemo(
     () => buildPreviewMergeContext({ event, guest: previewGuest, mergeData }),

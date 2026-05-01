@@ -146,6 +146,13 @@ const InviteDesignCanvas = ({
 
   const selectedElement = elements.find((el) => el.id === selectedElementId);
 
+  // Parse canvas size early so callbacks can safely reference these constants.
+  const [canvasWidth, canvasHeight] = canvasSize.split('x').map(Number);
+  const aspectRatio = canvasWidth / canvasHeight;
+  const maxPreviewWidth = 300;
+  const previewWidth = maxPreviewWidth;
+  const previewHeight = maxPreviewWidth / aspectRatio;
+
   useEffect(() => {
     setElements(layout.elements || []);
     setCanvasSize(layout.canvasSize || '1080x1920');
@@ -452,6 +459,16 @@ const InviteDesignCanvas = ({
     [getTextAreaCursor, handleUpdateElement, refreshAutocomplete, selectedElement]
   );
 
+  const handleInsertPlaceholder = useCallback(
+    (token) => {
+      if (!selectedElement || selectedElement.type !== 'text' || selectedElement.locked) return;
+      const currentText = String(selectedElement.text || '');
+      const separator = currentText && !/\s$/.test(currentText) ? ' ' : '';
+      handleUpdateElement(selectedElement.id, { text: `${currentText}${separator}${token}`.trim() });
+    },
+    [handleUpdateElement, selectedElement]
+  );
+
   const handleAutocompleteSelect = useCallback(
     (token) => {
       if (!selectedElement || selectedElement.type !== 'text') return;
@@ -540,16 +557,6 @@ const InviteDesignCanvas = ({
       handleUpdateElement(selectedElement.id, { x: nextX, y: nextY });
     },
     [gridSize, handleUpdateElement, selectedElement, snapValue]
-  );
-
-  const handleInsertPlaceholder = useCallback(
-    (token) => {
-      if (!selectedElement || selectedElement.type !== 'text' || selectedElement.locked) return;
-      const currentText = String(selectedElement.text || '');
-      const separator = currentText && !/\s$/.test(currentText) ? ' ' : '';
-      handleUpdateElement(selectedElement.id, { text: `${currentText}${separator}${token}`.trim() });
-    },
-    [handleUpdateElement, selectedElement]
   );
 
   const getAlignedPosition = useCallback(
@@ -838,13 +845,6 @@ const InviteDesignCanvas = ({
     },
     [elements, updateLayout]
   );
-
-  // Parse canvas size
-  const [canvasWidth, canvasHeight] = canvasSize.split('x').map(Number);
-  const aspectRatio = canvasWidth / canvasHeight;
-  const maxPreviewWidth = 300;
-  const previewWidth = maxPreviewWidth;
-  const previewHeight = maxPreviewWidth / aspectRatio;
 
   return (
     <div className="invite-design-canvas">
