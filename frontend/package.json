@@ -4,15 +4,16 @@
   "description": "Vedika 360 - Technology-driven event management platform Frontend",
   "private": true,
   "dependencies": {
+    "@ant-design/icons": "^5.2.6",
+    "antd": "^5.11.0",
+    "axios": "^1.6.2",
+    "date-fns": "^2.30.0",
+    "lottie-react": "^2.4.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-router-dom": "^6.20.0",
-    "axios": "^1.6.2",
-    "socket.io-client": "^4.7.2",
-    "antd": "^5.11.0",
-    "@ant-design/icons": "^5.2.6",
     "react-hook-form": "^7.48.0",
-    "date-fns": "^2.30.0",
+    "react-router-dom": "^6.20.0",
+    "socket.io-client": "^4.7.2",
     "uuid": "^9.0.1"
   },
   "scripts": {

@@ -24,8 +24,91 @@ import {
   LockOutlined,
   UnlockOutlined,
 } from '@ant-design/icons';
+import Lottie from 'lottie-react';
 import './InviteDesignCanvas.css';
 import { resolveTemplateString } from '../utils/invitePlaceholders';
+
+const LOTTIE_STICKERS = [
+  {
+    key: 'lottie-confetti',
+    label: 'Confetti',
+    thumb: '🎊',
+    sourceUrl: 'https://assets5.lottiefiles.com/packages/lf20_obhph3t0.json',
+    width: 400,
+    height: 400,
+    loop: true,
+  },
+  {
+    key: 'lottie-birthday',
+    label: 'Birthday',
+    thumb: '🎂',
+    sourceUrl: 'https://assets7.lottiefiles.com/packages/lf20_nt4ypxj4.json',
+    width: 380,
+    height: 380,
+    loop: true,
+  },
+  {
+    key: 'lottie-hearts',
+    label: 'Hearts',
+    thumb: '❤️',
+    sourceUrl: 'https://assets4.lottiefiles.com/packages/lf20_GtgJBk.json',
+    width: 360,
+    height: 360,
+    loop: true,
+  },
+  {
+    key: 'lottie-fireworks',
+    label: 'Fireworks',
+    thumb: '🎆',
+    sourceUrl: 'https://assets9.lottiefiles.com/packages/lf20_M9p23l.json',
+    width: 420,
+    height: 420,
+    loop: false,
+  },
+  {
+    key: 'lottie-stars',
+    label: 'Stars',
+    thumb: '⭐',
+    sourceUrl: 'https://assets6.lottiefiles.com/packages/lf20_aZTdD5.json',
+    width: 360,
+    height: 360,
+    loop: true,
+  },
+  {
+    key: 'lottie-wedding',
+    label: 'Wedding',
+    thumb: '💍',
+    sourceUrl: 'https://assets3.lottiefiles.com/packages/lf20_jbb5pqtg.json',
+    width: 400,
+    height: 400,
+    loop: true,
+  },
+  {
+    key: 'lottie-balloons',
+    label: 'Balloons',
+    thumb: '🎈',
+    sourceUrl: 'https://assets10.lottiefiles.com/packages/lf20_touohxv0.json',
+    width: 380,
+    height: 400,
+    loop: true,
+  },
+  {
+    key: 'lottie-celebration',
+    label: 'Celebrate',
+    thumb: '🥳',
+    sourceUrl: 'https://assets2.lottiefiles.com/packages/lf20_u4yrau84.json',
+    width: 400,
+    height: 400,
+    loop: true,
+  },
+];
+
+const resolveLottieUrl = (source) => {
+  if (!source) return '';
+  if (typeof source === 'string') return source;
+  if (typeof source === 'object' && typeof source.uri === 'string') return source.uri;
+  return '';
+};
 
 const InviteDesignCanvas = ({
   layout = {},
@@ -41,16 +124,24 @@ const InviteDesignCanvas = ({
   const [canvasSize, setCanvasSize] = useState(layout.canvasSize || '1080x1920');
   const [backgroundColor, setBackgroundColor] = useState(layout.backgroundColor || '#ffffff');
   const [showGrid, setShowGrid] = useState(false);
+  const [snapToGrid, setSnapToGrid] = useState(true);
+  const [gridSize, setGridSize] = useState(16);
   const [sectionGuide, setSectionGuide] = useState({ show: false, topYCanvas: 0, centerV: false });
+  const [dragGuide, setDragGuide] = useState({ show: false, xCanvas: null, yCanvas: null });
+  const [lottieDataMap, setLottieDataMap] = useState({});
   const [placeholderAutocomplete, setPlaceholderAutocomplete] = useState({
     active: false,
     start: -1,
     cursor: -1,
     query: '',
     suggestions: [],
+    activeIndex: 0,
   });
   const textAreaRef = useRef(null);
   const guideTimerRef = useRef(null);
+  const canvasRef = useRef(null);
+  const elementsRef = useRef(elements);
+  const dragStateRef = useRef(null);
 
   const selectedElement = elements.find((el) => el.id === selectedElementId);
 
@@ -59,6 +150,53 @@ const InviteDesignCanvas = ({
     setCanvasSize(layout.canvasSize || '1080x1920');
     setBackgroundColor(layout.backgroundColor || '#ffffff');
   }, [layout.backgroundColor, layout.canvasSize, layout.elements]);
+
+  useEffect(() => {
+    elementsRef.current = elements;
+  }, [elements]);
+
+  useEffect(() => {
+    const urls = Array.from(
+      new Set(
+        (elements || [])
+          .filter((element) => element.type === 'lottie')
+          .map((element) => resolveLottieUrl(element.lottieSource))
+          .filter(Boolean)
+      )
+    );
+    const missing = urls.filter((url) => !lottieDataMap[url]);
+    if (!missing.length) return;
+
+    let cancelled = false;
+
+    Promise.all(
+      missing.map(async (url) => {
+        try {
+          const response = await fetch(url);
+          if (!response.ok) return null;
+          const json = await response.json();
+          return [url, json];
+        } catch (_error) {
+          return null;
+        }
+      })
+    ).then((results) => {
+      if (cancelled) return;
+      const entries = results.filter(Boolean);
+      if (!entries.length) return;
+      setLottieDataMap((prev) => {
+        const next = { ...prev };
+        entries.forEach(([url, data]) => {
+          if (!next[url]) next[url] = data;
+        });
+        return next;
+      });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [elements, lottieDataMap]);
 
   useEffect(() => {
     return () => {
@@ -82,6 +220,15 @@ const InviteDesignCanvas = ({
       eventType: layout.eventType || null,
     });
   }, [onLayoutChange, canvasSize, backgroundColor, layout.templateKey, layout.mergeData, layout.eventType]);
+
+  const snapValue = useCallback(
+    (value) => {
+      if (!snapToGrid) return value;
+      const size = Math.max(1, Number(gridSize) || 1);
+      return Math.round(Number(value || 0) / size) * size;
+    },
+    [gridSize, snapToGrid]
+  );
 
   // Add new element
   const handleAddElement = useCallback(
@@ -118,6 +265,13 @@ const InviteDesignCanvas = ({
           color: '#cccccc',
           thickness: 2,
           orientation: 'horizontal',
+        }),
+        ...(type === 'lottie' && {
+          lottieSource: LOTTIE_STICKERS[0]?.sourceUrl || '',
+          loop: true,
+          autoPlay: true,
+          width: 260,
+          height: 260,
         }),
       };
 
@@ -219,6 +373,30 @@ const InviteDesignCanvas = ({
     [canvasSize, elements, generateId, updateLayout]
   );
 
+  const handleAddLottieSticker = useCallback(
+    (sticker) => {
+      if (!sticker?.sourceUrl) return;
+      const newElement = {
+        id: generateId(),
+        type: 'lottie',
+        locked: false,
+        x: 40,
+        y: 40,
+        width: Number(sticker.width) || 360,
+        height: Number(sticker.height) || 360,
+        z: elements.length,
+        lottieSource: sticker.sourceUrl,
+        loop: sticker.loop !== false,
+        autoPlay: true,
+      };
+      const newElements = [...elements, newElement];
+      setElements(newElements);
+      setSelectedElementId(newElement.id);
+      updateLayout(newElements);
+    },
+    [elements, generateId, updateLayout]
+  );
+
   const refreshAutocomplete = useCallback(
     (textValue, cursorPos) => {
       const text = String(textValue || '');
@@ -250,6 +428,7 @@ const InviteDesignCanvas = ({
         cursor,
         query,
         suggestions,
+        activeIndex: 0,
       });
     },
     [placeholderTokens]
@@ -285,9 +464,81 @@ const InviteDesignCanvas = ({
       const cursor = Math.max(start, placeholderAutocomplete.cursor);
       const nextText = `${source.slice(0, start)}${token}${source.slice(cursor)}`;
       handleUpdateElement(selectedElement.id, { text: nextText });
-      setPlaceholderAutocomplete({ active: false, start: -1, cursor: -1, query: '', suggestions: [] });
+      setPlaceholderAutocomplete({ active: false, start: -1, cursor: -1, query: '', suggestions: [], activeIndex: 0 });
+
+      // Restore caret near inserted token end for fluid typing
+      requestAnimationFrame(() => {
+        const el = textAreaRef.current?.resizableTextArea?.textArea;
+        if (!el) return;
+        const nextPos = start + token.length;
+        el.focus();
+        try {
+          el.setSelectionRange(nextPos, nextPos);
+        } catch (_error) {
+          // no-op fallback for browsers that disallow selection updates
+        }
+      });
     },
     [handleInsertPlaceholder, handleUpdateElement, placeholderAutocomplete, selectedElement]
+  );
+
+  const handleTextKeyDown = useCallback(
+    (event) => {
+      if (!placeholderAutocomplete.active || !placeholderAutocomplete.suggestions.length) return;
+
+      if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        setPlaceholderAutocomplete((prev) => ({
+          ...prev,
+          activeIndex: (prev.activeIndex + 1) % prev.suggestions.length,
+        }));
+        return;
+      }
+
+      if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        setPlaceholderAutocomplete((prev) => ({
+          ...prev,
+          activeIndex: (prev.activeIndex - 1 + prev.suggestions.length) % prev.suggestions.length,
+        }));
+        return;
+      }
+
+      if (event.key === 'Enter' || event.key === 'Tab') {
+        event.preventDefault();
+        const token = placeholderAutocomplete.suggestions[placeholderAutocomplete.activeIndex];
+        if (token) handleAutocompleteSelect(token);
+        return;
+      }
+
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setPlaceholderAutocomplete({ active: false, start: -1, cursor: -1, query: '', suggestions: [], activeIndex: 0 });
+      }
+    },
+    [handleAutocompleteSelect, placeholderAutocomplete]
+  );
+
+  const handleNumericPositionUpdate = useCallback(
+    (id, key, value) => {
+      if (value === null || value === undefined || Number.isNaN(Number(value))) return;
+      const normalized = key === 'x' || key === 'y' || key === 'width' || key === 'height'
+        ? snapValue(value)
+        : value;
+      handleUpdateElement(id, { [key]: normalized });
+    },
+    [handleUpdateElement, snapValue]
+  );
+
+  const nudgeSelected = useCallback(
+    (dx, dy) => {
+      if (!selectedElement || selectedElement.locked) return;
+      const step = Math.max(1, Number(gridSize) || 1);
+      const nextX = snapValue(Number(selectedElement.x || 0) + dx * step);
+      const nextY = snapValue(Number(selectedElement.y || 0) + dy * step);
+      handleUpdateElement(selectedElement.id, { x: nextX, y: nextY });
+    },
+    [gridSize, handleUpdateElement, selectedElement, snapValue]
   );
 
   const handleInsertPlaceholder = useCallback(
@@ -298,6 +549,181 @@ const InviteDesignCanvas = ({
       handleUpdateElement(selectedElement.id, { text: `${currentText}${separator}${token}`.trim() });
     },
     [handleUpdateElement, selectedElement]
+  );
+
+  const getAlignedPosition = useCallback(
+    (targetElementId, rawX, rawY, width, height) => {
+      const sourceElements = elementsRef.current || [];
+      const targetWidth = Number(width) || 0;
+      const targetHeight = Number(height) || 0;
+      const threshold = 10;
+
+      let snappedX = rawX;
+      let snappedY = rawY;
+      let bestX = { distance: Number.POSITIVE_INFINITY, line: null, x: rawX };
+      let bestY = { distance: Number.POSITIVE_INFINITY, line: null, y: rawY };
+
+      const xTargets = [
+        { value: 0 },
+        { value: canvasWidth / 2 },
+        { value: canvasWidth },
+      ];
+
+      const yTargets = [
+        { value: 0 },
+        { value: canvasHeight / 2 },
+        { value: canvasHeight },
+      ];
+
+      sourceElements
+        .filter((element) => element.id !== targetElementId)
+        .forEach((element) => {
+          const otherX = Number(element.x || 0);
+          const otherY = Number(element.y || 0);
+          const otherWidth = Number(element.width) || 0;
+          const otherHeight = Number(element.height) || 0;
+
+          xTargets.push(
+            { value: otherX },
+            { value: otherX + otherWidth / 2 },
+            { value: otherX + otherWidth }
+          );
+
+          yTargets.push(
+            { value: otherY },
+            { value: otherY + otherHeight / 2 },
+            { value: otherY + otherHeight }
+          );
+        });
+
+      xTargets.forEach((target) => {
+        const options = [
+          { distance: Math.abs(rawX - target.value), x: target.value },
+          { distance: Math.abs(rawX + targetWidth / 2 - target.value), x: target.value - targetWidth / 2 },
+          { distance: Math.abs(rawX + targetWidth - target.value), x: target.value - targetWidth },
+        ];
+
+        options.forEach((candidate) => {
+          if (candidate.distance <= threshold && candidate.distance < bestX.distance) {
+            bestX = { distance: candidate.distance, line: target.value, x: candidate.x };
+          }
+        });
+      });
+
+      yTargets.forEach((target) => {
+        const options = [
+          { distance: Math.abs(rawY - target.value), y: target.value },
+          { distance: Math.abs(rawY + targetHeight / 2 - target.value), y: target.value - targetHeight / 2 },
+          { distance: Math.abs(rawY + targetHeight - target.value), y: target.value - targetHeight },
+        ];
+
+        options.forEach((candidate) => {
+          if (candidate.distance <= threshold && candidate.distance < bestY.distance) {
+            bestY = { distance: candidate.distance, line: target.value, y: candidate.y };
+          }
+        });
+      });
+
+      let xGuide = null;
+      let yGuide = null;
+
+      if (bestX.distance !== Number.POSITIVE_INFINITY) {
+        snappedX = bestX.x;
+        xGuide = bestX.line;
+      }
+
+      if (bestY.distance !== Number.POSITIVE_INFINITY) {
+        snappedY = bestY.y;
+        yGuide = bestY.line;
+      }
+
+      return {
+        x: snappedX,
+        y: snappedY,
+        guide: {
+          show: xGuide !== null || yGuide !== null,
+          xCanvas: xGuide,
+          yCanvas: yGuide,
+        },
+      };
+    },
+    [canvasHeight, canvasWidth]
+  );
+
+  const handleDragMove = useCallback(
+    (event) => {
+      const dragState = dragStateRef.current;
+      const viewport = canvasRef.current;
+      if (!dragState || !viewport) return;
+
+      const deltaX = (event.clientX - dragState.startClientX) / dragState.scaleX;
+      const deltaY = (event.clientY - dragState.startClientY) / dragState.scaleY;
+
+      let nextX = dragState.startX + deltaX;
+      let nextY = dragState.startY + deltaY;
+
+      if (snapToGrid) {
+        nextX = snapValue(nextX);
+        nextY = snapValue(nextY);
+      }
+
+      const aligned = getAlignedPosition(dragState.elementId, nextX, nextY, dragState.width, dragState.height);
+      nextX = aligned.x;
+      nextY = aligned.y;
+
+      const boundedX = Math.max(0, Math.min(canvasWidth - dragState.width, nextX));
+      const boundedY = Math.max(0, Math.min(canvasHeight - dragState.height, nextY));
+
+      const nextElements = (elementsRef.current || []).map((element) =>
+        element.id === dragState.elementId ? { ...element, x: boundedX, y: boundedY } : element
+      );
+
+      elementsRef.current = nextElements;
+      setElements(nextElements);
+      updateLayout(nextElements);
+      setDragGuide(aligned.guide);
+    },
+    [canvasHeight, canvasWidth, getAlignedPosition, snapToGrid, snapValue, updateLayout]
+  );
+
+  const handleDragEnd = useCallback(() => {
+    dragStateRef.current = null;
+    setDragGuide({ show: false, xCanvas: null, yCanvas: null });
+    window.removeEventListener('mousemove', handleDragMove);
+    window.removeEventListener('mouseup', handleDragEnd);
+  }, [handleDragMove]);
+
+  const handleElementMouseDown = useCallback(
+    (event, element) => {
+      if (event.button !== 0 || element.locked) return;
+      event.preventDefault();
+      event.stopPropagation();
+
+      const viewport = canvasRef.current;
+      if (!viewport) return;
+
+      const scaleX = previewWidth / canvasWidth;
+      const scaleY = previewHeight / canvasHeight;
+      const width = Number(element.width) || 0;
+      const height = Number(element.height);
+
+      dragStateRef.current = {
+        elementId: element.id,
+        startClientX: event.clientX,
+        startClientY: event.clientY,
+        startX: Number(element.x || 0),
+        startY: Number(element.y || 0),
+        width,
+        height: Number.isFinite(height) ? height : 0,
+        scaleX,
+        scaleY,
+      };
+
+      setSelectedElementId(element.id);
+      window.addEventListener('mousemove', handleDragMove);
+      window.addEventListener('mouseup', handleDragEnd);
+    },
+    [canvasHeight, canvasWidth, handleDragEnd, handleDragMove, previewHeight, previewWidth]
   );
 
   // Delete element
@@ -385,6 +811,20 @@ const InviteDesignCanvas = ({
                   <Button size="small" onClick={() => handleAddElement('divider')}>
                     + Line
                   </Button>
+                  <Button size="small" onClick={() => handleAddElement('lottie')}>
+                    + Animated
+                  </Button>
+                </Space>
+              </div>
+
+              <div>
+                <div style={{ marginBottom: 8, marginTop: 4, fontWeight: 600 }}>Animated Stickers</div>
+                <Space wrap size="small">
+                  {LOTTIE_STICKERS.map((sticker) => (
+                    <Button key={sticker.key} size="small" type="dashed" onClick={() => handleAddLottieSticker(sticker)}>
+                      {sticker.thumb} {sticker.label}
+                    </Button>
+                  ))}
                 </Space>
               </div>
 
@@ -435,6 +875,7 @@ const InviteDesignCanvas = ({
                             {element.type === 'image' && 'Image'}
                             {element.type === 'shape' && element.shapeType}
                             {element.type === 'divider' && 'Divider'}
+                            {element.type === 'lottie' && 'Animated'}
                           </span>
                         </div>
                         <div className="layer-actions">
@@ -465,7 +906,9 @@ const InviteDesignCanvas = ({
             <div style={{ textAlign: 'center' }}>
               <div className="canvas-viewport">
                 <div
+                  ref={canvasRef}
                   className="invite-canvas"
+                  onMouseDown={() => setSelectedElementId(null)}
                   style={{
                     width: previewWidth,
                     height: previewHeight,
@@ -500,6 +943,7 @@ const InviteDesignCanvas = ({
                       <div
                         key={element.id}
                         style={style}
+                        onMouseDown={(event) => handleElementMouseDown(event, element)}
                         onClick={() => !element.locked && setSelectedElementId(element.id)}
                         className="canvas-element"
                       >
@@ -549,6 +993,27 @@ const InviteDesignCanvas = ({
                             }}
                           />
                         )}
+                        {element.type === 'lottie' && (
+                          (() => {
+                            const lottieUrl = resolveLottieUrl(element.lottieSource);
+                            const lottieData = lottieDataMap[lottieUrl];
+                            if (!lottieData) {
+                              return (
+                                <div style={{ width: '100%', height: '100%', display: 'grid', placeItems: 'center', background: '#f5f3ff', color: '#6d28d9', fontSize: 12 }}>
+                                  Animated
+                                </div>
+                              );
+                            }
+                            return (
+                              <Lottie
+                                animationData={lottieData}
+                                loop={element.loop !== false}
+                                autoplay={element.autoPlay !== false}
+                                style={{ width: '100%', height: '100%' }}
+                              />
+                            );
+                          })()
+                        )}
                       </div>
                     );
                   })}
@@ -582,11 +1047,42 @@ const InviteDesignCanvas = ({
                       }}
                     />
                   ) : null}
+                  {dragGuide.show && dragGuide.xCanvas !== null ? (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        bottom: 0,
+                        left: (dragGuide.xCanvas / canvasWidth) * previewWidth,
+                        width: 1,
+                        transform: 'translateX(-0.5px)',
+                        backgroundColor: '#22c55e',
+                        opacity: 0.55,
+                        pointerEvents: 'none',
+                      }}
+                    />
+                  ) : null}
+                  {dragGuide.show && dragGuide.yCanvas !== null ? (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        left: 0,
+                        right: 0,
+                        top: (dragGuide.yCanvas / canvasHeight) * previewHeight,
+                        height: 1,
+                        backgroundColor: '#22c55e',
+                        opacity: 0.55,
+                        pointerEvents: 'none',
+                      }}
+                    />
+                  ) : null}
                 </div>
               </div>
 
               <div style={{ marginTop: 12, textAlign: 'center', fontSize: 12 }}>
                 <Switch checked={showGrid} onChange={setShowGrid} /> Grid
+                <span style={{ margin: '0 10px' }} />
+                <Switch checked={snapToGrid} onChange={setSnapToGrid} /> Snap
               </div>
             </div>
           </Card>
@@ -617,7 +1113,7 @@ const InviteDesignCanvas = ({
                       <InputNumber
                         size="small"
                         value={selectedElement.x}
-                        onChange={(val) => handleUpdateElement(selectedElement.id, { x: val })}
+                        onChange={(val) => handleNumericPositionUpdate(selectedElement.id, 'x', val)}
                         disabled={selectedElement.locked}
                         style={{ width: '100%' }}
                       />
@@ -627,7 +1123,7 @@ const InviteDesignCanvas = ({
                       <InputNumber
                         size="small"
                         value={selectedElement.y}
-                        onChange={(val) => handleUpdateElement(selectedElement.id, { y: val })}
+                        onChange={(val) => handleNumericPositionUpdate(selectedElement.id, 'y', val)}
                         disabled={selectedElement.locked}
                         style={{ width: '100%' }}
                       />
@@ -637,7 +1133,7 @@ const InviteDesignCanvas = ({
                       <InputNumber
                         size="small"
                         value={selectedElement.width}
-                        onChange={(val) => handleUpdateElement(selectedElement.id, { width: val })}
+                        onChange={(val) => handleNumericPositionUpdate(selectedElement.id, 'width', val)}
                         disabled={selectedElement.locked}
                         style={{ width: '100%' }}
                       />
@@ -647,12 +1143,27 @@ const InviteDesignCanvas = ({
                       <InputNumber
                         size="small"
                         value={selectedElement.height}
-                        onChange={(val) => handleUpdateElement(selectedElement.id, { height: val })}
+                        onChange={(val) => handleNumericPositionUpdate(selectedElement.id, 'height', val)}
                         disabled={selectedElement.locked}
                         style={{ width: '100%' }}
                       />
                     </Col>
                   </Row>
+                  <Space wrap size="small" style={{ marginTop: 8 }}>
+                    <Button size="small" onClick={() => nudgeSelected(-1, 0)} disabled={selectedElement.locked}>←</Button>
+                    <Button size="small" onClick={() => nudgeSelected(1, 0)} disabled={selectedElement.locked}>→</Button>
+                    <Button size="small" onClick={() => nudgeSelected(0, -1)} disabled={selectedElement.locked}>↑</Button>
+                    <Button size="small" onClick={() => nudgeSelected(0, 1)} disabled={selectedElement.locked}>↓</Button>
+                    <label style={{ fontSize: 12, marginLeft: 8 }}>Step</label>
+                    <InputNumber
+                      size="small"
+                      min={1}
+                      max={100}
+                      value={gridSize}
+                      onChange={(val) => setGridSize(Math.max(1, Number(val) || 1))}
+                      style={{ width: 80 }}
+                    />
+                  </Space>
                 </div>
 
                 {/* Text-specific properties */}
@@ -665,6 +1176,7 @@ const InviteDesignCanvas = ({
                         ref={textAreaRef}
                         value={selectedElement.text}
                         onChange={handleTextChange}
+                        onKeyDown={handleTextKeyDown}
                         onSelect={(e) => refreshAutocomplete(e.target.value, e.target.selectionStart)}
                         onKeyUp={(e) => refreshAutocomplete(e.target.value, e.target.selectionStart)}
                         rows={3}
@@ -680,7 +1192,7 @@ const InviteDesignCanvas = ({
                             {placeholderAutocomplete.suggestions.map((token) => (
                               <Tag
                                 key={token}
-                                color="cyan"
+                                color={token === placeholderAutocomplete.suggestions[placeholderAutocomplete.activeIndex] ? 'blue' : 'cyan'}
                                 style={{ cursor: 'pointer', marginInlineEnd: 0 }}
                                 onClick={() => handleAutocompleteSelect(token)}
                               >
@@ -924,6 +1436,43 @@ const InviteDesignCanvas = ({
                           style={{ marginTop: 4 }}
                         />
                       </div>
+                    </div>
+                  </>
+                )}
+
+                {/* Lottie-specific properties */}
+                {selectedElement.type === 'lottie' && (
+                  <>
+                    <Divider style={{ margin: '8px 0' }} />
+                    <div>
+                      <div style={{ fontWeight: 600, marginBottom: 8 }}>Animation</div>
+                      <label style={{ fontSize: 12 }}>Lottie JSON URL</label>
+                      <Input
+                        size="small"
+                        value={resolveLottieUrl(selectedElement.lottieSource)}
+                        onChange={(e) => handleUpdateElement(selectedElement.id, { lottieSource: e.target.value })}
+                        placeholder="https://assets.lottiefiles.com/..."
+                        disabled={selectedElement.locked}
+                        style={{ marginTop: 4 }}
+                      />
+                      <Space size="small" style={{ marginTop: 10 }}>
+                        <Button
+                          size="small"
+                          type={selectedElement.loop !== false ? 'primary' : 'default'}
+                          onClick={() => handleUpdateElement(selectedElement.id, { loop: !(selectedElement.loop !== false) })}
+                          disabled={selectedElement.locked}
+                        >
+                          {selectedElement.loop !== false ? 'Loop On' : 'Loop Off'}
+                        </Button>
+                        <Button
+                          size="small"
+                          type={selectedElement.autoPlay !== false ? 'primary' : 'default'}
+                          onClick={() => handleUpdateElement(selectedElement.id, { autoPlay: !(selectedElement.autoPlay !== false) })}
+                          disabled={selectedElement.locked}
+                        >
+                          {selectedElement.autoPlay !== false ? 'Auto Play' : 'Manual'}
+                        </Button>
+                      </Space>
                     </div>
                   </>
                 )}
