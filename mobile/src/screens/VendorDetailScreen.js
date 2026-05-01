@@ -1,6 +1,7 @@
-import React, { useContext, useEffect, useState } from 'react';
-import { View, StyleSheet, ScrollView, Alert, Image, Dimensions } from 'react-native';
+import React, { useContext, useEffect, useRef, useState } from 'react';
+import { View, StyleSheet, ScrollView, Alert, Image, Dimensions, Modal as RNModal, TouchableOpacity, Animated } from 'react-native';
 import { Text, Card, Button, Chip, Divider, ActivityIndicator } from 'react-native-paper';
+import { PinchGestureHandler, State as GestureState } from 'react-native-gesture-handler';
 import { AuthContext } from '../context/AuthContext';
 import { vendorService } from '../services/vendorService';
 import { aiService } from '../services/aiService';
@@ -16,6 +17,13 @@ const VendorDetailScreen = ({ route, navigation }) => {
   const [loading, setLoading] = useState(true);
   const [reviewSummary, setReviewSummary] = useState(null);
   const [loadingReviewSummary, setLoadingReviewSummary] = useState(false);
+  const [viewerVisible, setViewerVisible] = useState(false);
+  const [viewerImageIndex, setViewerImageIndex] = useState(0);
+  const [viewerZoom, setViewerZoom] = useState(1);
+  const baseScale = useRef(new Animated.Value(1)).current;
+  const pinchScale = useRef(new Animated.Value(1)).current;
+  const lastScaleRef = useRef(1);
+  const animatedScale = Animated.multiply(baseScale, pinchScale);
 
   useEffect(() => {
     const load = async () => {
@@ -38,6 +46,10 @@ const VendorDetailScreen = ({ route, navigation }) => {
   const testimonials = vendor.testimonials || [];
   const reviews = vendor.reviews || [];
   const packageCatalog = vendor.packageCatalog || [];
+  const portfolioImages = portfolio.filter((item) => {
+    const url = typeof item === 'string' ? item : item?.url;
+    return Boolean(url);
+  });
   const canBook = user && ['organizer', 'customer', 'admin'].includes(user.role);
   const contactInfo = [
     vendor.contactPhone && { icon: '📞', value: vendor.contactPhone },
@@ -46,6 +58,57 @@ const VendorDetailScreen = ({ route, navigation }) => {
   ].filter(Boolean);
   const socialLinks = vendor.socialLinks && typeof vendor.socialLinks === 'object' ? vendor.socialLinks : {};
   const hasSocials = Object.values(socialLinks).some(Boolean);
+
+  const openImageViewer = (index) => {
+    setViewerImageIndex(index);
+    setViewerZoom(1);
+    lastScaleRef.current = 1;
+    baseScale.setValue(1);
+    pinchScale.setValue(1);
+    setViewerVisible(true);
+  };
+
+  const closeImageViewer = () => {
+    setViewerVisible(false);
+    setViewerZoom(1);
+    lastScaleRef.current = 1;
+    baseScale.setValue(1);
+    pinchScale.setValue(1);
+  };
+
+  const zoomIn = () => {
+    setViewerZoom((z) => {
+      const next = Math.min(3, Number((z + 0.25).toFixed(2)));
+      lastScaleRef.current = next;
+      baseScale.setValue(next);
+      pinchScale.setValue(1);
+      return next;
+    });
+  };
+  const zoomOut = () => {
+    setViewerZoom((z) => {
+      const next = Math.max(1, Number((z - 0.25).toFixed(2)));
+      lastScaleRef.current = next;
+      baseScale.setValue(next);
+      pinchScale.setValue(1);
+      return next;
+    });
+  };
+  const onPinchGestureEvent = Animated.event(
+    [{ nativeEvent: { scale: pinchScale } }],
+    { useNativeDriver: true }
+  );
+  const onPinchStateChange = (event) => {
+    if (event.nativeEvent.oldState === GestureState.ACTIVE) {
+      const next = Math.min(3, Math.max(1, lastScaleRef.current * event.nativeEvent.scale));
+      lastScaleRef.current = next;
+      baseScale.setValue(next);
+      pinchScale.setValue(1);
+      setViewerZoom(Number(next.toFixed(2)));
+    }
+  };
+  const currentImage = portfolioImages[viewerImageIndex];
+  const currentImageUrl = currentImage ? (typeof currentImage === 'string' ? currentImage : currentImage.url) : null;
 
   return (
     <View style={styles.container}>
@@ -107,12 +170,15 @@ const VendorDetailScreen = ({ route, navigation }) => {
                 const url = typeof item === 'string' ? item : item.url;
                 if (!url) return null;
                 return (
-                  <View key={idx} style={styles.mediaThumb}>
+                  <TouchableOpacity key={idx} style={styles.mediaThumb} activeOpacity={0.9} onPress={() => openImageViewer(idx)}>
                     <Image source={{ uri: url }} style={styles.mediaImage} resizeMode="cover" />
+                    <View style={styles.fullscreenHint}>
+                      <Text variant="labelSmall" style={styles.fullscreenHintText}>Tap to view full screen</Text>
+                    </View>
                     {typeof item === 'object' && item.caption ? (
                       <Text variant="labelSmall" style={styles.mediaCaption} numberOfLines={1}>{item.caption}</Text>
                     ) : null}
-                  </View>
+                  </TouchableOpacity>
                 );
               })}
             </ScrollView>
@@ -220,6 +286,61 @@ const VendorDetailScreen = ({ route, navigation }) => {
 
         <View style={{ height: 30 }} />
       </ScrollView>
+
+      <RNModal visible={viewerVisible} animationType="fade" transparent onRequestClose={closeImageViewer}>
+        <View style={styles.viewerOverlay}>
+          <View style={styles.viewerTopBar}>
+            <TouchableOpacity onPress={zoomOut} style={styles.viewerTopBtn}><Text style={styles.viewerTopBtnText}>-</Text></TouchableOpacity>
+            <Text style={styles.viewerZoomText}>{Math.round(viewerZoom * 100)}%</Text>
+            <TouchableOpacity onPress={zoomIn} style={styles.viewerTopBtn}><Text style={styles.viewerTopBtnText}>+</Text></TouchableOpacity>
+            <TouchableOpacity onPress={closeImageViewer} style={styles.viewerTopBtn}><Text style={styles.viewerTopBtnText}>Close</Text></TouchableOpacity>
+          </View>
+
+          <View style={styles.viewerBody}>
+            {currentImageUrl ? (
+              <PinchGestureHandler onGestureEvent={onPinchGestureEvent} onHandlerStateChange={onPinchStateChange}>
+                <Animated.View style={styles.viewerPinchArea}>
+                  <Animated.Image
+                    source={{ uri: currentImageUrl }}
+                    style={[styles.viewerImage, { transform: [{ scale: animatedScale }] }]}
+                    resizeMode="contain"
+                  />
+                </Animated.View>
+              </PinchGestureHandler>
+            ) : null}
+          </View>
+
+          <View style={styles.viewerBottomBar}>
+            <TouchableOpacity
+              disabled={viewerImageIndex <= 0}
+              onPress={() => {
+                setViewerImageIndex((i) => Math.max(0, i - 1));
+                setViewerZoom(1);
+                lastScaleRef.current = 1;
+                baseScale.setValue(1);
+                pinchScale.setValue(1);
+              }}
+              style={[styles.viewerNavBtn, viewerImageIndex <= 0 && styles.viewerNavBtnDisabled]}
+            >
+              <Text style={styles.viewerNavBtnText}>Prev</Text>
+            </TouchableOpacity>
+            <Text style={styles.viewerCountText}>{portfolioImages.length ? `${viewerImageIndex + 1} / ${portfolioImages.length}` : ''}</Text>
+            <TouchableOpacity
+              disabled={viewerImageIndex >= portfolioImages.length - 1}
+              onPress={() => {
+                setViewerImageIndex((i) => Math.min(portfolioImages.length - 1, i + 1));
+                setViewerZoom(1);
+                lastScaleRef.current = 1;
+                baseScale.setValue(1);
+                pinchScale.setValue(1);
+              }}
+              style={[styles.viewerNavBtn, viewerImageIndex >= portfolioImages.length - 1 && styles.viewerNavBtnDisabled]}
+            >
+              <Text style={styles.viewerNavBtnText}>Next</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </RNModal>
     </View>
   );
 };
@@ -250,7 +371,22 @@ const styles = StyleSheet.create({
   mediaScroll: { marginBottom: Spacing.sm },
   mediaThumb: { width: SCREEN_W * 0.55, marginRight: Spacing.md, borderRadius: Radius.md, overflow: 'hidden', backgroundColor: Colors.surfaceVariant },
   mediaImage: { width: '100%', height: SCREEN_W * 0.4, borderRadius: Radius.md },
+  fullscreenHint: { position: 'absolute', right: 6, bottom: 6, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 },
+  fullscreenHintText: { color: '#fff', fontSize: 10, fontWeight: '600' },
   mediaCaption: { color: Colors.textMuted, paddingHorizontal: 6, paddingVertical: 4 },
+  viewerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)' },
+  viewerTopBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', paddingTop: Spacing.xxl, paddingHorizontal: Spacing.lg, gap: Spacing.sm },
+  viewerTopBtn: { backgroundColor: 'rgba(255,255,255,0.18)', borderRadius: 16, paddingHorizontal: 10, paddingVertical: 6 },
+  viewerTopBtnText: { color: '#fff', fontWeight: '700' },
+  viewerZoomText: { color: '#fff', fontWeight: '700', marginRight: Spacing.sm },
+  viewerBody: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: Spacing.md },
+  viewerPinchArea: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
+  viewerImage: { width: SCREEN_W * 0.92, height: '85%' },
+  viewerBottomBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.xl, paddingBottom: Spacing.xl },
+  viewerNavBtn: { backgroundColor: 'rgba(255,255,255,0.18)', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 8 },
+  viewerNavBtnDisabled: { opacity: 0.35 },
+  viewerNavBtnText: { color: '#fff', fontWeight: '700' },
+  viewerCountText: { color: '#fff', fontWeight: '600' },
   testimonialCard: { marginBottom: Spacing.md, borderRadius: Radius.md, elevation: 1, backgroundColor: Colors.surface },
   testimonialHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.sm },
   testimonialAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#d4a642', justifyContent: 'center', alignItems: 'center' },

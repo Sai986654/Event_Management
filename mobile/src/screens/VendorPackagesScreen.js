@@ -72,16 +72,43 @@ const CATEGORY_FIELDS = {
   ],
 };
 
+const CORE_RULE_KEYS = new Set(['fixed', 'perGuest', 'perPlate', 'perHour', 'minPlates']);
+
+const toRuleLabel = (key) =>
+  key
+    .replace(/([A-Z])/g, ' $1')
+    .replace(/_/g, ' ')
+    .replace(/^./, (s) => s.toUpperCase())
+    .trim();
+
+const getAddonKeys = (pkg) => {
+  const rules = pkg?.estimationRules || {};
+  return Object.entries(rules)
+    .filter(([key, value]) => !CORE_RULE_KEYS.has(key) && Number(value) > 0)
+    .map(([key]) => key);
+};
+
 /* ── Price estimation (mirrors backend estimatePackagePrice) ── */
 const estimatePrice = (pkg, criteria = {}) => {
   const rules = pkg.estimationRules || {};
-  const guests = Number(criteria.guests || 0);
+  const guestsInput = Number(criteria.guests || 0);
   const hours = Number(criteria.hours || 0);
+  const minGuests = Number(rules.minPlates || 0);
+  const guests = guestsInput > 0 ? Math.max(guestsInput, minGuests) : 0;
   const base = Number(pkg.basePrice || 0);
   const perGuest = Number(rules.perGuest || rules.perPlate || 0);
   const perHour = Number(rules.perHour || 0);
   const fixed = Number(rules.fixed || 0);
-  return Math.max(0, Math.round((base + fixed + perGuest * guests + perHour * hours) * 100) / 100);
+
+  const addonQty = criteria.addons || {};
+  const addonTotal = Object.entries(addonQty).reduce((sum, [key, qtyRaw]) => {
+    const rate = Number(rules[key] || 0);
+    const qty = Number(qtyRaw || 0);
+    if (rate <= 0 || qty <= 0) return sum;
+    return sum + rate * qty;
+  }, 0);
+
+  return Math.max(0, Math.round((base + fixed + perGuest * guests + perHour * hours + addonTotal) * 100) / 100);
 };
 
 const VendorPackagesScreen = ({ route, navigation }) => {
@@ -96,7 +123,7 @@ const VendorPackagesScreen = ({ route, navigation }) => {
   const [serviceDate, setServiceDate] = useState('');
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [criteriaMap, setCriteriaMap] = useState({}); // { [pkgId]: { guests, hours } }
+  const [criteriaMap, setCriteriaMap] = useState({}); // { [pkgId]: { guests, hours, addons: { ruleKey: qty } } }
 
   useEffect(() => {
     const load = async () => {
@@ -125,6 +152,20 @@ const VendorPackagesScreen = ({ route, navigation }) => {
     }));
   };
 
+  const updateAddonQty = (pkgId, addonKey, value) => {
+    const parsed = value === '' ? '' : String(value).replace(/[^0-9]/g, '');
+    setCriteriaMap((prev) => ({
+      ...prev,
+      [pkgId]: {
+        ...prev[pkgId],
+        addons: {
+          ...(prev[pkgId]?.addons || {}),
+          [addonKey]: parsed,
+        },
+      },
+    }));
+  };
+
   const openBooking = (pkg) => {
     setSelectedPackage(pkg);
     setBookingModal(true);
@@ -139,12 +180,16 @@ const VendorPackagesScreen = ({ route, navigation }) => {
       setSubmitting(true);
       const criteria = selectedPackage ? (criteriaMap[selectedPackage.id] || {}) : {};
       const price = selectedPackage ? estimatePrice(selectedPackage, criteria) : Number(vendor.basePrice || 0);
+      const addonSummary = Object.entries(criteria.addons || {})
+        .filter(([, qty]) => Number(qty || 0) > 0)
+        .map(([key, qty]) => `${toRuleLabel(key)} x ${qty}`)
+        .join(', ');
       await bookingService.createBooking({
         vendor: vendorId,
         event: selectedEvent,
         price,
         serviceDate: new Date(serviceDate).toISOString(),
-        notes: notes || `Package: ${selectedPackage?.title || 'Standard'}${criteria.guests ? ` | Guests: ${criteria.guests}` : ''}${criteria.hours ? ` | Hours: ${criteria.hours}` : ''}`,
+        notes: notes || `Package: ${selectedPackage?.title || 'Standard'}${criteria.guests ? ` | Guests: ${criteria.guests}` : ''}${criteria.hours ? ` | Hours: ${criteria.hours}` : ''}${addonSummary ? ` | Add-ons: ${addonSummary}` : ''}`,
       });
       Alert.alert('Success', 'Booking request sent!', [
         { text: 'OK', onPress: () => { setBookingModal(false); navigation.goBack(); } },
@@ -216,6 +261,7 @@ const VendorPackagesScreen = ({ route, navigation }) => {
     const rules = pkg.estimationRules || {};
     const hasPerGuest = Number(rules.perGuest || rules.perPlate || 0) > 0;
     const hasPerHour = Number(rules.perHour || 0) > 0;
+    const minPlates = Number(rules.minPlates || 0);
     if (!hasPerGuest && !hasPerHour) return null;
 
     const criteria = criteriaMap[pkg.id] || {};
@@ -250,12 +296,57 @@ const VendorPackagesScreen = ({ route, navigation }) => {
             />
           )}
         </View>
+        {hasPerGuest && minPlates > 0 && (
+          <Text variant="bodySmall" style={{ color: Colors.textMuted, marginTop: 6 }}>
+            Minimum billable guests/plates: {minPlates}
+          </Text>
+        )}
         {(Number(criteria.guests || 0) > 0 || Number(criteria.hours || 0) > 0) && (
           <View style={styles.estimatedRow}>
             <Text variant="labelMedium" style={{ color: Colors.textSecondary }}>Estimated Total:</Text>
             <Text variant="titleMedium" style={styles.estimatedPrice}>{formatCurrency(estimated)}</Text>
           </View>
         )}
+      </View>
+    );
+  };
+
+  const renderAddonCustomizer = (pkg) => {
+    const addonKeys = getAddonKeys(pkg);
+    if (addonKeys.length === 0) return null;
+
+    const criteria = criteriaMap[pkg.id] || {};
+    const addonQty = criteria.addons || {};
+
+    return (
+      <View style={styles.addonBox}>
+        <Text variant="labelLarge" style={styles.addonTitle}>Customize Add-ons</Text>
+        {addonKeys.map((key) => {
+          const rate = Number(pkg.estimationRules?.[key] || 0);
+          const qtyVal = addonQty[key]?.toString() || '';
+          const qtyNum = Number(qtyVal || 0);
+          const lineTotal = rate * qtyNum;
+
+          return (
+            <View key={key} style={styles.addonRow}>
+              <View style={{ flex: 1, paddingRight: Spacing.sm }}>
+                <Text style={styles.addonName}>{toRuleLabel(key)}</Text>
+                <Text style={styles.addonRate}>{formatCurrency(rate)} each</Text>
+              </View>
+              <TextInput
+                label="Qty"
+                value={qtyVal}
+                onChangeText={(v) => updateAddonQty(pkg.id, key, v)}
+                keyboardType="numeric"
+                mode="outlined"
+                dense
+                style={styles.addonQtyInput}
+                outlineStyle={{ borderRadius: Radius.sm }}
+              />
+              <Text style={styles.addonLineTotal}>{lineTotal > 0 ? formatCurrency(lineTotal) : '—'}</Text>
+            </View>
+          );
+        })}
       </View>
     );
   };
@@ -334,6 +425,9 @@ const VendorPackagesScreen = ({ route, navigation }) => {
                     {/* Criteria inputs for price estimation */}
                     {canBook && renderCriteriaInputs(pkg)}
 
+                    {/* Add-on customization */}
+                    {canBook && renderAddonCustomizer(pkg)}
+
                     {/* Book Button */}
                     {canBook && (
                       <Button
@@ -373,6 +467,10 @@ const VendorPackagesScreen = ({ route, navigation }) => {
                   const parts = [];
                   if (Number(c.guests || 0) > 0) parts.push(`${c.guests} guests`);
                   if (Number(c.hours || 0) > 0) parts.push(`${c.hours} hours`);
+                  const addonParts = Object.entries(c.addons || {})
+                    .filter(([, qty]) => Number(qty || 0) > 0)
+                    .map(([key, qty]) => `${toRuleLabel(key)} x ${qty}`);
+                  if (addonParts.length > 0) parts.push(...addonParts);
                   return parts.length > 0 ? (
                     <View style={styles.modalEstimate}>
                       <Text variant="bodySmall" style={{ color: Colors.textSecondary }}>{parts.join(' • ')}</Text>
@@ -441,6 +539,13 @@ const styles = StyleSheet.create({
   criteriaInput: { flex: 1, backgroundColor: '#fff' },
   estimatedRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: Spacing.md, paddingTop: Spacing.sm, borderTopWidth: 1, borderTopColor: Colors.primary + '22' },
   estimatedPrice: { fontWeight: '800', color: Colors.primary },
+  addonBox: { backgroundColor: '#fffaf1', borderRadius: Radius.md, padding: Spacing.md, marginBottom: Spacing.md, borderWidth: 1, borderColor: '#f1d8a5' },
+  addonTitle: { fontWeight: '700', color: '#8a6d2b', marginBottom: Spacing.sm },
+  addonRow: { flexDirection: 'row', alignItems: 'center', marginBottom: Spacing.sm },
+  addonName: { color: Colors.textPrimary, fontWeight: '600', fontSize: 13 },
+  addonRate: { color: Colors.textSecondary, fontSize: 12, marginTop: 2 },
+  addonQtyInput: { width: 88, marginRight: Spacing.sm, backgroundColor: '#fff' },
+  addonLineTotal: { minWidth: 78, textAlign: 'right', color: Colors.primary, fontWeight: '700', fontSize: 12 },
   bookBtn: { marginTop: Spacing.md, backgroundColor: Colors.primary, borderRadius: Radius.sm },
   modal: { backgroundColor: Colors.surface, margin: Spacing.lg, borderRadius: Radius.lg, padding: Spacing.xl, maxHeight: '85%' },
   modalTitle: { fontWeight: '800', marginBottom: Spacing.lg, color: Colors.textPrimary },

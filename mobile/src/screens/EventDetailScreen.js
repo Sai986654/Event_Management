@@ -217,10 +217,66 @@ const EventDetailScreen = ({ route, navigation }) => {
 
   const isOrganizer = user?.role === 'organizer' || user?.role === 'admin';
   const isCustomer = user?.role === 'customer';
+  const owner = event.organizer || {};
+  const ownerRoleLabel = owner.role === 'customer' ? 'Customer' : 'Event Owner';
+  const ownerPhone = owner.phone || '';
+  const ownerEmail = owner.email || '';
   const timeline = event.timeline || [];
   const tasks = event.tasks || [];
   const rsvpConfirmed = guests.filter((g) => g.rsvpStatus === 'confirmed').length;
   const checkedIn = guests.filter((g) => g.checkedIn).length;
+
+  const cleanPhoneForWhatsApp = (phone) => String(phone || '').replace(/[^\d]/g, '');
+
+  const handleContactCall = async () => {
+    if (!ownerPhone) {
+      Alert.alert('No Phone', `${ownerRoleLabel} phone number is not available.`);
+      return;
+    }
+    const url = `tel:${ownerPhone}`;
+    const canOpen = await Linking.canOpenURL(url);
+    if (!canOpen) {
+      Alert.alert('Unavailable', 'Phone call is not supported on this device.');
+      return;
+    }
+    Linking.openURL(url);
+  };
+
+  const handleContactWhatsApp = async () => {
+    if (!ownerPhone) {
+      Alert.alert('No Phone', `${ownerRoleLabel} phone number is not available.`);
+      return;
+    }
+    const digits = cleanPhoneForWhatsApp(ownerPhone);
+    if (!digits) {
+      Alert.alert('Invalid Phone', 'Could not use this number for WhatsApp.');
+      return;
+    }
+    const text = encodeURIComponent(`Hi ${owner.name || ''}, regarding event \"${event.title}\" on ${formatDate(event.date)}.`);
+    const url = `https://wa.me/${digits}?text=${text}`;
+    const canOpen = await Linking.canOpenURL(url);
+    if (!canOpen) {
+      Alert.alert('Unavailable', 'WhatsApp is not installed or link is unsupported.');
+      return;
+    }
+    Linking.openURL(url);
+  };
+
+  const handleContactEmail = async () => {
+    if (!ownerEmail) {
+      Alert.alert('No Email', `${ownerRoleLabel} email is not available.`);
+      return;
+    }
+    const subject = encodeURIComponent(`Regarding event: ${event.title}`);
+    const body = encodeURIComponent(`Hello ${owner.name || ''},\n\nI wanted to discuss your event \"${event.title}\" (${formatDate(event.date)}).`);
+    const url = `mailto:${ownerEmail}?subject=${subject}&body=${body}`;
+    const canOpen = await Linking.canOpenURL(url);
+    if (!canOpen) {
+      Alert.alert('Unavailable', 'Email app is not available on this device.');
+      return;
+    }
+    Linking.openURL(url);
+  };
 
   // ── Tab selector ──
   const tabs = [
@@ -386,6 +442,39 @@ const EventDetailScreen = ({ route, navigation }) => {
                 ))}
               </Card.Content>
             </Card>
+
+            {/* Customer / Owner Contact */}
+            {isOrganizer && (
+              <Card style={styles.card}>
+                <Card.Content>
+                  <Text variant="titleSmall" style={styles.cardTitle}>{ownerRoleLabel} Contact</Text>
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Name</Text>
+                    <Text style={styles.detailValue}>{owner.name || '—'}</Text>
+                  </View>
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Phone</Text>
+                    <Text style={styles.detailValue}>{ownerPhone || '—'}</Text>
+                  </View>
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Email</Text>
+                    <Text style={styles.detailValue}>{ownerEmail || '—'}</Text>
+                  </View>
+
+                  <View style={styles.contactActions}>
+                    <Button compact mode="contained-tonal" icon="phone" onPress={handleContactCall} disabled={!ownerPhone}>
+                      Call
+                    </Button>
+                    <Button compact mode="contained-tonal" icon="whatsapp" onPress={handleContactWhatsApp} disabled={!ownerPhone}>
+                      WhatsApp
+                    </Button>
+                    <Button compact mode="contained-tonal" icon="email-outline" onPress={handleContactEmail} disabled={!ownerEmail}>
+                      Email
+                    </Button>
+                  </View>
+                </Card.Content>
+              </Card>
+            )}
           </View>
         )}
 
@@ -678,6 +767,7 @@ const styles = StyleSheet.create({
   detailRow: { flexDirection: 'row', paddingVertical: 6, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Colors.divider },
   detailLabel: { width: 100, fontSize: 12, fontWeight: '600', color: Colors.textMuted },
   detailValue: { flex: 1, fontSize: 13, color: Colors.textPrimary },
+  contactActions: { flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.sm, flexWrap: 'wrap' },
 
   /* Guest / Vendor rows */
   guestRow: { flexDirection: 'row', alignItems: 'center' },

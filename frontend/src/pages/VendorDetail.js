@@ -17,6 +17,93 @@ import { AuthContext } from '../context/AuthContext';
 import { formatCurrency, getErrorMessage, getPaymentRequirement } from '../utils/helpers';
 import './VendorDetail.css';
 
+const CORE_RULE_KEYS = new Set(['fixed', 'perGuest', 'perPlate', 'perHour', 'minPlates']);
+
+const toRuleLabel = (key) =>
+  String(key || '')
+    .replace(/([A-Z])/g, ' $1')
+    .replace(/_/g, ' ')
+    .replace(/^./, (s) => s.toUpperCase())
+    .trim();
+
+const getAddonKeys = (rules = {}) =>
+  Object.entries(rules)
+    .filter(([k, v]) => !CORE_RULE_KEYS.has(k) && Number(v) > 0)
+    .map(([k]) => k);
+
+const estimatePackagePrice = (pkg, criteria = {}) => {
+  if (!pkg) return 0;
+  const rules = pkg.estimationRules || {};
+  const base = Number(pkg.basePrice ?? pkg.price ?? 0);
+  const fixed = Number(rules.fixed || 0);
+  const perGuest = Number(rules.perGuest || rules.perPlate || 0);
+  const perHour = Number(rules.perHour || 0);
+  const minGuests = Number(rules.minPlates || 0);
+  const guestsInput = Number(criteria.guests || 0);
+  const guests = guestsInput > 0 ? Math.max(guestsInput, minGuests) : 0;
+  const hours = Number(criteria.hours || 0);
+  const addons = criteria.addons || {};
+  const addonTotal = Object.entries(addons).reduce((sum, [key, qtyRaw]) => {
+    const rate = Number(rules[key] || 0);
+    const qty = Number(qtyRaw || 0);
+    if (rate <= 0 || qty <= 0) return sum;
+    return sum + rate * qty;
+  }, 0);
+  return Math.max(0, Math.round((base + fixed + guests * perGuest + hours * perHour + addonTotal) * 100) / 100);
+};
+
+const getPricingBreakdown = (pkg, criteria = {}) => {
+  if (!pkg) return null;
+  const rules = pkg.estimationRules || {};
+  const base = Number(pkg.basePrice ?? pkg.price ?? 0);
+  const fixed = Number(rules.fixed || 0);
+
+  const perGuestRate = Number(rules.perGuest || rules.perPlate || 0);
+  const minGuests = Number(rules.minPlates || 0);
+  const guestsInput = Number(criteria.guests || 0);
+  const billableGuests = guestsInput > 0 ? Math.max(guestsInput, minGuests) : 0;
+  const guestCharge = perGuestRate * billableGuests;
+
+  const perHourRate = Number(rules.perHour || 0);
+  const hours = Number(criteria.hours || 0);
+  const hourCharge = perHourRate * hours;
+
+  const addons = criteria.addons || {};
+  const addonLines = Object.entries(addons)
+    .map(([key, qtyRaw]) => {
+      const rate = Number(rules[key] || 0);
+      const qty = Number(qtyRaw || 0);
+      if (rate <= 0 || qty <= 0) return null;
+      return {
+        key,
+        label: toRuleLabel(key),
+        qty,
+        rate,
+        lineTotal: rate * qty,
+      };
+    })
+    .filter(Boolean);
+
+  const addOnTotal = addonLines.reduce((sum, item) => sum + item.lineTotal, 0);
+  const total = Math.max(0, Math.round((base + fixed + guestCharge + hourCharge + addOnTotal) * 100) / 100);
+
+  return {
+    base,
+    fixed,
+    perGuestRate,
+    guestsInput,
+    billableGuests,
+    minGuests,
+    guestCharge,
+    perHourRate,
+    hours,
+    hourCharge,
+    addonLines,
+    addOnTotal,
+    total,
+  };
+};
+
 const VendorDetail = () => {
   const { vendorId } = useParams();
   const navigate = useNavigate();
@@ -30,6 +117,8 @@ const VendorDetail = () => {
   const [bookingLoading, setBookingLoading] = useState(false);
   const [userEvents, setUserEvents] = useState([]);
   const [bookingForm] = Form.useForm();
+  const [bookingCriteria, setBookingCriteria] = useState({ guests: 0, hours: 0, addons: {} });
+  const [calculatedPrice, setCalculatedPrice] = useState(0);
   const [reviewSummary, setReviewSummary] = useState(null);
   const [loadingReviewSummary, setLoadingReviewSummary] = useState(false);
 
@@ -52,6 +141,13 @@ const VendorDetail = () => {
     load();
   }, [vendorId]);
 
+  useEffect(() => {
+    if (!selectedPackage) return;
+    const next = estimatePackagePrice(selectedPackage, bookingCriteria);
+    setCalculatedPrice(next);
+    bookingForm.setFieldsValue({ price: next });
+  }, [selectedPackage, bookingCriteria, bookingForm]);
+
   const loadReviewSummary = async () => {
     setLoadingReviewSummary(true);
     try {
@@ -64,6 +160,20 @@ const VendorDetail = () => {
     }
   };
 
+  const updateBookingCriteria = (field, value) => {
+    setBookingCriteria((prev) => ({ ...prev, [field]: value || 0 }));
+  };
+
+  const updateBookingAddonQty = (key, value) => {
+    setBookingCriteria((prev) => ({
+      ...prev,
+      addons: {
+        ...(prev.addons || {}),
+        [key]: value || 0,
+      },
+    }));
+  };
+
   const openBookingModal = async (pkg) => {
     if (!user) {
       message.info('Please log in to book a vendor');
@@ -72,7 +182,16 @@ const VendorDetail = () => {
     }
     setSelectedPackage(pkg);
     bookingForm.resetFields();
-    bookingForm.setFieldsValue({ price: pkg?.price || Number(vendor.basePrice) || 0 });
+    const rules = pkg?.estimationRules || {};
+    const initCriteria = {
+      guests: Number(rules.perGuest || rules.perPlate || 0) > 0 ? 50 : 0,
+      hours: Number(rules.perHour || 0) > 0 ? 4 : 0,
+      addons: {},
+    };
+    setBookingCriteria(initCriteria);
+    const initialPrice = pkg ? estimatePackagePrice(pkg, initCriteria) : Number(vendor.basePrice) || 0;
+    setCalculatedPrice(initialPrice);
+    bookingForm.setFieldsValue({ price: initialPrice });
     try {
       const data = await eventService.getEvents({ limit: 100 });
       setUserEvents(data.events || []);
@@ -85,13 +204,18 @@ const VendorDetail = () => {
   const handleBookVendor = async (values) => {
     try {
       setBookingLoading(true);
+      const bookingPrice = selectedPackage ? calculatedPrice : values.price;
+      const addonSummary = Object.entries(bookingCriteria.addons || {})
+        .filter(([, qty]) => Number(qty || 0) > 0)
+        .map(([key, qty]) => `${toRuleLabel(key)} x ${qty}`)
+        .join(', ');
       await bookingService.createBooking({
         event: values.event,
         vendor: Number(vendorId),
-        price: values.price,
+        price: bookingPrice,
         serviceDate: values.serviceDate.toISOString(),
         notes: selectedPackage
-          ? `Package: ${selectedPackage.name}\n${values.notes || ''}`
+          ? `Package: ${selectedPackage.title || selectedPackage.name}${bookingCriteria.guests ? ` | Guests: ${bookingCriteria.guests}` : ''}${bookingCriteria.hours ? ` | Hours: ${bookingCriteria.hours}` : ''}${addonSummary ? ` | Add-ons: ${addonSummary}` : ''}${values.notes ? `\n${values.notes}` : ''}`
           : values.notes,
       });
       message.success('Booking created successfully! The vendor will confirm shortly.');
@@ -104,7 +228,7 @@ const VendorDetail = () => {
           await paymentService.checkoutForEntity({
             entityType: paymentRequirement.entityType,
             entityId: paymentRequirement.entityId,
-            amount: Number(paymentRequirement.config?.amount || values.price || 0),
+            amount: Number(paymentRequirement.config?.amount || bookingPrice || 0),
             description: `Booking #${paymentRequirement.entityId} confirmation`,
           });
 
@@ -136,7 +260,12 @@ const VendorDetail = () => {
     return <Empty description="Vendor not found" />;
   }
 
-  const packages = Array.isArray(vendor.packages) ? vendor.packages : [];
+  const packages = Array.isArray(vendor.packageCatalog)
+    ? vendor.packageCatalog
+    : Array.isArray(vendor.packages)
+      ? vendor.packages
+      : [];
+  const pricingBreakdown = selectedPackage ? getPricingBreakdown(selectedPackage, bookingCriteria) : null;
   const portfolioItems = Array.isArray(vendor.portfolio) ? vendor.portfolio : [];
 
   return (
@@ -220,22 +349,22 @@ const VendorDetail = () => {
                 title={
                   <div style={{ textAlign: 'center' }}>
                     {idx === 1 && <Badge.Ribbon text="Most Popular" color="#667eea" />}
-                    <h3 style={{ margin: 0 }}>{pkg.name}</h3>
+                    <h3 style={{ margin: 0 }}>{pkg.title || pkg.name}</h3>
                   </div>
                 }
               >
                 <div className="package-content">
                   <div className="package-price">
-                    <span className="price-amount">{formatCurrency(pkg.price)}</span>
-                    {pkg.priceType && <span className="price-type"> / {pkg.priceType}</span>}
+                    <span className="price-amount">{formatCurrency(pkg.basePrice ?? pkg.price ?? 0)}</span>
+                    {(pkg.unitLabel || pkg.priceType) && <span className="price-type"> / {pkg.unitLabel || pkg.priceType}</span>}
                   </div>
                   <p className="package-description">{pkg.description}</p>
                   <Divider />
                   <ul className="package-includes">
-                    {(pkg.includes || []).map((item, i) => (
+                    {(pkg.deliverables || pkg.includes || []).map((item, i) => (
                       <li key={i}>
                         <CheckCircleOutlined style={{ color: '#52c41a', marginRight: 8 }} />
-                        {item}
+                        {typeof item === 'string' ? item : item.item || item.name || JSON.stringify(item)}
                       </li>
                     ))}
                   </ul>
@@ -337,7 +466,7 @@ const VendorDetail = () => {
 
       {/* Booking Modal */}
       <Modal
-        title={`Book ${vendor.businessName}${selectedPackage ? ` — ${selectedPackage.name}` : ''}`}
+        title={`Book ${vendor.businessName}${selectedPackage ? ` — ${selectedPackage.title || selectedPackage.name}` : ''}`}
         open={bookingVisible}
         onCancel={() => setBookingVisible(false)}
         footer={null}
@@ -372,12 +501,136 @@ const VendorDetail = () => {
           >
             <DatePicker style={{ width: '100%' }} />
           </Form.Item>
+          {selectedPackage ? (
+            <Card size="small" style={{ marginBottom: 16, background: '#fafcff', borderColor: '#dbe7ff' }}>
+              <Space direction="vertical" size={10} style={{ width: '100%' }}>
+                <Text strong>Customize Package Items</Text>
+                <Text type="secondary">Change quantities below and final price updates instantly.</Text>
+
+                {Number(selectedPackage?.estimationRules?.perGuest || selectedPackage?.estimationRules?.perPlate || 0) > 0 ? (
+                  <Row align="middle" justify="space-between" gutter={10}>
+                    <Col flex="auto">
+                      <Text>Guests / Plates</Text>
+                    </Col>
+                    <Col>
+                      <InputNumber
+                        min={0}
+                        value={bookingCriteria.guests}
+                        onChange={(v) => updateBookingCriteria('guests', v)}
+                      />
+                    </Col>
+                  </Row>
+                ) : null}
+
+                {Number(selectedPackage?.estimationRules?.perHour || 0) > 0 ? (
+                  <Row align="middle" justify="space-between" gutter={10}>
+                    <Col flex="auto">
+                      <Text>Hours</Text>
+                    </Col>
+                    <Col>
+                      <InputNumber
+                        min={0}
+                        value={bookingCriteria.hours}
+                        onChange={(v) => updateBookingCriteria('hours', v)}
+                      />
+                    </Col>
+                  </Row>
+                ) : null}
+
+                {getAddonKeys(selectedPackage?.estimationRules || {}).map((key) => {
+                  const rate = Number(selectedPackage?.estimationRules?.[key] || 0);
+                  const qty = Number(bookingCriteria.addons?.[key] || 0);
+                  return (
+                    <Row key={key} align="middle" justify="space-between" gutter={10}>
+                      <Col flex="auto">
+                        <Text>{toRuleLabel(key)}</Text>
+                        <div><Text type="secondary">{formatCurrency(rate)} each</Text></div>
+                      </Col>
+                      <Col>
+                        <InputNumber
+                          min={0}
+                          value={qty}
+                          onChange={(v) => updateBookingAddonQty(key, v)}
+                        />
+                      </Col>
+                    </Row>
+                  );
+                })}
+
+                {pricingBreakdown ? (
+                  <Card size="small" style={{ background: '#fff', borderColor: '#e6eefc', marginTop: 8 }}>
+                    <Space direction="vertical" size={6} style={{ width: '100%' }}>
+                      <Text strong>Selected Add-ons and Cost Breakdown</Text>
+
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <Text>Base Price</Text>
+                        <Text>{formatCurrency(pricingBreakdown.base)}</Text>
+                      </div>
+
+                      {pricingBreakdown.fixed > 0 ? (
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <Text>Fixed Charges</Text>
+                          <Text>{formatCurrency(pricingBreakdown.fixed)}</Text>
+                        </div>
+                      ) : null}
+
+                      {pricingBreakdown.perGuestRate > 0 ? (
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <Text>
+                            Guests/Plates: {pricingBreakdown.billableGuests} x {formatCurrency(pricingBreakdown.perGuestRate)}
+                          </Text>
+                          <Text>{formatCurrency(pricingBreakdown.guestCharge)}</Text>
+                        </div>
+                      ) : null}
+
+                      {pricingBreakdown.perGuestRate > 0 && pricingBreakdown.minGuests > 0 && pricingBreakdown.guestsInput > 0 && pricingBreakdown.billableGuests > pricingBreakdown.guestsInput ? (
+                        <Text type="secondary">Minimum applied: {pricingBreakdown.minGuests} guests/plates</Text>
+                      ) : null}
+
+                      {pricingBreakdown.perHourRate > 0 ? (
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <Text>
+                            Hours: {pricingBreakdown.hours} x {formatCurrency(pricingBreakdown.perHourRate)}
+                          </Text>
+                          <Text>{formatCurrency(pricingBreakdown.hourCharge)}</Text>
+                        </div>
+                      ) : null}
+
+                      {pricingBreakdown.addonLines.length > 0 ? (
+                        <>
+                          <Divider style={{ margin: '4px 0' }} />
+                          {pricingBreakdown.addonLines.map((line) => (
+                            <div key={line.key} style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <Text>{line.label}: {line.qty} x {formatCurrency(line.rate)}</Text>
+                              <Text>{formatCurrency(line.lineTotal)}</Text>
+                            </div>
+                          ))}
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <Text strong>Add-ons Subtotal</Text>
+                            <Text strong>{formatCurrency(pricingBreakdown.addOnTotal)}</Text>
+                          </div>
+                        </>
+                      ) : (
+                        <Text type="secondary">No add-ons selected</Text>
+                      )}
+
+                      <Divider style={{ margin: '4px 0' }} />
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <Text strong>Final Total</Text>
+                        <Text strong>{formatCurrency(pricingBreakdown.total)}</Text>
+                      </div>
+                    </Space>
+                  </Card>
+                ) : null}
+              </Space>
+            </Card>
+          ) : null}
           <Form.Item
             name="price"
-            label="Agreed Price (INR ₹)"
+            label={selectedPackage ? 'Final Price (INR ₹)' : 'Agreed Price (INR ₹)'}
             rules={[{ required: true, message: 'Please enter the price' }]}
           >
-            <InputNumber min={0} style={{ width: '100%' }} />
+            <InputNumber min={0} style={{ width: '100%' }} disabled={Boolean(selectedPackage)} />
           </Form.Item>
           <Form.Item name="notes" label="Special Requirements">
             <Input.TextArea rows={3} placeholder="Any special requirements or notes..." />

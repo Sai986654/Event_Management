@@ -139,7 +139,7 @@ exports.getEvents = asyncHandler(async (req, res) => {
 exports.getEvent = asyncHandler(async (req, res) => {
   const event = await prisma.event.findUnique({
     where: { id: Number(req.params.id) },
-    include: { organizer: { select: { id: true, name: true, email: true } } },
+    include: { organizer: { select: { id: true, name: true, email: true, phone: true, role: true } } },
   });
   if (!event) return res.status(404).json({ message: 'Event not found' });
 

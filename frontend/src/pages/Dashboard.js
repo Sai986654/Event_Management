@@ -1,6 +1,6 @@
 import React, { useContext, useEffect, useState, useCallback, useMemo } from 'react';
 import { Layout, Button, Card, Row, Col, Statistic, Table, Tag, Tabs, Select, Tooltip, message, Empty, Spin, Space, Badge } from 'antd';
-import { PlusOutlined, CalendarOutlined, TeamOutlined, SortAscendingOutlined, SortDescendingOutlined, AimOutlined } from '@ant-design/icons';
+import { PlusOutlined, CalendarOutlined, TeamOutlined, SortAscendingOutlined, SortDescendingOutlined, AimOutlined, ShopOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { eventService } from '../services/eventService';

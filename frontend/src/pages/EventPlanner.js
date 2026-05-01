@@ -51,6 +51,20 @@ const formatINR = (value) => {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(amount);
 };
 
+const CORE_RULE_KEYS = new Set(['fixed', 'perGuest', 'perPlate', 'perHour', 'minPlates']);
+
+const toRuleLabel = (key) =>
+  String(key || '')
+    .replace(/([A-Z])/g, ' $1')
+    .replace(/_/g, ' ')
+    .replace(/^./, (s) => s.toUpperCase())
+    .trim();
+
+const getAddonKeys = (rules = {}) =>
+  Object.entries(rules)
+    .filter(([k, v]) => !CORE_RULE_KEYS.has(k) && Number(v) > 0)
+    .map(([k]) => k);
+
 const EventPlanner = () => {
   const [events, setEvents] = useState([]);
   const [packages, setPackages] = useState([]);
@@ -266,6 +280,19 @@ const EventPlanner = () => {
     }));
   };
 
+  const updateAddonCriteria = (packageId, ruleKey, value) => {
+    setCriteriaMap((prev) => ({
+      ...prev,
+      [packageId]: {
+        ...(prev[packageId] || {}),
+        addons: {
+          ...(prev[packageId]?.addons || {}),
+          [ruleKey]: value || 0,
+        },
+      },
+    }));
+  };
+
   const selectVendorForSector = (sector, vendor) => {
     setSelectedVendorBySector((prev) => ({
       ...prev,
@@ -284,9 +311,20 @@ const EventPlanner = () => {
   const estimatePackageAmount = (pkg) => {
     const base = Number(pkg?.basePrice || 0);
     const rules = pkg?.estimationRules || {};
-    const guests = Number(criteriaMap[pkg?.id]?.guests || selectedEvent?.guestCount || 0);
+    const guestsInput = Number(criteriaMap[pkg?.id]?.guests || selectedEvent?.guestCount || 0);
+    const minGuests = Number(rules.minPlates || 0);
+    const guests = guestsInput > 0 ? Math.max(guestsInput, minGuests) : 0;
     const hours = Number(criteriaMap[pkg?.id]?.hours || (Number(rules.perHour || 0) > 0 ? 4 : 0));
-    return base + Number(rules.perGuest || 0) * guests + Number(rules.perHour || 0) * hours;
+    const perGuest = Number(rules.perGuest || rules.perPlate || 0);
+    const fixed = Number(rules.fixed || 0);
+    const addons = criteriaMap[pkg?.id]?.addons || {};
+    const addonTotal = Object.entries(addons).reduce((sum, [key, qtyRaw]) => {
+      const rate = Number(rules[key] || 0);
+      const qty = Number(qtyRaw || 0);
+      if (rate <= 0 || qty <= 0) return sum;
+      return sum + rate * qty;
+    }, 0);
+    return base + fixed + perGuest * guests + Number(rules.perHour || 0) * hours + addonTotal;
   };
 
   const showSwitchImpact = (sector, candidate) => {
@@ -803,6 +841,31 @@ const EventPlanner = () => {
                                 />
                               </Col>
                             </Row>
+                            {getAddonKeys(pkg.estimationRules || {}).length > 0 && (
+                              <div>
+                                <Text strong>Customize Add-ons</Text>
+                                <Space direction="vertical" style={{ width: '100%', marginTop: 8 }}>
+                                  {getAddonKeys(pkg.estimationRules || {}).map((ruleKey) => (
+                                    <Row key={ruleKey} align="middle" justify="space-between">
+                                      <Col flex="auto">
+                                        <Text>{toRuleLabel(ruleKey)}</Text>
+                                        <div>
+                                          <Text type="secondary">{formatINR(pkg.estimationRules?.[ruleKey] || 0)} each</Text>
+                                        </div>
+                                      </Col>
+                                      <Col>
+                                        <InputNumber
+                                          min={0}
+                                          placeholder="Qty"
+                                          value={criteriaMap[pkg.id]?.addons?.[ruleKey]}
+                                          onChange={(v) => updateAddonCriteria(pkg.id, ruleKey, v)}
+                                        />
+                                      </Col>
+                                    </Row>
+                                  ))}
+                                </Space>
+                              </div>
+                            )}
                             <Button size="small" onClick={() => showSwitchImpact(activeSector, pkg)}>
                               Budget impact if switch
                             </Button>

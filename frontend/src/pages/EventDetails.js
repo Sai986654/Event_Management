@@ -19,7 +19,7 @@ import {
   Select,
   Image,
 } from 'antd';
-import { EditOutlined, DeleteOutlined, ControlOutlined, ShopOutlined, CopyOutlined, VideoCameraOutlined, BulbOutlined, CheckSquareOutlined, BgColorsOutlined } from '@ant-design/icons';
+import { EditOutlined, DeleteOutlined, ControlOutlined, ShopOutlined, CopyOutlined, VideoCameraOutlined, BulbOutlined, CheckSquareOutlined, BgColorsOutlined, PhoneOutlined, WhatsAppOutlined, MailOutlined } from '@ant-design/icons';
 import { eventService } from '../services/eventService';
 import { guestService } from '../services/guestService';
 import { bookingService } from '../services/bookingService';
@@ -376,6 +376,16 @@ const EventDetails = () => {
   const isOrganizer = user?.role === 'organizer';
   const isAdmin = user?.role === 'admin';
   const isOrgOrAdmin = isOrganizer || isAdmin;
+  const owner = event?.organizer || {};
+  const ownerRoleLabel = owner.role === 'customer' ? 'Customer' : 'Event Owner';
+  const ownerPhone = owner.phone || '';
+  const ownerEmail = owner.email || '';
+  const ownerPhoneDigits = String(ownerPhone).replace(/[^\d]/g, '');
+  const waText = encodeURIComponent(`Hi ${owner.name || ''}, regarding event \"${event?.title || ''}\" on ${formatDate(event?.date)}.`);
+  const waHref = ownerPhoneDigits ? `https://wa.me/${ownerPhoneDigits}?text=${waText}` : '';
+  const mailHref = ownerEmail
+    ? `mailto:${ownerEmail}?subject=${encodeURIComponent(`Regarding event: ${event?.title || ''}`)}`
+    : '';
 
   if (loading) {
     return (
@@ -619,6 +629,39 @@ const EventDetails = () => {
                         </tr>
                       </tbody>
                     </table>
+
+                    {isOrgOrAdmin ? (
+                      <div className="owner-contact-card">
+                        <h3>{ownerRoleLabel} Contact</h3>
+                        <table className="details-table">
+                          <tbody>
+                            <tr>
+                              <td>Name:</td>
+                              <td>{owner.name || '—'}</td>
+                            </tr>
+                            <tr>
+                              <td>Phone:</td>
+                              <td>{ownerPhone || '—'}</td>
+                            </tr>
+                            <tr>
+                              <td>Email:</td>
+                              <td>{ownerEmail || '—'}</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                        <Space wrap style={{ marginTop: 12 }}>
+                          <Button icon={<PhoneOutlined />} href={ownerPhone ? `tel:${ownerPhone}` : undefined} disabled={!ownerPhone}>
+                            Call
+                          </Button>
+                          <Button icon={<WhatsAppOutlined />} href={waHref || undefined} target="_blank" disabled={!waHref}>
+                            WhatsApp
+                          </Button>
+                          <Button icon={<MailOutlined />} href={mailHref || undefined} disabled={!mailHref}>
+                            Email
+                          </Button>
+                        </Space>
+                      </div>
+                    ) : null}
                   </Card>
                 ),
               },
