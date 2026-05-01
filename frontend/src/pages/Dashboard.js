@@ -124,7 +124,7 @@ const OrganizerDashboard = ({ user }) => {
       ),
       children: activeEvents.length === 0
         ? <Empty description="No active events yet. Book a vendor to see events here!" />
-        : <Table dataSource={activeEvents} columns={columns} pagination={{ pageSize: 10 }} rowKey="id" />,
+        : <Table dataSource={activeEvents} columns={columns} pagination={{ pageSize: 10 }} rowKey="id" scroll={{ x: 900 }} />,
     },
     {
       key: 'drafts',
@@ -135,12 +135,12 @@ const OrganizerDashboard = ({ user }) => {
       ),
       children: draftEvents.length === 0
         ? <Empty description="No draft events." />
-        : <Table dataSource={draftEvents} columns={columns} pagination={{ pageSize: 10 }} rowKey="id" />,
+        : <Table dataSource={draftEvents} columns={columns} pagination={{ pageSize: 10 }} rowKey="id" scroll={{ x: 900 }} />,
     },
   ];
 
   const sortBar = (
-    <Space>
+    <Space wrap>
       <Select
         value={sortBy}
         onChange={handleSortByChange}
@@ -171,21 +171,52 @@ const OrganizerDashboard = ({ user }) => {
     </Space>
   );
 
+  const quickActions = [
+    { key: 'vendors', label: 'Browse Vendors', to: '/vendors', kind: 'default' },
+    { key: 'bookings', label: 'My Bookings', to: '/bookings', kind: 'default' },
+    ...(user?.role === 'admin' ? [{ key: 'admin-control', label: 'Admin Control Center', to: '/admin/control-center', kind: 'primary' }] : []),
+    ...((user?.role === 'organizer' || user?.role === 'admin')
+      ? [{ key: 'activities', label: 'Activity Tracker', to: '/activities', kind: 'default' }]
+      : []),
+    ...((user?.role === 'organizer' || user?.role === 'admin')
+      ? [{ key: 'contact-intelligence', label: 'Contact Intelligence', to: '/contact-intelligence', kind: 'default' }]
+      : []),
+    ...(user?.role === 'organizer' ? [{ key: 'planner', label: 'Event Planner', to: '/planner', kind: 'default' }] : []),
+  ];
+
   return (
     <Spin spinning={loading}>
-      <div className="dashboard-header">
-        <h1>Welcome, {user?.name}! 👋</h1>
-        <Link to="/events/create">
-          <Button type="primary" size="large" icon={<PlusOutlined />}>Create New Event</Button>
-        </Link>
+      <div className="dashboard-header dashboard-header--hero">
+        <div className="dashboard-header-content">
+          <h1>Welcome, {user?.name}! 👋</h1>
+          <p className="dashboard-subtitle">
+            Track active events, budgets, and vendor progress from one premium workspace.
+          </p>
+        </div>
+        <div className="dashboard-hero-actions">
+          <Link to="/events/create">
+            <Button type="primary" size="large" icon={<PlusOutlined />}>Create New Event</Button>
+          </Link>
+        </div>
       </div>
 
+      <Card className="dashboard-action-rail" bordered={false}>
+        <div className="dashboard-action-rail-header">Quick Actions</div>
+        <Space wrap size={[10, 10]}>
+          {quickActions.map((item) => (
+            <Link key={item.key} to={item.to}>
+              <Button type={item.kind === 'primary' ? 'primary' : 'default'}>{item.label}</Button>
+            </Link>
+          ))}
+        </Space>
+      </Card>
+
       <Row gutter={[16, 16]} className="stats-grid">
-        <Col xs={24} sm={12} md={6}><Card><Statistic title="Total Events" value={stats.totalEvents} prefix={<CalendarOutlined />} /></Card></Col>
-        <Col xs={24} sm={12} md={6}><Card><Statistic title="Upcoming Events" value={stats.upcomingEvents} valueStyle={{ color: '#667eea' }} /></Card></Col>
-        <Col xs={24} sm={12} md={6}><Card><Statistic title="Total Guests" value={stats.totalGuests} prefix={<TeamOutlined />} /></Card></Col>
-        <Col xs={24} sm={12} md={6}>
-          <Card>
+        <Col xs={24} sm={12} lg={6}><Card className="dashboard-stat-card"><Statistic title="Total Events" value={stats.totalEvents} prefix={<CalendarOutlined />} /></Card></Col>
+        <Col xs={24} sm={12} lg={6}><Card className="dashboard-stat-card"><Statistic title="Upcoming Events" value={stats.upcomingEvents} valueStyle={{ color: '#0ea5e9' }} /></Card></Col>
+        <Col xs={24} sm={12} lg={6}><Card className="dashboard-stat-card"><Statistic title="Total Guests" value={stats.totalGuests} prefix={<TeamOutlined />} /></Card></Col>
+        <Col xs={24} sm={12} lg={6}>
+          <Card className="dashboard-stat-card">
             <Statistic
               title="Total Budget"
               value={stats.totalBudget}
@@ -197,24 +228,11 @@ const OrganizerDashboard = ({ user }) => {
       </Row>
 
       <Card
-        style={{ marginTop: 24 }}
+        className="events-card"
+        style={{ marginTop: 20 }}
         extra={sortBar}
       >
         <Tabs defaultActiveKey="active" items={tabItems} />
-      </Card>
-
-      <Card className="quick-actions" style={{ marginTop: 24 }}>
-        <h2>Quick Actions</h2>
-        <Row gutter={[16, 16]}>
-          <Col xs={24} sm={12} md={8}><Link to="/vendors"><Button block size="large">Browse Vendors</Button></Link></Col>
-          <Col xs={24} sm={12} md={8}><Link to="/bookings"><Button block size="large">My Bookings</Button></Link></Col>
-          {user?.role === 'admin' && (
-            <Col xs={24} sm={12} md={8}><Link to="/admin/control-center"><Button block size="large">Admin Control Center</Button></Link></Col>
-          )}
-          {(user?.role === 'organizer' || user?.role === 'admin') && (
-            <Col xs={24} sm={12} md={8}><Link to="/activities"><Button block size="large">Update Activities</Button></Link></Col>
-          )}
-        </Row>
       </Card>
     </Spin>
   );
@@ -283,7 +301,7 @@ const VendorDashboard = ({ user }) => {
       <Card title="Recent Bookings" style={{ marginTop: 24 }}>
         {bookings.length === 0
           ? <Empty description="No bookings yet. Customers will book you from the marketplace!" />
-          : <Table dataSource={bookings} columns={columns} pagination={false} rowKey="id" />}
+          : <Table dataSource={bookings} columns={columns} pagination={false} rowKey="id" scroll={{ x: 760 }} />}
       </Card>
       <Card style={{ marginTop: 24 }}>
         <Link to="/vendor/workspace"><Button type="primary">Manage Services, Packages & Testimonials</Button></Link>
@@ -366,13 +384,13 @@ const CustomerDashboard = ({ user }) => {
       <Card title="My Events" style={{ marginTop: 24 }}>
         {events.length === 0
           ? <Empty description="No events yet. Create one to get started!" />
-          : <Table dataSource={events} columns={eventCols} pagination={false} rowKey="id" />}
+          : <Table dataSource={events} columns={eventCols} pagination={false} rowKey="id" scroll={{ x: 700 }} />}
       </Card>
 
       <Card title="My Bookings" style={{ marginTop: 24 }}>
         {bookings.length === 0
           ? <Empty description={<>No bookings yet. <Link to="/vendors">Browse vendors</Link> to find the perfect match!</>} />
-          : <Table dataSource={bookings} columns={bookingCols} pagination={false} rowKey="id" />}
+          : <Table dataSource={bookings} columns={bookingCols} pagination={false} rowKey="id" scroll={{ x: 760 }} />}
       </Card>
 
       <Card style={{ marginTop: 24 }}>

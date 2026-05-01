@@ -12,7 +12,7 @@
 }
 
 .header-container {
-  max-width: 1400px;
+  max-width: 1640px;
   margin: 0 auto;
   display: flex;
   justify-content: space-between;
@@ -48,12 +48,12 @@
 .header-right {
   display: flex;
   align-items: center;
-  gap: 24px;
+  gap: clamp(10px, 1.8vw, 22px);
 }
 
 .nav-menu {
   display: flex;
-  gap: 24px;
+  gap: clamp(12px, 1.7vw, 24px);
   margin: 0;
 }
 
@@ -61,8 +61,19 @@
   color: white;
   text-decoration: none;
   font-weight: 600;
+  font-size: 15px;
   transition: color 180ms ease;
   position: relative;
+}
+
+@media (max-width: 1080px) {
+  .nav-menu {
+    gap: 12px;
+  }
+
+  .nav-menu a {
+    font-size: 14px;
+  }
 }
 
 .nav-menu a:hover {
