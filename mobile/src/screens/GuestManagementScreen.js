@@ -158,6 +158,7 @@ const GuestManagementScreen = ({ route }) => {
   const [showSendModal, setShowSendModal] = useState(false);
   const [selectedSendChannel, setSelectedSendChannel] = useState('email');
   const [sendingInvites, setSendingInvites] = useState(false);
+  const [fabOpen, setFabOpen] = useState(false);
 
   const fetchGuests = useCallback(async () => {
     try {
@@ -687,23 +688,36 @@ const GuestManagementScreen = ({ route }) => {
             </Button>
           </View>
         </Modal>
+
+        <FAB.Group
+          open={fabOpen}
+          visible
+          icon={fabOpen ? 'close' : 'plus'}
+          fabStyle={styles.fabGroupMain}
+          color={Colors.textOnPrimary}
+          actions={[
+            {
+              icon: 'lightning-bolt',
+              label: 'Quick Add',
+              onPress: () => {
+                setFabOpen(false);
+                setShowQuickAddModal(true);
+              },
+              style: [styles.fabGroupAction, { backgroundColor: '#4f63d4' }],
+            },
+            {
+              icon: 'account-plus',
+              label: 'Add Guest',
+              onPress: () => {
+                setFabOpen(false);
+                setShowAddModal(true);
+              },
+              style: styles.fabGroupAction,
+            },
+          ]}
+          onStateChange={({ open }) => setFabOpen(open)}
+        />
       </Portal>
-
-      <FAB
-        icon="plus"
-        style={styles.fab}
-        color={Colors.textOnPrimary}
-        onPress={() => setShowAddModal(true)}
-        label="Add Guest"
-      />
-
-      <FAB
-        icon="lightning-bolt"
-        style={[styles.fab, { bottom: 80 }]}
-        color={Colors.textOnPrimary}
-        onPress={() => setShowQuickAddModal(true)}
-        label="Quick Add"
-      />
     </View>
   );
 };
@@ -911,7 +925,13 @@ const styles = StyleSheet.create({
   modalTemplateChip: { marginRight: 8 },
   input: { marginBottom: Spacing.md },
   modalActions: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: Spacing.md },
-  fab: { position: 'absolute', right: 16, bottom: 16, backgroundColor: Colors.primary, borderRadius: Radius.lg },
+  fabGroupMain: {
+    backgroundColor: Colors.primary,
+    borderRadius: Radius.lg,
+  },
+  fabGroupAction: {
+    backgroundColor: Colors.primary,
+  },
 });
 
 export default GuestManagementScreen;

@@ -148,10 +148,22 @@ const EventsDashboard = ({ user, navigation }) => {
     });
   }, [sortBy, sortOrder, userLocation]);
 
-  // Segregate events: active = at least 1 vendor booking, drafts = 0 bookings
-  const activeEvents = applySortToList(events.filter((e) => (e._count?.bookings || 0) > 0));
-  const draftEvents = applySortToList(events.filter((e) => (e._count?.bookings || 0) === 0));
-  const visibleEvents = activeTab === 'active' ? activeEvents : draftEvents;
+  // Segregate events for better tracking visibility.
+  const completedEvents = applySortToList(
+    events.filter((e) => String(e.status || '').toLowerCase() === 'completed')
+  );
+  const activeEvents = applySortToList(
+    events.filter((e) => (e._count?.bookings || 0) > 0 && String(e.status || '').toLowerCase() !== 'completed')
+  );
+  const draftEvents = applySortToList(
+    events.filter((e) => (e._count?.bookings || 0) === 0 && String(e.status || '').toLowerCase() !== 'completed')
+  );
+  const visibleEvents =
+    activeTab === 'active'
+      ? activeEvents
+      : activeTab === 'completed'
+        ? completedEvents
+        : draftEvents;
 
   const upcoming = events.filter((e) => new Date(e.date) > new Date()).length;
   // Budget computed across ALL events regardless of tab
@@ -233,6 +245,14 @@ const EventsDashboard = ({ user, navigation }) => {
               Drafts ({draftEvents.length})
             </Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            style={[tabStyles.tab, activeTab === 'completed' && tabStyles.tabActive]}
+            onPress={() => setActiveTab('completed')}
+          >
+            <Text style={[tabStyles.tabText, activeTab === 'completed' && tabStyles.tabTextActive]}>
+              Completed ({completedEvents.length})
+            </Text>
+          </TouchableOpacity>
         </View>
 
         {visibleEvents.length === 0 ? (
@@ -241,7 +261,9 @@ const EventsDashboard = ({ user, navigation }) => {
               <Text style={styles.emptyText}>
                 {activeTab === 'active'
                   ? 'No active events yet. Book a vendor to move events here!'
-                  : 'No draft events. Tap + to create your first event!'}
+                  : activeTab === 'completed'
+                    ? 'No completed events yet. Completed events will appear here for tracking.'
+                    : 'No draft events. Tap + to create your first event!'}
               </Text>
             </Card.Content>
           </Card>
