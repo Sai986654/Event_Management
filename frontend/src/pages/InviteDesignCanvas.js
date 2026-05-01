@@ -14,9 +14,6 @@ import {
   Tag,
   Tooltip,
   Popconfirm,
-  Form,
-  Tabs,
-  Slider,
   Switch,
 } from 'antd';
 import {
@@ -24,7 +21,6 @@ import {
   CopyOutlined,
   ArrowUpOutlined,
   ArrowDownOutlined,
-  PlusOutlined,
   LockOutlined,
   UnlockOutlined,
 } from '@ant-design/icons';
@@ -41,6 +37,16 @@ const InviteDesignCanvas = ({ layout = {}, templateMeta = null, onLayoutChange =
 
   // Generate unique ID
   const generateId = useCallback(() => `element-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`, []);
+
+  // Update layout
+  const updateLayout = useCallback((newElements) => {
+    onLayoutChange({
+      elements: newElements,
+      canvasSize,
+      backgroundColor,
+      templateKey: layout.templateKey || null,
+    });
+  }, [onLayoutChange, canvasSize, backgroundColor, layout.templateKey]);
 
   // Add new element
   const handleAddElement = useCallback(
@@ -85,7 +91,7 @@ const InviteDesignCanvas = ({ layout = {}, templateMeta = null, onLayoutChange =
       setSelectedElementId(newElement.id);
       updateLayout(newElements);
     },
-    [elements, generateId]
+    [elements, generateId, updateLayout]
   );
 
   // Update element
@@ -97,7 +103,7 @@ const InviteDesignCanvas = ({ layout = {}, templateMeta = null, onLayoutChange =
       setElements(newElements);
       updateLayout(newElements);
     },
-    [elements]
+    [elements, updateLayout]
   );
 
   // Delete element
@@ -108,7 +114,7 @@ const InviteDesignCanvas = ({ layout = {}, templateMeta = null, onLayoutChange =
       setSelectedElementId(null);
       updateLayout(newElements);
     },
-    [elements]
+    [elements, updateLayout]
   );
 
   // Duplicate element
@@ -130,7 +136,7 @@ const InviteDesignCanvas = ({ layout = {}, templateMeta = null, onLayoutChange =
       setSelectedElementId(duplicated.id);
       updateLayout(newElements);
     },
-    [elements, generateId]
+    [elements, generateId, updateLayout]
   );
 
   // Reorder elements
@@ -153,18 +159,8 @@ const InviteDesignCanvas = ({ layout = {}, templateMeta = null, onLayoutChange =
       setElements(newElements);
       updateLayout(newElements);
     },
-    [elements]
+    [elements, updateLayout]
   );
-
-  // Update layout
-  const updateLayout = (newElements) => {
-    onLayoutChange({
-      elements: newElements,
-      canvasSize,
-      backgroundColor,
-      templateKey: layout.templateKey || null,
-    });
-  };
 
   // Parse canvas size
   const [canvasWidth, canvasHeight] = canvasSize.split('x').map(Number);

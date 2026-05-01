@@ -1,62 +1,88 @@
-const escapeSvg = (svg) => encodeURIComponent(svg).replace(/%0A/g, '').replace(/%20/g, ' ');
-
-const svgToDataUri = (svg) => `data:image/svg+xml;utf8,${escapeSvg(svg)}`;
-
-const CARTOON_BRIDE_GROOM = svgToDataUri(`
-<svg xmlns='http://www.w3.org/2000/svg' width='420' height='420' viewBox='0 0 420 420'>
-  <rect width='420' height='420' rx='32' fill='#fff7ed'/>
-  <circle cx='150' cy='160' r='58' fill='#f8c9a2'/>
-  <circle cx='270' cy='160' r='58' fill='#f3bf95'/>
-  <path d='M98 238c10-40 92-40 104 0v98H98z' fill='#fde7f3'/>
-  <path d='M218 238c10-40 92-40 104 0v98H218z' fill='#e5f0ff'/>
-  <circle cx='132' cy='150' r='6' fill='#1f2937'/><circle cx='168' cy='150' r='6' fill='#1f2937'/>
-  <circle cx='252' cy='150' r='6' fill='#1f2937'/><circle cx='288' cy='150' r='6' fill='#1f2937'/>
-  <path d='M138 176c8 12 22 12 30 0' stroke='#9a3412' stroke-width='4' fill='none' stroke-linecap='round'/>
-  <path d='M258 176c8 12 22 12 30 0' stroke='#9a3412' stroke-width='4' fill='none' stroke-linecap='round'/>
-  <path d='M108 113c12-26 62-36 86-8' stroke='#111827' stroke-width='14' fill='none' stroke-linecap='round'/>
-  <path d='M226 118c8-24 58-34 82-10' stroke='#111827' stroke-width='14' fill='none' stroke-linecap='round'/>
-  <circle cx='95' cy='110' r='8' fill='#f59e0b'/><circle cx='205' cy='110' r='8' fill='#f59e0b'/>
-  <text x='210' y='356' text-anchor='middle' font-family='Arial' font-size='34' font-weight='700' fill='#7c2d12'>Bride & Groom</text>
-</svg>
-`);
-
-const CARTOON_BIRTHDAY_BOY = svgToDataUri(`
-<svg xmlns='http://www.w3.org/2000/svg' width='420' height='420' viewBox='0 0 420 420'>
-  <rect width='420' height='420' rx='32' fill='#eef2ff'/>
-  <circle cx='210' cy='150' r='64' fill='#f6c29d'/>
-  <path d='M146 235c18-34 110-34 128 0v106H146z' fill='#93c5fd'/>
-  <circle cx='188' cy='148' r='7' fill='#1f2937'/><circle cx='232' cy='148' r='7' fill='#1f2937'/>
-  <path d='M190 182c10 10 30 10 40 0' stroke='#7c2d12' stroke-width='4' fill='none' stroke-linecap='round'/>
-  <path d='M150 110c18-36 108-46 124-8' stroke='#1f2937' stroke-width='14' fill='none' stroke-linecap='round'/>
-  <polygon points='210,52 188,96 232,96' fill='#f59e0b'/>
-  <circle cx='104' cy='98' r='18' fill='#f472b6'/><circle cx='314' cy='94' r='18' fill='#34d399'/><circle cx='324' cy='128' r='14' fill='#fbbf24'/>
-  <line x1='104' y1='118' x2='104' y2='170' stroke='#64748b' stroke-width='2'/>
-  <line x1='314' y1='112' x2='314' y2='170' stroke='#64748b' stroke-width='2'/>
-  <line x1='324' y1='142' x2='324' y2='175' stroke='#64748b' stroke-width='2'/>
-  <text x='210' y='364' text-anchor='middle' font-family='Arial' font-size='34' font-weight='700' fill='#1e3a8a'>Birthday Star</text>
-</svg>
-`);
-
-const CARTOON_CAKE = svgToDataUri(`
-<svg xmlns='http://www.w3.org/2000/svg' width='360' height='280' viewBox='0 0 360 280'>
-  <rect width='360' height='280' rx='26' fill='#fff1f2'/>
-  <rect x='70' y='130' width='220' height='90' rx='16' fill='#fecdd3'/>
-  <rect x='90' y='94' width='180' height='54' rx='14' fill='#fda4af'/>
-  <rect x='175' y='56' width='12' height='42' rx='5' fill='#f59e0b'/>
-  <path d='M181 42c12 8 12 20 0 26c-12-6-12-18 0-26z' fill='#fb7185'/>
-  <circle cx='120' cy='164' r='8' fill='#fb7185'/><circle cx='168' cy='182' r='8' fill='#fb7185'/><circle cx='216' cy='164' r='8' fill='#fb7185'/><circle cx='250' cy='188' r='8' fill='#fb7185'/>
-  <text x='180' y='252' text-anchor='middle' font-family='Arial' font-size='28' font-weight='700' fill='#9f1239'>Celebration Cake</text>
-</svg>
-`);
-
 export const STICKER_ASSETS = [
-  { key: 'emoji-heart', label: 'Hearts', type: 'emoji', text: '💖✨', width: 220, height: 90, fontSize: 60 },
-  { key: 'emoji-rings', label: 'Rings', type: 'emoji', text: '💍💐', width: 220, height: 90, fontSize: 56 },
-  { key: 'emoji-party', label: 'Party', type: 'emoji', text: '🎉🎂', width: 220, height: 90, fontSize: 56 },
-  { key: 'emoji-stars', label: 'Stars', type: 'emoji', text: '🌟🎊', width: 220, height: 90, fontSize: 56 },
-  { key: 'cartoon-bride-groom', label: 'Bride & Groom', type: 'image', imageUrl: CARTOON_BRIDE_GROOM, width: 320, height: 320 },
-  { key: 'cartoon-birthday-boy', label: 'Birthday Boy', type: 'image', imageUrl: CARTOON_BIRTHDAY_BOY, width: 320, height: 320 },
-  { key: 'cartoon-cake', label: 'Cake', type: 'image', imageUrl: CARTOON_CAKE, width: 280, height: 210 },
+  { key: 'emoji-heart', label: 'Hearts', thumb: '💖', type: 'emoji', text: '💖✨', width: 220, height: 90, fontSize: 60 },
+  { key: 'emoji-rings', label: 'Rings', thumb: '💍', type: 'emoji', text: '💍💐', width: 220, height: 90, fontSize: 56 },
+  { key: 'emoji-party', label: 'Party', thumb: '🎉', type: 'emoji', text: '🎉🎂', width: 220, height: 90, fontSize: 56 },
+  { key: 'emoji-stars', label: 'Stars', thumb: '🌟', type: 'emoji', text: '🌟🎊', width: 220, height: 90, fontSize: 56 },
+  { key: 'cartoon-bride-groom', label: 'Bride & Groom', thumb: '💒', type: 'emoji', text: '💒\n👰🤵\n💍💐', width: 300, height: 220, fontSize: 52 },
+  { key: 'cartoon-birthday-boy', label: 'Birthday Boy', thumb: '🎂', type: 'emoji', text: '🎂\n🎉👦🌟\n🎈🎁', width: 300, height: 220, fontSize: 52 },
+  { key: 'cartoon-cake', label: 'Cake', thumb: '🍰', type: 'emoji', text: '🎂🍰\n🎊✨', width: 260, height: 180, fontSize: 56 },
+];
+
+// ── Lottie animated cartoon stickers ──
+// Free animations from LottieFiles CDN. Find more at lottiefiles.com → right-click → copy JSON link
+export const LOTTIE_STICKERS = [
+  {
+    key: 'lottie-confetti',
+    label: 'Confetti',
+    thumb: '🎊',
+    source: { uri: 'https://assets5.lottiefiles.com/packages/lf20_obhph3t0.json' },
+    width: 400,
+    height: 400,
+    loop: true,
+  },
+  {
+    key: 'lottie-birthday',
+    label: 'Birthday',
+    thumb: '🎂',
+    source: { uri: 'https://assets7.lottiefiles.com/packages/lf20_nt4ypxj4.json' },
+    width: 380,
+    height: 380,
+    loop: true,
+  },
+  {
+    key: 'lottie-hearts',
+    label: 'Hearts',
+    thumb: '❤️',
+    source: { uri: 'https://assets4.lottiefiles.com/packages/lf20_GtgJBk.json' },
+    width: 360,
+    height: 360,
+    loop: true,
+  },
+  {
+    key: 'lottie-fireworks',
+    label: 'Fireworks',
+    thumb: '🎆',
+    source: { uri: 'https://assets9.lottiefiles.com/packages/lf20_M9p23l.json' },
+    width: 420,
+    height: 420,
+    loop: false,
+  },
+  {
+    key: 'lottie-stars',
+    label: 'Stars',
+    thumb: '⭐',
+    source: { uri: 'https://assets6.lottiefiles.com/packages/lf20_aZTdD5.json' },
+    width: 360,
+    height: 360,
+    loop: true,
+  },
+  {
+    key: 'lottie-wedding',
+    label: 'Wedding',
+    thumb: '💍',
+    source: { uri: 'https://assets3.lottiefiles.com/packages/lf20_jbb5pqtg.json' },
+    width: 400,
+    height: 400,
+    loop: true,
+  },
+  {
+    key: 'lottie-balloons',
+    label: 'Balloons',
+    thumb: '🎈',
+    source: { uri: 'https://assets10.lottiefiles.com/packages/lf20_touohxv0.json' },
+    width: 380,
+    height: 400,
+    loop: true,
+  },
+  {
+    key: 'lottie-celebration',
+    label: 'Celebrate',
+    thumb: '🥳',
+    source: { uri: 'https://assets2.lottiefiles.com/packages/lf20_u4yrau84.json' },
+    width: 400,
+    height: 400,
+    loop: true,
+  },
 ];
 
 const formatEventDate = (dateValue) => {
@@ -380,6 +406,29 @@ export const autoBeautifyLayout = (layout) => {
   return {
     ...baseLayout,
     elements: next,
+  };
+};
+
+export const COLOR_THEMES = {
+  'wedding-warm': { bg: '#fff7f2', text: '#7c2d12', shape: '#fcd4b5', divider: '#b45309', label: 'Wedding Warm 🌹' },
+  'royal-gold': { bg: '#fffbeb', text: '#92400e', shape: '#fde68a', divider: '#d97706', label: 'Royal Gold ✨' },
+  'birthday-pop': { bg: '#eef2ff', text: '#1d4ed8', shape: '#bfdbfe', divider: '#f97316', label: 'Birthday Pop 🎉' },
+  'pastel-baby': { bg: '#fdf4ff', text: '#7e22ce', shape: '#f0abfc', divider: '#c084fc', label: 'Pastel Baby 🍼' },
+};
+
+export const applyColorThemeToLayout = (layout, themeKey) => {
+  const theme = COLOR_THEMES[themeKey];
+  if (!theme) return layout;
+  const baseLayout = layout && typeof layout === 'object' ? layout : {};
+  return {
+    ...baseLayout,
+    backgroundColor: theme.bg,
+    elements: (Array.isArray(baseLayout.elements) ? baseLayout.elements : []).map((el) => {
+      if (el.type === 'text') return { ...el, color: theme.text };
+      if (el.type === 'shape') return { ...el, fillColor: theme.shape };
+      if (el.type === 'divider') return { ...el, color: theme.divider };
+      return el;
+    }),
   };
 };
 

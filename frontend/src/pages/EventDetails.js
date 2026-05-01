@@ -381,7 +381,7 @@ const EventDetails = () => {
   const ownerPhone = owner.phone || '';
   const ownerEmail = owner.email || '';
   const ownerPhoneDigits = String(ownerPhone).replace(/[^\d]/g, '');
-  const waText = encodeURIComponent(`Hi ${owner.name || ''}, regarding event \"${event?.title || ''}\" on ${formatDate(event?.date)}.`);
+  const waText = encodeURIComponent(`Hi ${owner.name || ''}, regarding event "${event?.title || ''}" on ${formatDate(event?.date)}.`);
   const waHref = ownerPhoneDigits ? `https://wa.me/${ownerPhoneDigits}?text=${waText}` : '';
   const mailHref = ownerEmail
     ? `mailto:${ownerEmail}?subject=${encodeURIComponent(`Regarding event: ${event?.title || ''}`)}`

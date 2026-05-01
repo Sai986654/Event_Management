@@ -2,8 +2,9 @@ import React, { useMemo, useRef, useState } from 'react';
 import { Image, ScrollView, StyleSheet, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { Button, Card, Chip, Divider, Text, TextInput } from 'react-native-paper';
 import * as ImagePicker from 'expo-image-picker';
+import LottieView from 'lottie-react-native';
 import { Colors, Radius, Spacing } from '../theme';
-import { STICKER_ASSETS } from '../utils/inviteTemplatePresets';
+import { applyColorThemeToLayout, COLOR_THEMES, LOTTIE_STICKERS, STICKER_ASSETS } from '../utils/inviteTemplatePresets';
 
 const DEFAULT_LAYOUT = {
   canvasSize: '1080x1920',
@@ -51,6 +52,7 @@ const InviteDesignCanvas = ({ layout, onLayoutChange, fullScreen = false, onDrag
   const [historyPast, setHistoryPast] = useState([]);
   const [historyFuture, setHistoryFuture] = useState([]);
   const [customImageUrl, setCustomImageUrl] = useState('');
+  const [lockPan, setLockPan] = useState(false);
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const dragRef = useRef({
     activeElementId: null,
@@ -89,10 +91,7 @@ const InviteDesignCanvas = ({ layout, onLayoutChange, fullScreen = false, onDrag
   };
 
   const patchLayout = (patch, options = {}) => {
-    commitLayout({
-      ...mergedLayout,
-      ...patch,
-    }, options);
+    commitLayout({ ...mergedLayout, ...patch }, options);
   };
 
   const patchElement = (elementId, patch, options = {}) => {
@@ -116,12 +115,10 @@ const InviteDesignCanvas = ({ layout, onLayoutChange, fullScreen = false, onDrag
       setSelectedElementIds([]);
       return;
     }
-
     if (!additive) {
       setSelectedElementIds([elementId]);
       return;
     }
-
     setSelectedElementIds((prev) =>
       prev.includes(elementId) ? prev.filter((id) => id !== elementId) : [...prev, elementId]
     );
@@ -146,64 +143,28 @@ const InviteDesignCanvas = ({ layout, onLayoutChange, fullScreen = false, onDrag
     onLayoutChange(previous);
     const previousIds = new Set((previous.elements || []).map((element) => element.id));
     setSelectedElementIds((prev) => prev.filter((id) => previousIds.has(id)));
-    const prevSelected = previous.elements?.find((el) => el.id === selectedElementId);
-    if (!prevSelected) setSelectedElementId(null);
+    if (!previousIds.has(selectedElementId)) setSelectedElementId(null);
   };
 
   const redo = () => {
     if (!historyFuture.length) return;
-    const [next, ...rest] = historyFuture;
-    setHistoryFuture(rest);
+    const next = historyFuture[0];
+    setHistoryFuture((prev) => prev.slice(1));
     setHistoryPast((prev) => [...prev.slice(-39), cloneLayout(mergedLayout)]);
     onLayoutChange(next);
-    const nextIds = new Set((next.elements || []).map((element) => element.id));
-    setSelectedElementIds((prev) => prev.filter((id) => nextIds.has(id)));
-    const nextSelected = next.elements?.find((el) => el.id === selectedElementId);
-    if (!nextSelected) setSelectedElementId(null);
   };
 
   const addElement = (type) => {
     const id = `el-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-    const base = {
-      id,
-      type,
-      x: 80,
-      y: 80,
-      width: 520,
-      height: 120,
-      z: mergedLayout.elements.length,
-    };
-
+    const base = { id, x: 80, y: 200, z: mergedLayout.elements.length };
     const typed =
       type === 'text'
-        ? {
-            ...base,
-            text: 'New text',
-            fontSize: 42,
-            color: '#2b1d18',
-            textAlign: 'center',
-            fontWeight: '700',
-          }
+        ? { ...base, type: 'text', text: 'Your text here', fontSize: 42, color: '#7c2d12', textAlign: 'center', fontWeight: '700', width: 860, height: 110 }
         : type === 'shape'
-          ? {
-              ...base,
-              fillColor: '#fcd4b5',
-              borderRadius: 24,
-              height: 180,
-            }
-          : type === 'divider'
-            ? {
-                ...base,
-                width: 640,
-                height: 4,
-                color: '#b45309',
-              }
-            : {
-                ...base,
-                imageUrl: '',
-                width: 480,
-                height: 320,
-              };
+        ? { ...base, type: 'shape', fillColor: '#fcd4b5', borderRadius: 24, width: 860, height: 560 }
+        : type === 'divider'
+        ? { ...base, type: 'divider', color: '#b45309', width: 640, height: 4 }
+        : { ...base, type: 'image', imageUrl: '', width: 480, height: 320 };
 
     patchLayout({ elements: [...mergedLayout.elements, typed] });
     setSelectedElementId(id);
@@ -213,7 +174,6 @@ const InviteDesignCanvas = ({ layout, onLayoutChange, fullScreen = false, onDrag
   const addSticker = (sticker) => {
     if (!sticker) return;
     const id = `sticker-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-
     const base = {
       id,
       x: 120,
@@ -222,24 +182,34 @@ const InviteDesignCanvas = ({ layout, onLayoutChange, fullScreen = false, onDrag
       height: numberOrFallback(sticker.height, 180),
       z: mergedLayout.elements.length,
     };
+    const element = {
+      ...base,
+      type: 'text',
+      text: sticker.text || '✨',
+      fontSize: numberOrFallback(sticker.fontSize, 56),
+      color: '#7c2d12',
+      textAlign: 'center',
+      fontWeight: '700',
+    };
+    patchLayout({ elements: [...mergedLayout.elements, element] });
+    setSelectedElementId(id);
+    setSelectedElementIds((prev) => (multiSelectMode ? [...prev, id] : []));
+  };
 
-    const element =
-      sticker.type === 'emoji'
-        ? {
-            ...base,
-            type: 'text',
-            text: sticker.text || '✨',
-            fontSize: numberOrFallback(sticker.fontSize, 56),
-            color: '#7c2d12',
-            textAlign: 'center',
-            fontWeight: '700',
-          }
-        : {
-            ...base,
-            type: 'image',
-            imageUrl: sticker.imageUrl || '',
-          };
-
+  const addLottieSticker = (sticker) => {
+    const id = `lottie-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const element = {
+      id,
+      type: 'lottie',
+      x: 80,
+      y: 400,
+      width: sticker.width || 400,
+      height: sticker.height || 400,
+      z: mergedLayout.elements.length,
+      lottieSource: sticker.source,
+      loop: sticker.loop !== false,
+      autoPlay: true,
+    };
     patchLayout({ elements: [...mergedLayout.elements, element] });
     setSelectedElementId(id);
     setSelectedElementIds((prev) => (multiSelectMode ? [...prev, id] : []));
@@ -248,19 +218,11 @@ const InviteDesignCanvas = ({ layout, onLayoutChange, fullScreen = false, onDrag
   const addCustomImageSticker = () => {
     const url = String(customImageUrl || '').trim();
     if (!url) return;
-
     const id = `custom-image-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     const element = {
-      id,
-      type: 'image',
-      x: 140,
-      y: 680,
-      width: 300,
-      height: 300,
-      z: mergedLayout.elements.length,
-      imageUrl: url,
+      id, type: 'image', x: 140, y: 680, width: 300, height: 300,
+      z: mergedLayout.elements.length, imageUrl: url,
     };
-
     patchLayout({ elements: [...mergedLayout.elements, element] });
     setSelectedElementId(id);
     setSelectedElementIds((prev) => (multiSelectMode ? [...prev, id] : []));
@@ -270,69 +232,50 @@ const InviteDesignCanvas = ({ layout, onLayoutChange, fullScreen = false, onDrag
   const addImageFromGallery = async () => {
     try {
       const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (perm.status !== 'granted') {
-        return;
-      }
-
+      if (perm.status !== 'granted') return;
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         quality: 0.9,
       });
-
       if (result.canceled || !result.assets?.length) return;
       const uri = result.assets[0]?.uri;
       if (!uri) return;
-
       const id = `gallery-image-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
       const element = {
-        id,
-        type: 'image',
-        x: 140,
-        y: 680,
-        width: 320,
-        height: 320,
-        z: mergedLayout.elements.length,
-        imageUrl: uri,
+        id, type: 'image', x: 140, y: 680, width: 320, height: 320,
+        z: mergedLayout.elements.length, imageUrl: uri,
       };
-
       patchLayout({ elements: [...mergedLayout.elements, element] });
       setSelectedElementId(id);
       setSelectedElementIds((prev) => (multiSelectMode ? [...prev, id] : []));
     } catch (_error) {
-      // Silent fallback keeps editor responsive if picker fails on unsupported envs.
+      // Silent fallback
     }
   };
 
   const deleteSelected = () => {
-    const targetIds = multiSelectMode && selectedElementIds.length ? selectedElementIds : selectedElement ? [selectedElement.id] : [];
+    const targetIds = multiSelectMode && selectedElementIds.length
+      ? selectedElementIds
+      : selectedElement ? [selectedElement.id] : [];
     if (!targetIds.length) return;
-    patchLayout({
-      elements: mergedLayout.elements.filter((element) => !targetIds.includes(element.id)),
-    });
+    patchLayout({ elements: mergedLayout.elements.filter((element) => !targetIds.includes(element.id)) });
     clearSelection();
   };
 
   const duplicateSelected = () => {
-    const sourceIds = multiSelectMode && selectedElementIds.length ? selectedElementIds : selectedElement ? [selectedElement.id] : [];
+    const sourceIds = multiSelectMode && selectedElementIds.length
+      ? selectedElementIds
+      : selectedElement ? [selectedElement.id] : [];
     if (!sourceIds.length) return;
-
     const sourceElements = mergedLayout.elements.filter((element) => sourceIds.includes(element.id));
     if (!sourceElements.length) return;
-
     const createdIds = [];
     const duplicated = sourceElements.map((element, idx) => {
       const id = `el-${Date.now()}-${Math.random().toString(36).slice(2, 6)}-${idx}`;
       createdIds.push(id);
-      return {
-        ...element,
-        id,
-        x: numberOrFallback(element.x, 80) + 24,
-        y: numberOrFallback(element.y, 80) + 24,
-        z: mergedLayout.elements.length + idx,
-      };
+      return { ...element, id, x: numberOrFallback(element.x, 80) + 24, y: numberOrFallback(element.y, 80) + 24, z: mergedLayout.elements.length + idx };
     });
-
     patchLayout({ elements: [...mergedLayout.elements, ...duplicated] });
     if (multiSelectMode) {
       setSelectedElementIds(createdIds);
@@ -345,49 +288,34 @@ const InviteDesignCanvas = ({ layout, onLayoutChange, fullScreen = false, onDrag
 
   const reorderSelected = (direction) => {
     if (!selectedElement) return;
-    const ordered = mergedLayout.elements
-      .slice()
-      .sort((a, b) => numberOrFallback(a.z, 0) - numberOrFallback(b.z, 0));
+    const ordered = mergedLayout.elements.slice().sort((a, b) => numberOrFallback(a.z, 0) - numberOrFallback(b.z, 0));
     const index = ordered.findIndex((element) => element.id === selectedElement.id);
     if (index < 0) return;
-
     const swapIndex = direction === 'up' ? index + 1 : index - 1;
     if (swapIndex < 0 || swapIndex >= ordered.length) return;
-
     const next = ordered.slice();
     [next[index], next[swapIndex]] = [next[swapIndex], next[index]];
-    const normalized = next.map((element, idx) => ({ ...element, z: idx }));
-    patchLayout({ elements: normalized });
+    patchLayout({ elements: next.map((element, idx) => ({ ...element, z: idx })) });
   };
 
   const onElementDragStart = (element, nativeEvent) => {
     beginInteractionHistory();
     onDragStateChange(true);
-    if (multiSelectMode && !selectedElementIds.includes(element.id)) {
-      setSelectedElementIds([element.id]);
-    }
+    if (multiSelectMode && !selectedElementIds.includes(element.id)) setSelectedElementIds([element.id]);
     const activeIds = getActiveSelectionIds(element.id);
     const activeSet = new Set(activeIds);
     const startPositions = {};
     mergedLayout.elements.forEach((item) => {
       if (activeSet.has(item.id)) {
-        startPositions[item.id] = {
-          x: numberOrFallback(item.x, 0),
-          y: numberOrFallback(item.y, 0),
-        };
+        startPositions[item.id] = { x: numberOrFallback(item.x, 0), y: numberOrFallback(item.y, 0) };
       }
     });
     dragRef.current = {
-      activeElementId: element.id,
-      mode: 'move',
-      startPageX: numberOrFallback(nativeEvent?.pageX, 0),
-      startPageY: numberOrFallback(nativeEvent?.pageY, 0),
-      startX: numberOrFallback(element.x, 0),
-      startY: numberOrFallback(element.y, 0),
-      startWidth: numberOrFallback(element.width, 100),
-      startHeight: numberOrFallback(element.height, 60),
-      groupElementIds: activeIds,
-      startPositions,
+      activeElementId: element.id, mode: 'move',
+      startPageX: numberOrFallback(nativeEvent?.pageX, 0), startPageY: numberOrFallback(nativeEvent?.pageY, 0),
+      startX: numberOrFallback(element.x, 0), startY: numberOrFallback(element.y, 0),
+      startWidth: numberOrFallback(element.width, 100), startHeight: numberOrFallback(element.height, 60),
+      groupElementIds: activeIds, startPositions,
     };
     setSelectedElementId(element.id);
   };
@@ -396,37 +324,25 @@ const InviteDesignCanvas = ({ layout, onLayoutChange, fullScreen = false, onDrag
     beginInteractionHistory();
     onDragStateChange(true);
     dragRef.current = {
-      activeElementId: element.id,
-      mode: 'resize',
-      startPageX: numberOrFallback(nativeEvent?.pageX, 0),
-      startPageY: numberOrFallback(nativeEvent?.pageY, 0),
-      startX: numberOrFallback(element.x, 0),
-      startY: numberOrFallback(element.y, 0),
-      startWidth: numberOrFallback(element.width, 100),
-      startHeight: numberOrFallback(element.height, 60),
+      activeElementId: element.id, mode: 'resize',
+      startPageX: numberOrFallback(nativeEvent?.pageX, 0), startPageY: numberOrFallback(nativeEvent?.pageY, 0),
+      startX: numberOrFallback(element.x, 0), startY: numberOrFallback(element.y, 0),
+      startWidth: numberOrFallback(element.width, 100), startHeight: numberOrFallback(element.height, 60),
       groupElementIds: [element.id],
-      startPositions: {
-        [element.id]: {
-          x: numberOrFallback(element.x, 0),
-          y: numberOrFallback(element.y, 0),
-        },
-      },
+      startPositions: { [element.id]: { x: numberOrFallback(element.x, 0), y: numberOrFallback(element.y, 0) } },
     };
     setSelectedElementId(element.id);
   };
 
   const onElementDragMove = (element, nativeEvent) => {
     if (dragRef.current.activeElementId !== element.id) return;
-
     const pageX = numberOrFallback(nativeEvent?.pageX, dragRef.current.startPageX);
     const pageY = numberOrFallback(nativeEvent?.pageY, dragRef.current.startPageY);
     const deltaPreviewX = pageX - dragRef.current.startPageX;
     const deltaPreviewY = pageY - dragRef.current.startPageY;
-
     const deltaCanvasX = deltaPreviewX * (canvasSize.width / previewWidth);
     const deltaCanvasY = deltaPreviewY * (canvasSize.height / previewHeight);
     const grid = 16;
-
     const width = numberOrFallback(element.width, dragRef.current.startWidth || 100);
     const height = numberOrFallback(element.height, dragRef.current.startHeight || 60);
 
@@ -439,56 +355,33 @@ const InviteDesignCanvas = ({ layout, onLayoutChange, fullScreen = false, onDrag
         nextWidth = Math.max(32, Math.round(nextWidth / grid) * grid);
         nextHeight = Math.max(32, Math.round(nextHeight / grid) * grid);
       }
-      patchElement(
-        element.id,
-        { width: Math.round(nextWidth), height: Math.round(nextHeight) },
-        { trackHistory: false }
-      );
+      patchElement(element.id, { width: Math.round(nextWidth), height: Math.round(nextHeight) }, { trackHistory: false });
       return;
     }
 
     const selectedIds = dragRef.current.groupElementIds || [];
     if (selectedIds.length > 1) {
-      let deltaX = deltaCanvasX;
-      let deltaY = deltaCanvasY;
-      if (snapToGrid) {
-        deltaX = Math.round(deltaX / grid) * grid;
-        deltaY = Math.round(deltaY / grid) * grid;
-      }
-
+      const deltaX = snapToGrid ? Math.round(deltaCanvasX / grid) * grid : deltaCanvasX;
+      const deltaY = snapToGrid ? Math.round(deltaCanvasY / grid) * grid : deltaCanvasY;
       const selectedSet = new Set(selectedIds);
       const nextElements = mergedLayout.elements.map((item) => {
         if (!selectedSet.has(item.id)) return item;
-        const widthValue = numberOrFallback(item.width, 100);
-        const heightValue = numberOrFallback(item.height, 60);
-        const start = dragRef.current.startPositions[item.id] || {
-          x: numberOrFallback(item.x, 0),
-          y: numberOrFallback(item.y, 0),
-        };
-        const maxX = Math.max(0, canvasSize.width - widthValue);
-        const maxY = Math.max(0, canvasSize.height - heightValue);
-
+        const wv = numberOrFallback(item.width, 100);
+        const hv = numberOrFallback(item.height, 60);
+        const start = dragRef.current.startPositions[item.id] || { x: numberOrFallback(item.x, 0), y: numberOrFallback(item.y, 0) };
         return {
           ...item,
-          x: Math.round(clamp(start.x + deltaX, 0, maxX)),
-          y: Math.round(clamp(start.y + deltaY, 0, maxY)),
+          x: Math.round(clamp(start.x + deltaX, 0, Math.max(0, canvasSize.width - wv))),
+          y: Math.round(clamp(start.y + deltaY, 0, Math.max(0, canvasSize.height - hv))),
         };
       });
-
       patchLayout({ elements: nextElements }, { trackHistory: false });
       return;
     }
 
-    const maxX = Math.max(0, canvasSize.width - width);
-    const maxY = Math.max(0, canvasSize.height - height);
-
-    let nextX = clamp(dragRef.current.startX + deltaCanvasX, 0, maxX);
-    let nextY = clamp(dragRef.current.startY + deltaCanvasY, 0, maxY);
-    if (snapToGrid) {
-      nextX = Math.round(nextX / grid) * grid;
-      nextY = Math.round(nextY / grid) * grid;
-    }
-
+    let nextX = clamp(dragRef.current.startX + deltaCanvasX, 0, Math.max(0, canvasSize.width - width));
+    let nextY = clamp(dragRef.current.startY + deltaCanvasY, 0, Math.max(0, canvasSize.height - height));
+    if (snapToGrid) { nextX = Math.round(nextX / grid) * grid; nextY = Math.round(nextY / grid) * grid; }
     patchElement(element.id, { x: Math.round(nextX), y: Math.round(nextY) }, { trackHistory: false });
   };
 
@@ -498,20 +391,14 @@ const InviteDesignCanvas = ({ layout, onLayoutChange, fullScreen = false, onDrag
       dragRef.current.mode = 'move';
       dragRef.current.groupElementIds = [];
       dragRef.current.startPositions = {};
-      onDragStateChange(false);
+      if (!lockPan) onDragStateChange(false);
     }
   };
 
   const selectedMetrics = selectedElement
     ? {
-        cx:
-          ((numberOrFallback(selectedElement.x, 0) + numberOrFallback(selectedElement.width, 100) / 2) /
-            canvasSize.width) *
-          previewWidth,
-        cy:
-          ((numberOrFallback(selectedElement.y, 0) + numberOrFallback(selectedElement.height, 60) / 2) /
-            canvasSize.height) *
-          previewHeight,
+        cx: ((numberOrFallback(selectedElement.x, 0) + numberOrFallback(selectedElement.width, 100) / 2) / canvasSize.width) * previewWidth,
+        cy: ((numberOrFallback(selectedElement.y, 0) + numberOrFallback(selectedElement.height, 60) / 2) / canvasSize.height) * previewHeight,
       }
     : null;
 
@@ -526,385 +413,329 @@ const InviteDesignCanvas = ({ layout, onLayoutChange, fullScreen = false, onDrag
           <TouchableOpacity
             key={value}
             onPress={() => onSelect(value)}
-            style={[
-              styles.swatch,
-              { backgroundColor: value },
-              isActive ? styles.swatchActive : null,
-              value === '#ffffff' ? styles.swatchWhite : null,
-            ]}
+            style={[styles.swatch, { backgroundColor: value }, isActive ? styles.swatchActive : null, value === '#ffffff' ? styles.swatchWhite : null]}
           />
         );
       })}
     </View>
   );
 
-  return (
-    <View>
-      <Card style={styles.card}>
-        <Card.Content>
-          <Text style={styles.sectionTitle}>Canvas Preview</Text>
-          <Text style={styles.subtle}>Tap to select. Drag an element directly on the preview to move it.</Text>
-          <View style={styles.rowWrap}>
-            <Chip
-              selected={multiSelectMode}
-              onPress={() => {
-                setMultiSelectMode((prev) => {
-                  const next = !prev;
-                  if (!next) {
-                    setSelectedElementIds([]);
-                  }
-                  return next;
-                });
-              }}
-              style={styles.chip}
-            >
-              Multi-select
-            </Chip>
-            <Chip selected={snapToGrid} onPress={() => setSnapToGrid((prev) => !prev)} style={styles.chip}>
-              Snap to grid
-            </Chip>
-            <Chip selected={showSafeArea} onPress={() => setShowSafeArea((prev) => !prev)} style={styles.chip}>
-              Print safe area
-            </Chip>
-            <Button mode="outlined" onPress={clearSelection} disabled={!selectedElementId && !selectedElementIds.length}>
-              Clear
-            </Button>
-            <Button mode="outlined" onPress={undo} disabled={!historyPast.length}>Undo</Button>
-            <Button mode="outlined" onPress={redo} disabled={!historyFuture.length}>Redo</Button>
-          </View>
-          <View style={styles.previewWrap}>
-            <View
-              style={[
-                styles.preview,
-                {
-                  width: previewWidth,
-                  height: previewHeight,
-                  backgroundColor: mergedLayout.backgroundColor || '#fff7f2',
-                },
-              ]}
-            >
-              {mergedLayout.elements
-                .slice()
-                .sort((a, b) => numberOrFallback(a.z, 0) - numberOrFallback(b.z, 0))
-                .map((element) => {
-                  const left = (numberOrFallback(element.x, 0) / canvasSize.width) * previewWidth;
-                  const top = (numberOrFallback(element.y, 0) / canvasSize.height) * previewHeight;
-                  const width = (numberOrFallback(element.width, 100) / canvasSize.width) * previewWidth;
-                  const height = (numberOrFallback(element.height, 60) / canvasSize.height) * previewHeight;
-                  const isSelected = isElementSelected(element.id);
+  const ToolTile = ({ icon, label, color = '#667eea', bg = '#eef2ff', onPress, disabled = false }) => (
+    <TouchableOpacity
+      onPress={onPress}
+      disabled={disabled}
+      style={[styles.toolTile, { backgroundColor: bg }, disabled && styles.toolTileDisabled]}
+    >
+      <Text style={[styles.toolTileIcon, { color }]}>{icon}</Text>
+      <Text style={[styles.toolTileLabel, { color: disabled ? '#94a3b8' : color }]}>{label}</Text>
+    </TouchableOpacity>
+  );
 
-                  return (
+  const ToggleTile = ({ label, active, onPress }) => (
+    <TouchableOpacity onPress={onPress} style={[styles.toggleTile, active && styles.toggleTileActive]}>
+      <Text style={[styles.toggleTileText, active && styles.toggleTileTextActive]}>{label}</Text>
+    </TouchableOpacity>
+  );
+
+  return (
+    <View style={styles.wrapper}>
+      {/* ── TOOLBAR ROW 1: Add + Emoji Stickers + Actions ── */}
+      <View style={styles.toolbarBlock}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <View style={styles.toolRow}>
+            <ToolTile icon="Aa" label="Text" color="#4f46e5" bg="#eef2ff" onPress={() => addElement('text')} />
+            <ToolTile icon="▭" label="Shape" color="#7c3aed" bg="#f3e8ff" onPress={() => addElement('shape')} />
+            <ToolTile icon="━" label="Line" color="#d97706" bg="#fffbeb" onPress={() => addElement('divider')} />
+            <ToolTile icon="🖼" label="Image" color="#059669" bg="#ecfdf5" onPress={() => addElement('image')} />
+            <View style={styles.toolSep} />
+            {STICKER_ASSETS.map((asset) => (
+              <ToolTile key={asset.key} icon={asset.thumb || '✨'} label={asset.label} color="#be185d" bg="#fdf2f8" onPress={() => addSticker(asset)} />
+            ))}
+            <View style={styles.toolSep} />
+            <ToolTile icon="↩" label="Undo" color="#475569" bg="#f8fafc" onPress={undo} disabled={!historyPast.length} />
+            <ToolTile icon="↪" label="Redo" color="#475569" bg="#f8fafc" onPress={redo} disabled={!historyFuture.length} />
+            <ToolTile icon="✕" label="Clear" color="#991b1b" bg="#fef2f2" onPress={clearSelection} disabled={!selectedElementId && !selectedElementIds.length} />
+            <ToolTile icon="📷" label="Gallery" color="#0891b2" bg="#ecfeff" onPress={addImageFromGallery} />
+          </View>
+        </ScrollView>
+
+        {/* ── TOOLBAR ROW 1b: Lottie animated stickers ── */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 4 }}>
+          <View style={styles.toolRow}>
+            <Text style={[styles.propLabel, { alignSelf: 'center', marginRight: 4, marginBottom: 0 }]}>✨ Animated:</Text>
+            {LOTTIE_STICKERS.map((sticker) => (
+              <ToolTile
+                key={sticker.key}
+                icon={sticker.thumb}
+                label={sticker.label}
+                color="#7c3aed"
+                bg="#f5f3ff"
+                onPress={() => addLottieSticker(sticker)}
+              />
+            ))}
+          </View>
+        </ScrollView>
+
+        {/* ── TOOLBAR ROW 2: Toggles + Color Themes ── */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 6 }}>
+          <View style={styles.toolRow}>
+            <ToggleTile label="⊞ Grid" active={snapToGrid} onPress={() => setSnapToGrid((prev) => !prev)} />
+            <ToggleTile label="⬚ Safe" active={showSafeArea} onPress={() => setShowSafeArea((prev) => !prev)} />
+            <ToggleTile
+              label="⊕ Multi"
+              active={multiSelectMode}
+              onPress={() => { setMultiSelectMode((prev) => { if (prev) setSelectedElementIds([]); return !prev; }); }}
+            />
+            <ToggleTile
+              label={lockPan ? '🔒 Locked' : '🔓 Pan'}
+              active={lockPan}
+              onPress={() => { const next = !lockPan; setLockPan(next); onDragStateChange(next); }}
+            />
+            <View style={styles.toolSep} />
+            {Object.entries(COLOR_THEMES).map(([key, theme]) => (
+              <TouchableOpacity
+                key={key}
+                style={[styles.themeChip, { backgroundColor: theme.bg, borderColor: theme.divider }]}
+                onPress={() => commitLayout(applyColorThemeToLayout(mergedLayout, key))}
+              >
+                <Text style={[styles.themeChipText, { color: theme.text }]}>{theme.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </ScrollView>
+      </View>
+
+      {/* ── CANVAS ── */}
+      <View style={styles.canvasSection}>
+        <View
+          style={[
+            styles.canvasPreview,
+            { width: previewWidth, height: previewHeight, backgroundColor: mergedLayout.backgroundColor || '#fff7f2' },
+          ]}
+        >
+          {mergedLayout.elements
+            .slice()
+            .sort((a, b) => numberOrFallback(a.z, 0) - numberOrFallback(b.z, 0))
+            .map((element) => {
+              const left = (numberOrFallback(element.x, 0) / canvasSize.width) * previewWidth;
+              const top = (numberOrFallback(element.y, 0) / canvasSize.height) * previewHeight;
+              const width = (numberOrFallback(element.width, 100) / canvasSize.width) * previewWidth;
+              const height = (numberOrFallback(element.height, 60) / canvasSize.height) * previewHeight;
+              const isSelected = isElementSelected(element.id);
+
+              return (
+                <View
+                  key={element.id}
+                  onStartShouldSetResponder={() => true}
+                  onMoveShouldSetResponder={() => true}
+                  onResponderGrant={(evt) => onElementDragStart(element, evt.nativeEvent)}
+                  onResponderMove={(evt) => onElementDragMove(element, evt.nativeEvent)}
+                  onResponderRelease={() => onElementDragEnd(element)}
+                  onResponderTerminate={() => onElementDragEnd(element)}
+                  onResponderTerminationRequest={() => false}
+                  style={[
+                    styles.previewElement,
+                    { left, top, width, height, borderColor: isSelected ? Colors.primary : 'transparent' },
+                  ]}
+                >
+                  {element.type === 'text' ? (
+                    <Text
+                      numberOfLines={4}
+                      style={{
+                        color: element.color || '#2b1d18',
+                        fontWeight: element.fontWeight === '400' ? '400' : '700',
+                        fontSize: 11,
+                        textAlign: element.textAlign || 'center',
+                      }}
+                    >
+                      {element.text || 'Text'}
+                    </Text>
+                  ) : null}
+
+                  {element.type === 'shape' ? (
                     <View
-                      key={element.id}
+                      style={{
+                        flex: 1,
+                        borderRadius: Math.max(0, (numberOrFallback(element.borderRadius, 0) / canvasSize.width) * previewWidth),
+                        backgroundColor: element.fillColor || '#fcd4b5',
+                      }}
+                    />
+                  ) : null}
+
+                  {element.type === 'divider' ? (
+                    <View style={{ marginTop: Math.max(0, height / 2 - 1), height: 2, width: '100%', backgroundColor: element.color || '#b45309' }} />
+                  ) : null}
+
+                  {element.type === 'image' ? (
+                    element.imageUrl ? (
+                      <Image source={{ uri: element.imageUrl }} resizeMode="cover" style={styles.imageFill} />
+                    ) : (
+                      <View style={styles.imagePlaceholder}><Text style={styles.imagePlaceholderText}>Image</Text></View>
+                    )
+                  ) : null}
+
+                  {element.type === 'lottie' ? (
+                    element.lottieSource ? (
+                      <LottieView
+                        source={element.lottieSource}
+                        autoPlay={element.autoPlay !== false}
+                        loop={element.loop !== false}
+                        style={styles.imageFill}
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <View style={styles.imagePlaceholder}><Text style={styles.imagePlaceholderText}>🎬</Text></View>
+                    )
+                  ) : null}
+
+                  {isSelected ? (
+                    <View
                       onStartShouldSetResponder={() => true}
                       onMoveShouldSetResponder={() => true}
-                      onResponderGrant={(evt) => onElementDragStart(element, evt.nativeEvent)}
+                      onResponderGrant={(evt) => onResizeStart(element, evt.nativeEvent)}
                       onResponderMove={(evt) => onElementDragMove(element, evt.nativeEvent)}
                       onResponderRelease={() => onElementDragEnd(element)}
                       onResponderTerminate={() => onElementDragEnd(element)}
                       onResponderTerminationRequest={() => false}
-                      style={[
-                        styles.previewElement,
-                        {
-                          left,
-                          top,
-                          width,
-                          height,
-                          borderColor: isSelected ? Colors.primary : 'transparent',
-                        },
-                      ]}
-                    >
-                      {element.type === 'text' ? (
-                        <Text
-                          numberOfLines={2}
-                          style={{
-                            color: element.color || '#2b1d18',
-                            fontWeight: element.fontWeight === '400' ? '400' : '700',
-                            fontSize: 11,
-                            textAlign: element.textAlign || 'center',
-                          }}
-                        >
-                          {element.text || 'Text'}
-                        </Text>
-                      ) : null}
-
-                      {element.type === 'shape' ? (
-                        <View
-                          style={{
-                            flex: 1,
-                            borderRadius: Math.max(0, (numberOrFallback(element.borderRadius, 0) / canvasSize.width) * previewWidth),
-                            backgroundColor: element.fillColor || '#fcd4b5',
-                          }}
-                        />
-                      ) : null}
-
-                      {element.type === 'divider' ? (
-                        <View
-                          style={{
-                            marginTop: Math.max(0, height / 2 - 1),
-                            height: 2,
-                            width: '100%',
-                            backgroundColor: element.color || '#b45309',
-                          }}
-                        />
-                      ) : null}
-
-                      {element.type === 'image' ? (
-                        element.imageUrl ? (
-                          <Image
-                            source={{ uri: element.imageUrl }}
-                            resizeMode="cover"
-                            style={styles.imageFill}
-                          />
-                        ) : (
-                          <View style={styles.imagePlaceholder}>
-                            <Text style={styles.imagePlaceholderText}>Image</Text>
-                          </View>
-                        )
-                      ) : null}
-
-                      {isSelected ? (
-                        <View
-                          onStartShouldSetResponder={() => true}
-                          onMoveShouldSetResponder={() => true}
-                          onResponderGrant={(evt) => onResizeStart(element, evt.nativeEvent)}
-                          onResponderMove={(evt) => onElementDragMove(element, evt.nativeEvent)}
-                          onResponderRelease={() => onElementDragEnd(element)}
-                          onResponderTerminate={() => onElementDragEnd(element)}
-                          onResponderTerminationRequest={() => false}
-                          style={styles.resizeHandle}
-                          pointerEvents={multiSelectMode && selectedElementIds.length > 1 ? 'none' : 'auto'}
-                        />
-                      ) : null}
-                    </View>
-                  );
-                })}
-
-              {showVerticalGuide ? <View style={styles.guideVertical} /> : null}
-              {showHorizontalGuide ? <View style={styles.guideHorizontal} /> : null}
-              {showSafeArea ? <View style={styles.safeAreaGuide} pointerEvents="none" /> : null}
-            </View>
-          </View>
-
-          <Divider style={styles.divider} />
-
-          <Text style={styles.sectionTitle}>Add Element</Text>
-          <View style={styles.rowWrap}>
-            <Button mode="contained-tonal" onPress={() => addElement('text')}>+ Text</Button>
-            <Button mode="contained-tonal" onPress={() => addElement('shape')}>+ Shape</Button>
-            <Button mode="contained-tonal" onPress={() => addElement('divider')}>+ Divider</Button>
-            <Button mode="contained-tonal" onPress={() => addElement('image')}>+ Image</Button>
-          </View>
-
-          <Divider style={styles.divider} />
-
-          <Text style={styles.sectionTitle}>Emoji & Cartoon Stickers</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View style={styles.rowWrap}>
-              {STICKER_ASSETS.map((asset) => (
-                <Chip key={asset.key} style={styles.chip} onPress={() => addSticker(asset)}>
-                  {asset.label}
-                </Chip>
-              ))}
-            </View>
-          </ScrollView>
-
-          <View style={{ marginTop: 10 }}>
-            <TextInput
-              mode="outlined"
-              label="Custom character image URL"
-              value={customImageUrl}
-              onChangeText={setCustomImageUrl}
-              style={styles.input}
-              placeholder="https://.../bride-groom.png"
-            />
-            <Button mode="contained-tonal" onPress={addCustomImageSticker} disabled={!customImageUrl.trim()}>
-              Add Custom Sticker
-            </Button>
-            <Button mode="outlined" onPress={addImageFromGallery} style={{ marginTop: 8 }}>
-              Pick From Gallery
-            </Button>
-          </View>
-        </Card.Content>
-      </Card>
-
-      <Card style={styles.card}>
-        <Card.Content>
-          <Text style={styles.sectionTitle}>Layers</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View style={styles.rowWrap}>
-              {mergedLayout.elements.length ? (
-                mergedLayout.elements.map((element, idx) => {
-                  const label =
-                    element.type === 'text'
-                      ? `Text ${idx + 1}`
-                      : element.type === 'shape'
-                        ? `Shape ${idx + 1}`
-                        : element.type === 'divider'
-                          ? `Divider ${idx + 1}`
-                          : `Image ${idx + 1}`;
-                  return (
-                    <Chip
-                      key={element.id}
-                      selected={isElementSelected(element.id)}
-                      style={styles.chip}
-                      onPress={() => selectElement(element.id, multiSelectMode)}
-                    >
-                      {label}
-                    </Chip>
-                  );
-                })
-              ) : (
-                <Text style={styles.subtle}>No elements yet.</Text>
-              )}
-            </View>
-          </ScrollView>
-
-          {selectedElement ? (
-            <View>
-              <Divider style={styles.divider} />
-              <Text style={styles.sectionTitle}>Element Properties</Text>
-
-              <View style={styles.grid2}>
-                <TextInput
-                  mode="outlined"
-                  label="X"
-                  keyboardType="numeric"
-                  value={String(selectedElement.x ?? 0)}
-                  onChangeText={(value) => patchElement(selectedElement.id, { x: numberOrFallback(value, 0) })}
-                  style={styles.input}
-                />
-                <TextInput
-                  mode="outlined"
-                  label="Y"
-                  keyboardType="numeric"
-                  value={String(selectedElement.y ?? 0)}
-                  onChangeText={(value) => patchElement(selectedElement.id, { y: numberOrFallback(value, 0) })}
-                  style={styles.input}
-                />
-                <TextInput
-                  mode="outlined"
-                  label="Width"
-                  keyboardType="numeric"
-                  value={String(selectedElement.width ?? 100)}
-                  onChangeText={(value) => patchElement(selectedElement.id, { width: numberOrFallback(value, 100) })}
-                  style={styles.input}
-                />
-                <TextInput
-                  mode="outlined"
-                  label="Height"
-                  keyboardType="numeric"
-                  value={String(selectedElement.height ?? 60)}
-                  onChangeText={(value) => patchElement(selectedElement.id, { height: numberOrFallback(value, 60) })}
-                  style={styles.input}
-                />
-              </View>
-
-              {selectedElement.type === 'text' ? (
-                <View>
-                  <TextInput
-                    mode="outlined"
-                    label="Text"
-                    value={selectedElement.text || ''}
-                    onChangeText={(value) => patchElement(selectedElement.id, { text: value })}
-                    multiline
-                    style={styles.input}
-                  />
-                  <View style={styles.grid2}>
-                    <TextInput
-                      mode="outlined"
-                      label="Font Size"
-                      keyboardType="numeric"
-                      value={String(selectedElement.fontSize ?? 42)}
-                      onChangeText={(value) => patchElement(selectedElement.id, { fontSize: numberOrFallback(value, 42) })}
-                      style={styles.input}
+                      style={styles.resizeHandle}
+                      pointerEvents={multiSelectMode && selectedElementIds.length > 1 ? 'none' : 'auto'}
                     />
-                  </View>
-                  <Text style={styles.subtle}>Text Color</Text>
-                  <ColorSwatchRow
-                    selected={selectedElement.color || '#2b1d18'}
-                    onSelect={(value) => patchElement(selectedElement.id, { color: value })}
-                  />
+                  ) : null}
                 </View>
-              ) : null}
+              );
+            })}
 
-              {selectedElement.type === 'shape' ? (
-                <View style={styles.grid2}>
-                  <TextInput
-                    mode="outlined"
-                    label="Radius"
-                    keyboardType="numeric"
-                    value={String(selectedElement.borderRadius ?? 24)}
-                    onChangeText={(value) => patchElement(selectedElement.id, { borderRadius: numberOrFallback(value, 24) })}
-                    style={styles.input}
-                  />
-                </View>
-              ) : null}
+          {showVerticalGuide ? <View style={styles.guideVertical} /> : null}
+          {showHorizontalGuide ? <View style={styles.guideHorizontal} /> : null}
+          {showSafeArea ? <View style={styles.safeAreaGuide} pointerEvents="none" /> : null}
+        </View>
+      </View>
 
-              {selectedElement.type === 'shape' ? (
-                <>
-                  <Text style={styles.subtle}>Shape Fill Color</Text>
-                  <ColorSwatchRow
-                    selected={selectedElement.fillColor || '#fcd4b5'}
-                    onSelect={(value) => patchElement(selectedElement.id, { fillColor: value })}
-                  />
-                </>
-              ) : null}
+      {/* ── LAYERS BAR ── */}
+      {mergedLayout.elements.length > 0 ? (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.layersBar}>
+          <View style={styles.toolRow}>
+            {mergedLayout.elements.map((el, idx) => {
+              const icons = { text: 'Aa', shape: '▭', divider: '━', image: '🖼', lottie: '🎬' };
+              const layerLabel = `${icons[el.type] || '?'} ${idx + 1}`;
+              return (
+                <TouchableOpacity
+                  key={el.id}
+                  style={[styles.layerChip, isElementSelected(el.id) && styles.layerChipActive]}
+                  onPress={() => selectElement(el.id, multiSelectMode)}
+                >
+                  <Text style={[styles.layerChipText, isElementSelected(el.id) && styles.layerChipTextActive]}>{layerLabel}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </ScrollView>
+      ) : null}
 
-              {selectedElement.type === 'divider' ? (
-                <>
-                  <Text style={styles.subtle}>Divider Color</Text>
-                  <ColorSwatchRow
-                    selected={selectedElement.color || '#b45309'}
-                    onSelect={(value) => patchElement(selectedElement.id, { color: value })}
-                  />
-                </>
-              ) : null}
+      {/* ── PROPERTIES PANEL ── */}
+      {selectedElement ? (
+        <Card style={styles.propsCard}>
+          <Card.Content>
+            <Text style={styles.propTitle}>
+              {selectedElement.type === 'text' ? 'Aa Text'
+                : selectedElement.type === 'shape' ? '▭ Shape'
+                : selectedElement.type === 'divider' ? '━ Divider'
+                : selectedElement.type === 'lottie' ? '🎬 Lottie'
+                : '🖼 Image'} Properties
+            </Text>
 
-              {selectedElement.type === 'image' ? (
+            <View style={styles.grid4}>
+              <TextInput mode="outlined" label="X" keyboardType="numeric" dense value={String(selectedElement.x ?? 0)} onChangeText={(v) => patchElement(selectedElement.id, { x: numberOrFallback(v, 0) })} style={styles.propInput} />
+              <TextInput mode="outlined" label="Y" keyboardType="numeric" dense value={String(selectedElement.y ?? 0)} onChangeText={(v) => patchElement(selectedElement.id, { y: numberOrFallback(v, 0) })} style={styles.propInput} />
+              <TextInput mode="outlined" label="W" keyboardType="numeric" dense value={String(selectedElement.width ?? 100)} onChangeText={(v) => patchElement(selectedElement.id, { width: numberOrFallback(v, 100) })} style={styles.propInput} />
+              <TextInput mode="outlined" label="H" keyboardType="numeric" dense value={String(selectedElement.height ?? 60)} onChangeText={(v) => patchElement(selectedElement.id, { height: numberOrFallback(v, 60) })} style={styles.propInput} />
+            </View>
+
+            {selectedElement.type === 'text' ? (
+              <View>
+                <TextInput mode="outlined" label="Text Content" value={selectedElement.text || ''} onChangeText={(v) => patchElement(selectedElement.id, { text: v })} multiline dense style={styles.propInput} />
+                <TextInput mode="outlined" label="Font Size" keyboardType="numeric" dense value={String(selectedElement.fontSize ?? 42)} onChangeText={(v) => patchElement(selectedElement.id, { fontSize: numberOrFallback(v, 42) })} style={[styles.propInput, { width: 100 }]} />
+                <Text style={styles.propLabel}>Text Color</Text>
+                <ColorSwatchRow selected={selectedElement.color || '#2b1d18'} onSelect={(v) => patchElement(selectedElement.id, { color: v })} />
+              </View>
+            ) : null}
+
+            {selectedElement.type === 'shape' ? (
+              <View>
+                <TextInput mode="outlined" label="Corner Radius" keyboardType="numeric" dense value={String(selectedElement.borderRadius ?? 24)} onChangeText={(v) => patchElement(selectedElement.id, { borderRadius: numberOrFallback(v, 24) })} style={[styles.propInput, { width: 140 }]} />
+                <Text style={styles.propLabel}>Shape Color</Text>
+                <ColorSwatchRow selected={selectedElement.fillColor || '#fcd4b5'} onSelect={(v) => patchElement(selectedElement.id, { fillColor: v })} />
+              </View>
+            ) : null}
+
+            {selectedElement.type === 'divider' ? (
+              <View>
+                <Text style={styles.propLabel}>Divider Color</Text>
+                <ColorSwatchRow selected={selectedElement.color || '#b45309'} onSelect={(v) => patchElement(selectedElement.id, { color: v })} />
+              </View>
+            ) : null}
+
+            {selectedElement.type === 'image' ? (
+              <TextInput mode="outlined" label="Image URL" value={selectedElement.imageUrl || ''} onChangeText={(v) => patchElement(selectedElement.id, { imageUrl: v })} dense style={styles.propInput} />
+            ) : null}
+
+            {selectedElement.type === 'lottie' ? (
+              <View>
                 <TextInput
                   mode="outlined"
-                  label="Image URL"
-                  value={selectedElement.imageUrl || ''}
-                  onChangeText={(value) => patchElement(selectedElement.id, { imageUrl: value })}
-                  style={styles.input}
+                  label="Lottie JSON URL"
+                  value={typeof selectedElement.lottieSource === 'object' ? (selectedElement.lottieSource?.uri || '') : ''}
+                  onChangeText={(v) => patchElement(selectedElement.id, { lottieSource: { uri: v } })}
+                  dense
+                  style={styles.propInput}
+                  placeholder="https://assets.lottiefiles.com/..."
                 />
-              ) : null}
-
-              <View style={styles.rowWrap}>
-                <Button mode="contained-tonal" onPress={() => reorderSelected('up')}>Bring Forward</Button>
-                <Button mode="contained-tonal" onPress={() => reorderSelected('down')}>Send Backward</Button>
-                <Button mode="contained-tonal" onPress={duplicateSelected}>Duplicate</Button>
-                <Button mode="contained-tonal" buttonColor="#fde8e8" textColor="#991b1b" onPress={deleteSelected}>
-                  Delete
-                </Button>
+                <View style={[styles.toolRow, { marginBottom: 8 }]}>
+                  <Chip
+                    selected={selectedElement.loop !== false}
+                    onPress={() => patchElement(selectedElement.id, { loop: !selectedElement.loop })}
+                    style={{ marginRight: 8 }}
+                  >
+                    {selectedElement.loop !== false ? '🔁 Loop on' : '🔂 Loop off'}
+                  </Chip>
+                  <Chip
+                    selected={selectedElement.autoPlay !== false}
+                    onPress={() => patchElement(selectedElement.id, { autoPlay: !selectedElement.autoPlay })}
+                  >
+                    {selectedElement.autoPlay !== false ? '▶ Auto' : '⏸ Manual'}
+                  </Chip>
+                </View>
               </View>
-            </View>
-          ) : null}
-        </Card.Content>
-      </Card>
+            ) : null}
 
-      <Card style={styles.card}>
+            <Divider style={{ marginVertical: 10 }} />
+            <View style={styles.toolRow}>
+              <Button compact mode="contained-tonal" onPress={() => reorderSelected('up')}>↑ Fwd</Button>
+              <Button compact mode="contained-tonal" onPress={() => reorderSelected('down')}>↓ Back</Button>
+              <Button compact mode="contained-tonal" onPress={duplicateSelected}>Copy</Button>
+              <Button compact mode="contained-tonal" buttonColor="#fde8e8" textColor="#991b1b" onPress={deleteSelected}>Delete</Button>
+            </View>
+          </Card.Content>
+        </Card>
+      ) : null}
+
+      {/* ── CANVAS SETTINGS ── */}
+      <Card style={styles.settingsCard}>
         <Card.Content>
-          <Text style={styles.sectionTitle}>Canvas Settings</Text>
-          <View style={styles.rowWrap}>
+          <Text style={styles.propTitle}>Canvas Settings</Text>
+          <View style={styles.toolRow}>
             {['1080x1920', '1080x1080', '1920x1080'].map((size) => (
-              <Chip
-                key={size}
-                selected={mergedLayout.canvasSize === size}
-                style={styles.chip}
-                onPress={() => patchLayout({ canvasSize: size })}
-              >
-                {size}
-              </Chip>
+              <ToggleTile key={size} label={size} active={mergedLayout.canvasSize === size} onPress={() => patchLayout({ canvasSize: size })} />
             ))}
           </View>
-          <Text style={styles.subtle}>Background Color</Text>
-          <ColorSwatchRow
-            selected={mergedLayout.backgroundColor || '#fff7f2'}
-            options={BACKGROUND_OPTIONS}
-            onSelect={(value) => patchLayout({ backgroundColor: value })}
-          />
+          <Text style={[styles.propLabel, { marginTop: 8 }]}>Background</Text>
+          <ColorSwatchRow selected={mergedLayout.backgroundColor || '#fff7f2'} options={BACKGROUND_OPTIONS} onSelect={(v) => patchLayout({ backgroundColor: v })} />
+          <Divider style={{ marginVertical: 10 }} />
+          <Text style={styles.propLabel}>Custom Image URL</Text>
+          <TextInput mode="outlined" label="https://..." value={customImageUrl} onChangeText={setCustomImageUrl} dense style={styles.propInput} />
+          <Button mode="contained-tonal" compact onPress={addCustomImageSticker} disabled={!customImageUrl.trim()} style={{ marginTop: 4 }}>
+            Add Custom Image
+          </Button>
         </Card.Content>
       </Card>
     </View>
@@ -912,136 +743,56 @@ const InviteDesignCanvas = ({ layout, onLayoutChange, fullScreen = false, onDrag
 };
 
 const styles = StyleSheet.create({
-  card: {
-    borderRadius: Radius.lg,
-    marginBottom: Spacing.md,
-    backgroundColor: Colors.surface,
+  wrapper: { flex: 1 },
+  toolbarBlock: {
+    backgroundColor: '#ffffff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
+    paddingHorizontal: 10,
+    paddingTop: 8,
+    paddingBottom: 6,
   },
-  sectionTitle: {
-    fontWeight: '700',
-    marginBottom: 8,
-    color: Colors.textPrimary,
+  toolRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingBottom: 4 },
+  toolTile: { width: 56, height: 56, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#e2e8f0' },
+  toolTileIcon: { fontSize: 22, fontWeight: '700', lineHeight: 28 },
+  toolTileLabel: { fontSize: 9, fontWeight: '600', marginTop: 1 },
+  toolTileDisabled: { opacity: 0.35 },
+  toggleTile: { paddingHorizontal: 10, paddingVertical: 7, borderRadius: 20, backgroundColor: '#f1f5f9', borderWidth: 1, borderColor: '#cbd5e1' },
+  toggleTileActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  toggleTileText: { fontSize: 12, fontWeight: '600', color: '#475569' },
+  toggleTileTextActive: { color: '#ffffff' },
+  themeChip: { paddingHorizontal: 10, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
+  themeChipText: { fontSize: 12, fontWeight: '700' },
+  toolSep: { width: 1, height: 40, backgroundColor: '#e2e8f0', marginHorizontal: 4 },
+  canvasSection: { alignItems: 'center', justifyContent: 'center', paddingVertical: 12, backgroundColor: '#f8fafc' },
+  canvasPreview: {
+    borderRadius: 14, borderWidth: 1, borderColor: '#e2e8f0',
+    position: 'relative', overflow: 'hidden',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 3,
   },
-  subtle: {
-    color: Colors.textSecondary,
-  },
-  divider: {
-    marginVertical: 12,
-  },
-  previewWrap: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 8,
-  },
-  preview: {
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#f1d9c8',
-    position: 'relative',
-    overflow: 'hidden',
-  },
-  previewElement: {
-    position: 'absolute',
-    borderWidth: 1,
-    borderRadius: 4,
-    padding: 2,
-    overflow: 'hidden',
-  },
-  resizeHandle: {
-    position: 'absolute',
-    width: 14,
-    height: 14,
-    right: -7,
-    bottom: -7,
-    borderRadius: 7,
-    backgroundColor: Colors.primary,
-    borderWidth: 2,
-    borderColor: '#ffffff',
-  },
-  guideVertical: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: '50%',
-    width: 1,
-    backgroundColor: '#3b82f6',
-    opacity: 0.5,
-  },
-  guideHorizontal: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: '50%',
-    height: 1,
-    backgroundColor: '#3b82f6',
-    opacity: 0.5,
-  },
-  safeAreaGuide: {
-    position: 'absolute',
-    top: '6%',
-    left: '6%',
-    right: '6%',
-    bottom: '6%',
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: '#f59e0b',
-    borderRadius: 10,
-    opacity: 0.7,
-  },
-  imagePlaceholder: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#f3f4f6',
-  },
-  imageFill: {
-    width: '100%',
-    height: '100%',
-  },
-  imagePlaceholderText: {
-    color: '#6b7280',
-    fontSize: 10,
-  },
-  rowWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    alignItems: 'center',
-  },
-  chip: {
-    marginRight: 8,
-    marginBottom: 8,
-  },
-  input: {
-    marginBottom: 10,
-    backgroundColor: Colors.surface,
-  },
-  swatchRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 6,
-    marginBottom: 10,
-  },
-  swatch: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#cbd5e1',
-  },
-  swatchActive: {
-    borderWidth: 3,
-    borderColor: '#334155',
-  },
-  swatchWhite: {
-    borderColor: '#94a3b8',
-  },
-  grid2: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
+  previewElement: { position: 'absolute', borderWidth: 1, borderRadius: 4, padding: 2, overflow: 'hidden' },
+  resizeHandle: { position: 'absolute', width: 16, height: 16, right: -8, bottom: -8, borderRadius: 8, backgroundColor: Colors.primary, borderWidth: 2, borderColor: '#ffffff' },
+  guideVertical: { position: 'absolute', top: 0, bottom: 0, left: '50%', width: 1, backgroundColor: '#3b82f6', opacity: 0.5 },
+  guideHorizontal: { position: 'absolute', left: 0, right: 0, top: '50%', height: 1, backgroundColor: '#3b82f6', opacity: 0.5 },
+  safeAreaGuide: { position: 'absolute', top: '6%', left: '6%', right: '6%', bottom: '6%', borderWidth: 1, borderStyle: 'dashed', borderColor: '#f59e0b', borderRadius: 10, opacity: 0.7 },
+  imagePlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f3f4f6' },
+  imageFill: { width: '100%', height: '100%' },
+  imagePlaceholderText: { color: '#6b7280', fontSize: 10 },
+  layersBar: { backgroundColor: '#f8fafc', borderTopWidth: 1, borderTopColor: '#e2e8f0', paddingVertical: 6, paddingHorizontal: 10 },
+  layerChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, backgroundColor: '#f1f5f9', borderWidth: 1, borderColor: '#cbd5e1', marginRight: 6 },
+  layerChipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  layerChipText: { fontSize: 12, fontWeight: '600', color: '#475569' },
+  layerChipTextActive: { color: '#ffffff' },
+  propsCard: { borderRadius: Radius.lg, marginHorizontal: 10, marginTop: 10, backgroundColor: Colors.surface, borderWidth: 1, borderColor: '#e2e8f0' },
+  propTitle: { fontSize: 14, fontWeight: '700', color: Colors.textPrimary, marginBottom: 10 },
+  propLabel: { fontSize: 12, fontWeight: '600', color: Colors.textSecondary, marginTop: 6, marginBottom: 4 },
+  propInput: { marginBottom: 8, backgroundColor: Colors.surface, fontSize: 13 },
+  grid4: { flexDirection: 'row', gap: 6, marginBottom: 8, flexWrap: 'wrap' },
+  settingsCard: { borderRadius: Radius.lg, marginHorizontal: 10, marginTop: 10, marginBottom: 20, backgroundColor: Colors.surface, borderWidth: 1, borderColor: '#e2e8f0' },
+  swatchRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4, marginBottom: 8 },
+  swatch: { width: 32, height: 32, borderRadius: 16, borderWidth: 1, borderColor: '#cbd5e1' },
+  swatchActive: { borderWidth: 3, borderColor: '#334155' },
+  swatchWhite: { borderColor: '#94a3b8' },
 });
 
 export default InviteDesignCanvas;
