@@ -3,6 +3,7 @@ import {
   Card,
   Row,
   Col,
+  Grid,
   Button,
   Space,
   Input,
@@ -33,7 +34,7 @@ const LOTTIE_STICKERS = [
     key: 'lottie-confetti',
     label: 'Confetti',
     thumb: '🎊',
-    sourceUrl: 'https://assets5.lottiefiles.com/packages/lf20_obhph3t0.json',
+    sourceUrl: 'https://assets1.lottiefiles.com/packages/lf20_jcikwtux.json',
     width: 400,
     height: 400,
     loop: true,
@@ -42,7 +43,7 @@ const LOTTIE_STICKERS = [
     key: 'lottie-birthday',
     label: 'Birthday',
     thumb: '🎂',
-    sourceUrl: 'https://assets7.lottiefiles.com/packages/lf20_nt4ypxj4.json',
+    sourceUrl: 'https://assets4.lottiefiles.com/packages/lf20_49rdyysj.json',
     width: 380,
     height: 380,
     loop: true,
@@ -51,7 +52,7 @@ const LOTTIE_STICKERS = [
     key: 'lottie-hearts',
     label: 'Hearts',
     thumb: '❤️',
-    sourceUrl: 'https://assets4.lottiefiles.com/packages/lf20_GtgJBk.json',
+    sourceUrl: 'https://assets5.lottiefiles.com/packages/lf20_ydo1amjm.json',
     width: 360,
     height: 360,
     loop: true,
@@ -78,7 +79,7 @@ const LOTTIE_STICKERS = [
     key: 'lottie-wedding',
     label: 'Wedding',
     thumb: '💍',
-    sourceUrl: 'https://assets3.lottiefiles.com/packages/lf20_jbb5pqtg.json',
+    sourceUrl: 'https://assets6.lottiefiles.com/packages/lf20_kkflmtur.json',
     width: 400,
     height: 400,
     loop: true,
@@ -96,9 +97,36 @@ const LOTTIE_STICKERS = [
     key: 'lottie-celebration',
     label: 'Celebrate',
     thumb: '🥳',
-    sourceUrl: 'https://assets2.lottiefiles.com/packages/lf20_u4yrau84.json',
+    sourceUrl: 'https://assets7.lottiefiles.com/packages/lf20_2cwDXD.json',
     width: 400,
     height: 400,
+    loop: true,
+  },
+  {
+    key: 'lottie-sparkles',
+    label: 'Sparkles',
+    thumb: '✨',
+    sourceUrl: 'https://assets8.lottiefiles.com/packages/lf20_49rdyysj.json',
+    width: 360,
+    height: 360,
+    loop: true,
+  },
+  {
+    key: 'lottie-party',
+    label: 'Party',
+    thumb: '🎉',
+    sourceUrl: 'https://assets9.lottiefiles.com/packages/lf20_jcikwtux.json',
+    width: 380,
+    height: 380,
+    loop: true,
+  },
+  {
+    key: 'lottie-stars-plus',
+    label: 'Stars+',
+    thumb: '🌟',
+    sourceUrl: 'https://assets10.lottiefiles.com/packages/lf20_ydo1amjm.json',
+    width: 360,
+    height: 360,
     loop: true,
   },
 ];
@@ -110,6 +138,20 @@ const resolveLottieUrl = (source) => {
   return '';
 };
 
+const getLottieMirrorUrls = (url) => {
+  const normalized = String(url || '').trim();
+  if (!normalized) return [];
+
+  const packageMatch = normalized.match(/\/packages\/([^/?#]+\.json)/i);
+  if (!packageMatch?.[1]) {
+    return [normalized];
+  }
+
+  const packageFile = packageMatch[1];
+  const variants = Array.from({ length: 10 }, (_, index) => `https://assets${index + 1}.lottiefiles.com/packages/${packageFile}`);
+  return [normalized, ...variants.filter((candidate) => candidate !== normalized)];
+};
+
 const InviteDesignCanvas = ({
   layout = {},
   templateMeta = null,
@@ -119,6 +161,7 @@ const InviteDesignCanvas = ({
   quickTextBlocks = [],
   sectionBlocks = [],
 }) => {
+  const screens = Grid.useBreakpoint();
   const [elements, setElements] = useState(layout.elements || []);
   const [selectedElementId, setSelectedElementId] = useState(null);
   const [canvasSize, setCanvasSize] = useState(layout.canvasSize || '1080x1920');
@@ -149,7 +192,7 @@ const InviteDesignCanvas = ({
   // Parse canvas size early so callbacks can safely reference these constants.
   const [canvasWidth, canvasHeight] = canvasSize.split('x').map(Number);
   const aspectRatio = canvasWidth / canvasHeight;
-  const maxPreviewWidth = 300;
+  const maxPreviewWidth = screens.xxl ? 420 : screens.xl ? 380 : screens.lg ? 330 : screens.md ? 300 : 250;
   const previewWidth = maxPreviewWidth;
   const previewHeight = maxPreviewWidth / aspectRatio;
 
@@ -178,15 +221,21 @@ const InviteDesignCanvas = ({
     let cancelled = false;
 
     Promise.all(
-      missing.map(async (url) => {
-        try {
-          const response = await fetch(url);
-          if (!response.ok) return null;
-          const json = await response.json();
-          return [url, json];
-        } catch (_error) {
-          return null;
+      missing.map(async (requestedUrl) => {
+        const candidates = getLottieMirrorUrls(requestedUrl);
+        for (const candidateUrl of candidates) {
+          try {
+            const response = await fetch(candidateUrl);
+            if (!response.ok) continue;
+            const json = await response.json();
+            const hasFrames = Array.isArray(json?.layers) || Array.isArray(json?.assets);
+            if (!hasFrames) continue;
+            return [requestedUrl, candidateUrl, json];
+          } catch (_error) {
+            // Try mirror domains when a source fails due to host or CORS policy.
+          }
         }
+        return null;
       })
     ).then((results) => {
       if (cancelled) return;
@@ -194,8 +243,9 @@ const InviteDesignCanvas = ({
       if (!entries.length) return;
       setLottieDataMap((prev) => {
         const next = { ...prev };
-        entries.forEach(([url, data]) => {
-          if (!next[url]) next[url] = data;
+        entries.forEach(([requestedUrl, resolvedUrl, data]) => {
+          if (!next[requestedUrl]) next[requestedUrl] = data;
+          if (!next[resolvedUrl]) next[resolvedUrl] = data;
         });
         return next;
       });
@@ -848,10 +898,10 @@ const InviteDesignCanvas = ({
 
   return (
     <div className="invite-design-canvas">
-      <Row gutter={16}>
+      <Row gutter={[14, 14]} className="invite-canvas-layout">
         {/* Left Panel - Element Manager */}
-        <Col xs={24} lg={6}>
-          <Card title="Elements & Layers" size="small">
+        <Col xs={{ span: 24, order: 2 }} xl={{ span: 6, order: 1 }} xxl={{ span: 5, order: 1 }}>
+          <Card title="Elements & Layers" size="small" className="invite-canvas-panel invite-canvas-panel--left">
             <Space direction="vertical" style={{ width: '100%' }} size={8}>
               <div>
                 <div style={{ marginBottom: 8, fontWeight: 600 }}>Add Element</div>
@@ -958,9 +1008,9 @@ const InviteDesignCanvas = ({
         </Col>
 
         {/* Center Panel - Canvas Preview */}
-        <Col xs={24} lg={7}>
-          <Card title="Canvas Preview" size="small">
-            <div style={{ textAlign: 'center' }}>
+        <Col xs={{ span: 24, order: 1 }} xl={{ span: 10, order: 2 }} xxl={{ span: 11, order: 2 }}>
+          <Card title="Canvas Preview" size="small" className="invite-canvas-panel invite-canvas-panel--center">
+            <div className="invite-canvas-center-body">
               <div className="canvas-viewport">
                 <div
                   ref={canvasRef}
@@ -1136,7 +1186,7 @@ const InviteDesignCanvas = ({
                 </div>
               </div>
 
-              <div style={{ marginTop: 12, textAlign: 'center', fontSize: 12 }}>
+              <div className="canvas-controls">
                 <Switch checked={showGrid} onChange={setShowGrid} /> Grid
                 <span style={{ margin: '0 10px' }} />
                 <Switch checked={snapToGrid} onChange={setSnapToGrid} /> Snap
@@ -1149,8 +1199,8 @@ const InviteDesignCanvas = ({
         </Col>
 
         {/* Right Panel - Element Properties */}
-        <Col xs={24} lg={11}>
-          <Card title="Element Properties" size="small">
+        <Col xs={{ span: 24, order: 3 }} xl={{ span: 8, order: 3 }}>
+          <Card title="Element Properties" size="small" className="invite-canvas-panel invite-canvas-panel--right">
             {selectedElement ? (
               <Space direction="vertical" style={{ width: '100%' }} size={12}>
                 <div>

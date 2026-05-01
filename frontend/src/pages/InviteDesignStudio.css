@@ -1,7 +1,8 @@
 .invite-studio-page {
-  max-width: 1280px;
+  max-width: 1600px;
   margin: 0 auto;
-  padding: 24px;
+  padding: 24px 20px 30px;
+  background: linear-gradient(180deg, #eef4ff 0%, #f7fbff 55%, #eef6ff 100%);
 }
 
 .invite-studio-loading {
@@ -12,8 +13,32 @@
 }
 
 .invite-studio-header {
-  margin-bottom: 16px;
+  margin-bottom: 18px;
   border-radius: 12px;
+  border: 1px solid #dbeafe;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
+}
+
+.invite-studio-card {
+  border-radius: 12px;
+  border: 1px solid #dbeafe;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+}
+
+.invite-studio-card .ant-card-head {
+  min-height: 48px;
+}
+
+.invite-studio-card .ant-card-head-title {
+  font-weight: 700;
+}
+
+.invite-studio-card--designs .ant-table-wrapper {
+  overflow-x: auto;
+}
+
+.invite-studio-card--editor .ant-card-body {
+  padding: 16px;
 }
 
 .invite-studio-json {
@@ -49,8 +74,35 @@
   gap: 6px;
 }
 
+@media (max-width: 1200px) {
+  .invite-studio-page {
+    padding: 16px;
+  }
+
+  .invite-studio-card--editor .ant-card-body {
+    padding: 14px;
+  }
+}
+
 @media (max-width: 768px) {
   .invite-studio-page {
+    padding: 12px;
+    background: #f8fbff;
+  }
+
+  .invite-studio-header {
+    margin-bottom: 12px;
+  }
+
+  .invite-studio-card .ant-card-head {
+    min-height: 44px;
+  }
+
+  .invite-studio-card .ant-card-head-title {
+    font-size: 15px;
+  }
+
+  .invite-studio-card--editor .ant-card-body {
     padding: 12px;
   }
 }

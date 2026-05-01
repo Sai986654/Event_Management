@@ -5,20 +5,67 @@
   font-size: 13px;
 }
 
+.invite-design-canvas .ant-card-body {
+  padding: 14px;
+}
+
+.invite-canvas-layout {
+  align-items: flex-start;
+}
+
+.invite-canvas-panel {
+  border-radius: 10px;
+}
+
+.invite-canvas-panel .ant-card-head {
+  min-height: 44px;
+}
+
+.invite-canvas-panel .ant-card-head-title {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.invite-canvas-panel--left .ant-card-body,
+.invite-canvas-panel--right .ant-card-body {
+  max-height: min(78vh, 860px);
+  overflow: auto;
+}
+
+.invite-canvas-panel--center {
+  position: sticky;
+  top: 16px;
+}
+
+.invite-canvas-center-body {
+  text-align: center;
+}
+
 .canvas-viewport {
   display: flex;
   justify-content: center;
   align-items: center;
-  min-height: 500px;
-  background: #f5f5f5;
-  border-radius: 4px;
+  min-height: 620px;
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
   padding: 16px;
   overflow: auto;
 }
 
+.canvas-controls {
+  margin-top: 12px;
+  text-align: center;
+  font-size: 12px;
+  padding: 8px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
 .invite-canvas {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  border-radius: 2px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.14);
+  border-radius: 4px;
 }
 
 .canvas-element {
@@ -115,10 +162,52 @@ label {
   margin-top: 4px !important;
 }
 
+@media (min-width: 1600px) {
+  .invite-canvas-panel--center .ant-card-body {
+    padding: 18px;
+  }
+
+  .canvas-viewport {
+    min-height: 680px;
+  }
+}
+
+@media (max-width: 1200px) {
+  .invite-canvas-panel--left .ant-card-body,
+  .invite-canvas-panel--right .ant-card-body {
+    max-height: min(60vh, 640px);
+  }
+
+  .canvas-viewport {
+    min-height: 480px;
+  }
+}
+
 /* Responsive */
 @media (max-width: 768px) {
+  .invite-design-canvas .ant-card-body {
+    padding: 12px;
+  }
+
+  .invite-canvas-panel--center {
+    position: static;
+  }
+
+  .invite-canvas-panel--left .ant-card-body,
+  .invite-canvas-panel--right .ant-card-body {
+    max-height: none;
+    overflow: visible;
+  }
+
   .canvas-viewport {
     min-height: 300px;
+    padding: 8px;
+  }
+
+  .canvas-controls {
+    margin-top: 10px;
+    padding: 6px 8px;
+    font-size: 11px;
   }
 
   .canvas-layer {

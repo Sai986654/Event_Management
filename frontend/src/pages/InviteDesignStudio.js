@@ -499,9 +499,9 @@ const InviteDesignStudio = () => {
         </Space>
       </Card>
 
-      <Row gutter={[16, 16]}>
-        <Col xs={24} lg={9}>
-          <Card title="Template + New Design">
+      <Row gutter={[18, 18]}>
+        <Col xs={24} lg={8} xl={7}>
+          <Card title="Template + New Design" className="invite-studio-card invite-studio-card--setup">
             <Space direction="vertical" style={{ width: '100%' }}>
               <div>
                 <Text strong>Template</Text>
@@ -532,7 +532,7 @@ const InviteDesignStudio = () => {
             </Space>
           </Card>
 
-          <Card title={`Designs (${designs.length})`} style={{ marginTop: 16 }}>
+          <Card title={`Designs (${designs.length})`} style={{ marginTop: 16 }} className="invite-studio-card invite-studio-card--designs">
             {designs.length ? (
               <Table
                 rowKey="id"
@@ -547,19 +547,20 @@ const InviteDesignStudio = () => {
           </Card>
         </Col>
 
-        <Col xs={24} lg={15}>
+        <Col xs={24} lg={16} xl={17}>
           <Card
             title={selectedDesign ? `Edit: ${selectedDesign.name}` : 'Design Editor'}
             extra={selectedDesign ? <Tag>Design ID: {selectedDesign.id}</Tag> : null}
+            className="invite-studio-card invite-studio-card--editor"
           >
             {selectedDesign ? (
               <Space direction="vertical" style={{ width: '100%' }} size={12}>
                 <Row gutter={12}>
-                  <Col span={10}>
+                  <Col xs={24} sm={12} lg={10}>
                     <Text strong>Name</Text>
                     <Input value={designName} onChange={(e) => setDesignName(e.target.value)} style={{ marginTop: 6 }} />
                   </Col>
-                  <Col span={7}>
+                  <Col xs={24} sm={6} lg={7}>
                     <Text strong>Status</Text>
                     <Select
                       value={designStatus}
@@ -572,7 +573,7 @@ const InviteDesignStudio = () => {
                       ]}
                     />
                   </Col>
-                  <Col span={7}>
+                  <Col xs={24} sm={6} lg={7}>
                     <Text strong>Language</Text>
                     <Select
                       value={designLanguage}
@@ -587,7 +588,7 @@ const InviteDesignStudio = () => {
                 </Row>
 
                 <Row gutter={12}>
-                  <Col span={8}>
+                  <Col xs={24} md={12} lg={8}>
                     <Text strong>Event Profile</Text>
                     <Select
                       value={inviteEventType}
@@ -596,7 +597,7 @@ const InviteDesignStudio = () => {
                       options={EVENT_TYPE_OPTIONS}
                     />
                   </Col>
-                  <Col span={8}>
+                  <Col xs={24} md={12} lg={8}>
                     <Text strong>Preview Guest</Text>
                     <Select
                       value={previewGuest?.id}
@@ -606,7 +607,7 @@ const InviteDesignStudio = () => {
                       placeholder="Select preview guest"
                     />
                   </Col>
-                  <Col span={8}>
+                  <Col xs={24} md={24} lg={8}>
                     <Text strong>Quick Compose</Text>
                     <Button
                       type="default"
@@ -766,7 +767,7 @@ const InviteDesignStudio = () => {
                   </Col>
                 </Row>
 
-                <Space wrap>
+                <Space wrap size={[10, 10]}>
                   <Button icon={<SaveOutlined />} type="primary" onClick={handleSaveDesign} loading={saving}>
                     Save Design
                   </Button>
@@ -780,7 +781,7 @@ const InviteDesignStudio = () => {
 
                 <Divider />
 
-                <Space align="center" wrap>
+                <Space align="center" wrap size={[10, 10]}>
                   <Text strong>Send via</Text>
                   <Select
                     value={sendVia}
