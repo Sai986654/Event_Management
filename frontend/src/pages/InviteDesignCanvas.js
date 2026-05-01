@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   Card,
   Row,
@@ -11,6 +11,7 @@ import {
   InputNumber,
   ColorPicker,
   Divider,
+  Collapse,
   Empty,
   Tag,
   Tooltip,
@@ -35,6 +36,7 @@ const LOTTIE_STICKERS = [
     label: 'Confetti',
     thumb: '🎊',
     sourceUrl: 'https://assets1.lottiefiles.com/packages/lf20_jcikwtux.json',
+    category: 'festive',
     width: 400,
     height: 400,
     loop: true,
@@ -44,6 +46,7 @@ const LOTTIE_STICKERS = [
     label: 'Birthday',
     thumb: '🎂',
     sourceUrl: 'https://assets4.lottiefiles.com/packages/lf20_49rdyysj.json',
+    category: 'celebration',
     width: 380,
     height: 380,
     loop: true,
@@ -53,6 +56,7 @@ const LOTTIE_STICKERS = [
     label: 'Hearts',
     thumb: '❤️',
     sourceUrl: 'https://assets5.lottiefiles.com/packages/lf20_ydo1amjm.json',
+    category: 'romantic',
     width: 360,
     height: 360,
     loop: true,
@@ -62,6 +66,7 @@ const LOTTIE_STICKERS = [
     label: 'Fireworks',
     thumb: '🎆',
     sourceUrl: 'https://assets9.lottiefiles.com/packages/lf20_M9p23l.json',
+    category: 'festive',
     width: 420,
     height: 420,
     loop: false,
@@ -71,6 +76,7 @@ const LOTTIE_STICKERS = [
     label: 'Stars',
     thumb: '⭐',
     sourceUrl: 'https://assets6.lottiefiles.com/packages/lf20_aZTdD5.json',
+    category: 'festive',
     width: 360,
     height: 360,
     loop: true,
@@ -80,6 +86,7 @@ const LOTTIE_STICKERS = [
     label: 'Wedding',
     thumb: '💍',
     sourceUrl: 'https://assets6.lottiefiles.com/packages/lf20_kkflmtur.json',
+    category: 'wedding',
     width: 400,
     height: 400,
     loop: true,
@@ -89,6 +96,7 @@ const LOTTIE_STICKERS = [
     label: 'Balloons',
     thumb: '🎈',
     sourceUrl: 'https://assets10.lottiefiles.com/packages/lf20_touohxv0.json',
+    category: 'celebration',
     width: 380,
     height: 400,
     loop: true,
@@ -98,6 +106,7 @@ const LOTTIE_STICKERS = [
     label: 'Celebrate',
     thumb: '🥳',
     sourceUrl: 'https://assets7.lottiefiles.com/packages/lf20_2cwDXD.json',
+    category: 'celebration',
     width: 400,
     height: 400,
     loop: true,
@@ -107,6 +116,7 @@ const LOTTIE_STICKERS = [
     label: 'Sparkles',
     thumb: '✨',
     sourceUrl: 'https://assets8.lottiefiles.com/packages/lf20_49rdyysj.json',
+    category: 'romantic',
     width: 360,
     height: 360,
     loop: true,
@@ -116,6 +126,7 @@ const LOTTIE_STICKERS = [
     label: 'Party',
     thumb: '🎉',
     sourceUrl: 'https://assets9.lottiefiles.com/packages/lf20_jcikwtux.json',
+    category: 'festive',
     width: 380,
     height: 380,
     loop: true,
@@ -125,11 +136,22 @@ const LOTTIE_STICKERS = [
     label: 'Stars+',
     thumb: '🌟',
     sourceUrl: 'https://assets10.lottiefiles.com/packages/lf20_ydo1amjm.json',
+    category: 'wedding',
     width: 360,
     height: 360,
     loop: true,
   },
 ];
+
+const STICKER_CATEGORY_OPTIONS = [
+  { value: 'all', label: '✨ All' },
+  { value: 'wedding', label: '💍 Wedding' },
+  { value: 'celebration', label: '🎉 Celebration' },
+  { value: 'romantic', label: '❤️ Romantic' },
+  { value: 'festive', label: '🎊 Festive' },
+];
+
+const STICKER_CATEGORY_STORAGE_KEY = 'inviteStudioStickerCategory';
 
 const resolveLottieUrl = (source) => {
   if (!source) return '';
@@ -173,6 +195,11 @@ const InviteDesignCanvas = ({
   const [sectionGuide, setSectionGuide] = useState({ show: false, topYCanvas: 0, centerV: false });
   const [dragGuide, setDragGuide] = useState({ show: false, xCanvas: null, yCanvas: null });
   const [lottieDataMap, setLottieDataMap] = useState({});
+  const [stickerCategory, setStickerCategory] = useState(() => {
+    if (typeof window === 'undefined') return 'all';
+    const stored = window.localStorage.getItem(STICKER_CATEGORY_STORAGE_KEY);
+    return STICKER_CATEGORY_OPTIONS.some((option) => option.value === stored) ? stored : 'all';
+  });
   const [placeholderAutocomplete, setPlaceholderAutocomplete] = useState({
     active: false,
     start: -1,
@@ -188,10 +215,25 @@ const InviteDesignCanvas = ({
   const dragStateRef = useRef(null);
 
   const selectedElement = elements.find((el) => el.id === selectedElementId);
+  const stickerCategoryCounts = useMemo(
+    () => LOTTIE_STICKERS.reduce((acc, sticker) => {
+      const key = sticker.category || 'festive';
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {}),
+    []
+  );
+  const filteredStickers = useMemo(
+    () => (stickerCategory === 'all'
+      ? LOTTIE_STICKERS
+      : LOTTIE_STICKERS.filter((sticker) => sticker.category === stickerCategory)),
+    [stickerCategory]
+  );
 
   // Parse canvas size early so callbacks can safely reference these constants.
   const [canvasWidth, canvasHeight] = canvasSize.split('x').map(Number);
   const aspectRatio = canvasWidth / canvasHeight;
+  const desktopWorkbench = Boolean(screens.xl);
   const maxPreviewWidth = screens.xxl ? 420 : screens.xl ? 380 : screens.lg ? 330 : screens.md ? 300 : 250;
   const previewWidth = maxPreviewWidth;
   const previewHeight = maxPreviewWidth / aspectRatio;
@@ -205,6 +247,11 @@ const InviteDesignCanvas = ({
   useEffect(() => {
     elementsRef.current = elements;
   }, [elements]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(STICKER_CATEGORY_STORAGE_KEY, stickerCategory);
+  }, [stickerCategory]);
 
   useEffect(() => {
     const urls = Array.from(
@@ -898,117 +945,152 @@ const InviteDesignCanvas = ({
 
   return (
     <div className="invite-design-canvas">
-      <Row gutter={[14, 14]} className="invite-canvas-layout">
+      <Row gutter={[14, 14]} className="invite-canvas-layout" wrap={!desktopWorkbench}>
         {/* Left Panel - Element Manager */}
-        <Col xs={{ span: 24, order: 2 }} xl={{ span: 6, order: 1 }} xxl={{ span: 5, order: 1 }}>
+        <Col
+          xs={{ span: 24, order: 2 }}
+          xl={{ span: 6, order: 1 }}
+          xxl={{ span: 5, order: 1 }}
+          style={desktopWorkbench ? { flex: '0 0 320px', maxWidth: 320 } : undefined}
+        >
           <Card title="Elements & Layers" size="small" className="invite-canvas-panel invite-canvas-panel--left">
-            <Space direction="vertical" style={{ width: '100%' }} size={8}>
-              <div>
-                <div style={{ marginBottom: 8, fontWeight: 600 }}>Add Element</div>
-                <Space wrap size="small">
-                  <Button size="small" onClick={() => handleAddElement('text')}>
-                    + Text
-                  </Button>
-                  <Button size="small" onClick={() => handleAddElement('image')}>
-                    + Image
-                  </Button>
-                  <Button size="small" onClick={() => handleAddElement('shape')}>
-                    + Shape
-                  </Button>
-                  <Button size="small" onClick={() => handleAddElement('divider')}>
-                    + Line
-                  </Button>
-                  <Button size="small" onClick={() => handleAddElement('lottie')}>
-                    + Animated
-                  </Button>
-                </Space>
-              </div>
-
-              <div>
-                <div style={{ marginBottom: 8, marginTop: 4, fontWeight: 600 }}>Animated Stickers</div>
-                <Space wrap size="small">
-                  {LOTTIE_STICKERS.map((sticker) => (
-                    <Button key={sticker.key} size="small" type="dashed" onClick={() => handleAddLottieSticker(sticker)}>
-                      {sticker.thumb} {sticker.label}
-                    </Button>
-                  ))}
-                </Space>
-              </div>
-
-              {quickTextBlocks.length ? (
-                <div>
-                  <div style={{ marginBottom: 8, marginTop: 4, fontWeight: 600 }}>Quick Text Blocks</div>
-                  <Space wrap size="small">
-                    {quickTextBlocks.map((block) => (
-                      <Button key={block.key} size="small" type="dashed" onClick={() => handleAddQuickTextBlock(block.text)}>
-                        + {block.label}
-                      </Button>
-                    ))}
-                  </Space>
-                </div>
-              ) : null}
-
-              {sectionBlocks.length ? (
-                <div>
-                  <div style={{ marginBottom: 8, marginTop: 4, fontWeight: 600 }}>Insert Section Layout</div>
-                  <Space wrap size="small">
-                    {sectionBlocks.map((block) => (
-                      <Button key={block.key} size="small" onClick={() => handleAddSectionBlock(block)}>
-                        + {block.label}
-                      </Button>
-                    ))}
-                  </Space>
-                </div>
-              ) : null}
-
-              <Divider style={{ margin: '8px 0' }} />
-
-              <div>
-                <div style={{ marginBottom: 8, fontWeight: 600 }}>Layers</div>
-                {elements.length === 0 ? (
-                  <Empty description="No elements" image={Empty.PRESENTED_IMAGE_SIMPLE} />
-                ) : (
-                  <div className="canvas-layers">
-                    {elements.map((element) => (
-                      <div
-                        key={element.id}
-                        className={`canvas-layer ${selectedElementId === element.id ? 'selected' : ''}`}
-                        onClick={() => setSelectedElementId(element.id)}
-                      >
-                        <div className="layer-info">
-                          <span className="layer-type">{element.type}</span>
-                          <span className="layer-label">
-                            {element.type === 'text' && element.text.substring(0, 20)}
-                            {element.type === 'image' && 'Image'}
-                            {element.type === 'shape' && element.shapeType}
-                            {element.type === 'divider' && 'Divider'}
-                            {element.type === 'lottie' && 'Animated'}
-                          </span>
-                        </div>
-                        <div className="layer-actions">
-                          <Tooltip title={element.locked ? 'Unlock' : 'Lock'}>
-                            <Button
-                              type="text"
-                              size="small"
-                              icon={element.locked ? <LockOutlined /> : <UnlockOutlined />}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleUpdateElement(element.id, { locked: !element.locked });
-                              }}
-                            />
-                          </Tooltip>
-                        </div>
+            <Collapse
+              ghost
+              size="small"
+              className="canvas-tool-collapse"
+              defaultActiveKey={['add', 'stickers', 'layers']}
+              items={[
+                {
+                  key: 'add',
+                  label: 'Add Element',
+                  children: (
+                    <div className="tool-section-content">
+                      <Space wrap size="small">
+                        <Button size="small" onClick={() => handleAddElement('text')}>+ Text</Button>
+                        <Button size="small" onClick={() => handleAddElement('image')}>+ Image</Button>
+                        <Button size="small" onClick={() => handleAddElement('shape')}>+ Shape</Button>
+                        <Button size="small" onClick={() => handleAddElement('divider')}>+ Line</Button>
+                        <Button size="small" onClick={() => handleAddElement('lottie')}>+ Animated</Button>
+                      </Space>
+                    </div>
+                  ),
+                },
+                {
+                  key: 'stickers',
+                  label: 'Animated Stickers',
+                  children: (
+                    <div className="tool-section-content">
+                      <div className="sticker-filter-row">
+                        <Select
+                          size="small"
+                          value={stickerCategory}
+                          onChange={setStickerCategory}
+                          style={{ width: '100%' }}
+                          options={STICKER_CATEGORY_OPTIONS.map((option) => ({
+                            value: option.value,
+                            label: option.value === 'all'
+                              ? `${option.label} (${LOTTIE_STICKERS.length})`
+                              : `${option.label} (${stickerCategoryCounts[option.value] || 0})`,
+                          }))}
+                        />
                       </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </Space>
+                      <div className="sticker-grid">
+                        {filteredStickers.map((sticker) => (
+                          <Button key={sticker.key} size="small" type="dashed" onClick={() => handleAddLottieSticker(sticker)}>
+                            {sticker.thumb} {sticker.label}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  ),
+                },
+                ...(quickTextBlocks.length ? [{
+                  key: 'quick-text',
+                  label: 'Quick Text Blocks',
+                  children: (
+                    <div className="tool-section-content">
+                      <Space wrap size="small">
+                        {quickTextBlocks.map((block) => (
+                          <Button key={block.key} size="small" type="dashed" onClick={() => handleAddQuickTextBlock(block.text)}>
+                            + {block.label}
+                          </Button>
+                        ))}
+                      </Space>
+                    </div>
+                  ),
+                }] : []),
+                ...(sectionBlocks.length ? [{
+                  key: 'section-layouts',
+                  label: 'Insert Section Layout',
+                  children: (
+                    <div className="tool-section-content">
+                      <Space wrap size="small">
+                        {sectionBlocks.map((block) => (
+                          <Button key={block.key} size="small" onClick={() => handleAddSectionBlock(block)}>
+                            + {block.label}
+                          </Button>
+                        ))}
+                      </Space>
+                    </div>
+                  ),
+                }] : []),
+                {
+                  key: 'layers',
+                  label: `Layers (${elements.length})`,
+                  children: (
+                    <div className="tool-section-content">
+                      {elements.length === 0 ? (
+                        <Empty description="No elements" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+                      ) : (
+                        <div className="canvas-layers">
+                          {elements.map((element) => (
+                            <div
+                              key={element.id}
+                              className={`canvas-layer ${selectedElementId === element.id ? 'selected' : ''}`}
+                              onClick={() => setSelectedElementId(element.id)}
+                            >
+                              <div className="layer-info">
+                                <span className="layer-type">{element.type}</span>
+                                <span className="layer-label">
+                                  {element.type === 'text' && element.text.substring(0, 20)}
+                                  {element.type === 'image' && 'Image'}
+                                  {element.type === 'shape' && element.shapeType}
+                                  {element.type === 'divider' && 'Divider'}
+                                  {element.type === 'lottie' && 'Animated'}
+                                </span>
+                              </div>
+                              <div className="layer-actions">
+                                <Tooltip title={element.locked ? 'Unlock' : 'Lock'}>
+                                  <Button
+                                    type="text"
+                                    size="small"
+                                    icon={element.locked ? <LockOutlined /> : <UnlockOutlined />}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleUpdateElement(element.id, { locked: !element.locked });
+                                    }}
+                                  />
+                                </Tooltip>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ),
+                },
+              ]}
+            />
           </Card>
         </Col>
 
         {/* Center Panel - Canvas Preview */}
-        <Col xs={{ span: 24, order: 1 }} xl={{ span: 10, order: 2 }} xxl={{ span: 11, order: 2 }}>
+        <Col
+          xs={{ span: 24, order: 1 }}
+          xl={{ span: 10, order: 2 }}
+          xxl={{ span: 11, order: 2 }}
+          style={desktopWorkbench ? { flex: '1 1 auto', minWidth: 0 } : undefined}
+        >
           <Card title="Canvas Preview" size="small" className="invite-canvas-panel invite-canvas-panel--center">
             <div className="invite-canvas-center-body">
               <div className="canvas-viewport">
@@ -1199,7 +1281,11 @@ const InviteDesignCanvas = ({
         </Col>
 
         {/* Right Panel - Element Properties */}
-        <Col xs={{ span: 24, order: 3 }} xl={{ span: 8, order: 3 }}>
+        <Col
+          xs={{ span: 24, order: 3 }}
+          xl={{ span: 8, order: 3 }}
+          style={desktopWorkbench ? { flex: '0 0 360px', maxWidth: 360 } : undefined}
+        >
           <Card title="Element Properties" size="small" className="invite-canvas-panel invite-canvas-panel--right">
             {selectedElement ? (
               <Space direction="vertical" style={{ width: '100%' }} size={12}>

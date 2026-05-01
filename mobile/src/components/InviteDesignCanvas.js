@@ -6,6 +6,14 @@ import LottieView from 'lottie-react-native';
 import { Colors, Radius, Spacing } from '../theme';
 import { applyColorThemeToLayout, COLOR_THEMES, LOTTIE_STICKERS, STICKER_ASSETS } from '../utils/inviteTemplatePresets';
 
+const STICKER_CATEGORIES = [
+  { value: 'all', label: '✨ All' },
+  { value: 'wedding', label: '💍 Wedding' },
+  { value: 'celebration', label: '🎉 Celebration' },
+  { value: 'romantic', label: '❤️ Romantic' },
+  { value: 'festive', label: '🎊 Festive' },
+];
+
 const DEFAULT_LAYOUT = {
   canvasSize: '1080x1920',
   backgroundColor: '#fff7f2',
@@ -53,6 +61,7 @@ const InviteDesignCanvas = ({ layout, onLayoutChange, fullScreen = false, onDrag
   const [historyFuture, setHistoryFuture] = useState([]);
   const [customImageUrl, setCustomImageUrl] = useState('');
   const [lockPan, setLockPan] = useState(false);
+  const [stickerCategory, setStickerCategory] = useState('all');
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const dragRef = useRef({
     activeElementId: null,
@@ -70,6 +79,20 @@ const InviteDesignCanvas = ({ layout, onLayoutChange, fullScreen = false, onDrag
   const selectedElement = useMemo(
     () => mergedLayout.elements.find((element) => element.id === selectedElementId) || null,
     [mergedLayout.elements, selectedElementId]
+  );
+  const stickerCategoryCounts = useMemo(
+    () => LOTTIE_STICKERS.reduce((acc, sticker) => {
+      const key = sticker.category || 'festive';
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {}),
+    []
+  );
+  const filteredLottieStickers = useMemo(
+    () => (stickerCategory === 'all'
+      ? LOTTIE_STICKERS
+      : LOTTIE_STICKERS.filter((sticker) => sticker.category === stickerCategory)),
+    [stickerCategory]
   );
 
   const canvasSize = parseCanvasSize(mergedLayout.canvasSize);
@@ -461,9 +484,34 @@ const InviteDesignCanvas = ({ layout, onLayoutChange, fullScreen = false, onDrag
 
         {/* ── TOOLBAR ROW 1b: Lottie animated stickers ── */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 4 }}>
+          <View style={styles.categoryRow}>
+            {STICKER_CATEGORIES.map((category) => (
+              <Chip
+                key={category.value}
+                selected={stickerCategory === category.value}
+                onPress={() => setStickerCategory(category.value)}
+                compact
+                style={[
+                  styles.stickerCategoryChip,
+                  stickerCategory === category.value && styles.stickerCategoryChipActive,
+                ]}
+                textStyle={[
+                  styles.stickerCategoryText,
+                  stickerCategory === category.value && styles.stickerCategoryTextActive,
+                ]}
+              >
+                {category.value === 'all'
+                  ? `${category.label} (${LOTTIE_STICKERS.length})`
+                  : `${category.label} (${stickerCategoryCounts[category.value] || 0})`}
+              </Chip>
+            ))}
+          </View>
+        </ScrollView>
+
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 4 }}>
           <View style={styles.toolRow}>
             <Text style={[styles.propLabel, { alignSelf: 'center', marginRight: 4, marginBottom: 0 }]}>✨ Animated:</Text>
-            {LOTTIE_STICKERS.map((sticker) => (
+            {filteredLottieStickers.map((sticker) => (
               <ToolTile
                 key={sticker.key}
                 icon={sticker.thumb}
@@ -763,6 +811,11 @@ const styles = StyleSheet.create({
   toggleTileTextActive: { color: '#ffffff' },
   themeChip: { paddingHorizontal: 10, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
   themeChipText: { fontSize: 12, fontWeight: '700' },
+  categoryRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingBottom: 2 },
+  stickerCategoryChip: { backgroundColor: '#f8fafc', borderColor: '#cbd5e1' },
+  stickerCategoryChipActive: { backgroundColor: '#e0e7ff', borderColor: '#818cf8' },
+  stickerCategoryText: { fontSize: 11, color: '#475569', fontWeight: '600' },
+  stickerCategoryTextActive: { color: '#3730a3', fontWeight: '700' },
   toolSep: { width: 1, height: 40, backgroundColor: '#e2e8f0', marginHorizontal: 4 },
   canvasSection: { alignItems: 'center', justifyContent: 'center', paddingVertical: 12, backgroundColor: '#f8fafc' },
   canvasPreview: {

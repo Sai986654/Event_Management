@@ -500,6 +500,7 @@ const InviteDesignStudio = () => {
       </Card>
 
       <Row gutter={[18, 18]}>
+        {!selectedDesign ? (
         <Col xs={24} lg={8} xl={7}>
           <Card title="Template + New Design" className="invite-studio-card invite-studio-card--setup">
             <Space direction="vertical" style={{ width: '100%' }}>
@@ -546,15 +547,36 @@ const InviteDesignStudio = () => {
             )}
           </Card>
         </Col>
+        ) : null}
 
-        <Col xs={24} lg={16} xl={17}>
+        <Col xs={24} lg={selectedDesign ? 24 : 16} xl={selectedDesign ? 24 : 17}>
           <Card
             title={selectedDesign ? `Edit: ${selectedDesign.name}` : 'Design Editor'}
             extra={selectedDesign ? <Tag>Design ID: {selectedDesign.id}</Tag> : null}
-            className="invite-studio-card invite-studio-card--editor"
+            className={`invite-studio-card invite-studio-card--editor${selectedDesign ? ' invite-studio-card--editor-focus' : ''}`}
           >
             {selectedDesign ? (
               <Space direction="vertical" style={{ width: '100%' }} size={12}>
+                <Row gutter={12} align="bottom">
+                  <Col xs={24} md={14} lg={15} xl={16}>
+                    <Text strong>Switch Design</Text>
+                    <Select
+                      value={selectedDesignId}
+                      onChange={loadDesignDetails}
+                      style={{ width: '100%', marginTop: 6 }}
+                      options={designs.map((design) => ({
+                        value: design.id,
+                        label: `${design.name} (${design.status || 'draft'})`,
+                      }))}
+                    />
+                  </Col>
+                  <Col xs={24} md={10} lg={9} xl={8}>
+                    <Button onClick={() => loadDesignDetails(null)} style={{ width: '100%' }}>
+                      Back To Design List
+                    </Button>
+                  </Col>
+                </Row>
+
                 <Row gutter={12}>
                   <Col xs={24} sm={12} lg={10}>
                     <Text strong>Name</Text>
