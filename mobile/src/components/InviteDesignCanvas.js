@@ -1,7 +1,9 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { Image, ScrollView, StyleSheet, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { Button, Card, Chip, Divider, Text, TextInput } from 'react-native-paper';
+import * as ImagePicker from 'expo-image-picker';
 import { Colors, Radius, Spacing } from '../theme';
+import { STICKER_ASSETS } from '../utils/inviteTemplatePresets';
 
 const DEFAULT_LAYOUT = {
   canvasSize: '1080x1920',
@@ -25,7 +27,16 @@ const numberOrFallback = (value, fallback) => {
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const cloneLayout = (value) => JSON.parse(JSON.stringify(value || DEFAULT_LAYOUT));
 
-const InviteDesignCanvas = ({ layout, onLayoutChange }) => {
+const COLOR_OPTIONS = [
+  '#7c2d12', '#9a3412', '#b45309', '#1d4ed8', '#6d28d9', '#be185d',
+  '#065f46', '#0f766e', '#1f2937', '#475569', '#111827', '#ffffff',
+];
+
+const BACKGROUND_OPTIONS = [
+  '#fff7f2', '#fffbeb', '#eef2ff', '#fff1f2', '#f0f9ff', '#f6f8fc', '#ffffff',
+];
+
+const InviteDesignCanvas = ({ layout, onLayoutChange, fullScreen = false, onDragStateChange = () => {} }) => {
   const mergedLayout = {
     ...DEFAULT_LAYOUT,
     ...(layout && typeof layout === 'object' ? layout : {}),
@@ -39,6 +50,8 @@ const InviteDesignCanvas = ({ layout, onLayoutChange }) => {
   const [showSafeArea, setShowSafeArea] = useState(true);
   const [historyPast, setHistoryPast] = useState([]);
   const [historyFuture, setHistoryFuture] = useState([]);
+  const [customImageUrl, setCustomImageUrl] = useState('');
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const dragRef = useRef({
     activeElementId: null,
     mode: 'move',
@@ -58,8 +71,13 @@ const InviteDesignCanvas = ({ layout, onLayoutChange }) => {
   );
 
   const canvasSize = parseCanvasSize(mergedLayout.canvasSize);
-  const previewWidth = 260;
-  const previewHeight = Math.round((canvasSize.height / canvasSize.width) * previewWidth);
+  let previewWidth = fullScreen ? Math.max(320, screenWidth - 24) : 260;
+  let previewHeight = Math.round((canvasSize.height / canvasSize.width) * previewWidth);
+  const maxPreviewHeight = fullScreen ? Math.max(420, Math.floor(screenHeight * 0.68)) : 560;
+  if (previewHeight > maxPreviewHeight) {
+    previewHeight = maxPreviewHeight;
+    previewWidth = Math.round((canvasSize.width / canvasSize.height) * previewHeight);
+  }
 
   const commitLayout = (nextLayout, options = {}) => {
     const { trackHistory = true } = options;
@@ -192,6 +210,100 @@ const InviteDesignCanvas = ({ layout, onLayoutChange }) => {
     setSelectedElementIds((prev) => (multiSelectMode ? [...prev, id] : []));
   };
 
+  const addSticker = (sticker) => {
+    if (!sticker) return;
+    const id = `sticker-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+
+    const base = {
+      id,
+      x: 120,
+      y: 620,
+      width: numberOrFallback(sticker.width, 260),
+      height: numberOrFallback(sticker.height, 180),
+      z: mergedLayout.elements.length,
+    };
+
+    const element =
+      sticker.type === 'emoji'
+        ? {
+            ...base,
+            type: 'text',
+            text: sticker.text || '✨',
+            fontSize: numberOrFallback(sticker.fontSize, 56),
+            color: '#7c2d12',
+            textAlign: 'center',
+            fontWeight: '700',
+          }
+        : {
+            ...base,
+            type: 'image',
+            imageUrl: sticker.imageUrl || '',
+          };
+
+    patchLayout({ elements: [...mergedLayout.elements, element] });
+    setSelectedElementId(id);
+    setSelectedElementIds((prev) => (multiSelectMode ? [...prev, id] : []));
+  };
+
+  const addCustomImageSticker = () => {
+    const url = String(customImageUrl || '').trim();
+    if (!url) return;
+
+    const id = `custom-image-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const element = {
+      id,
+      type: 'image',
+      x: 140,
+      y: 680,
+      width: 300,
+      height: 300,
+      z: mergedLayout.elements.length,
+      imageUrl: url,
+    };
+
+    patchLayout({ elements: [...mergedLayout.elements, element] });
+    setSelectedElementId(id);
+    setSelectedElementIds((prev) => (multiSelectMode ? [...prev, id] : []));
+    setCustomImageUrl('');
+  };
+
+  const addImageFromGallery = async () => {
+    try {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (perm.status !== 'granted') {
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 0.9,
+      });
+
+      if (result.canceled || !result.assets?.length) return;
+      const uri = result.assets[0]?.uri;
+      if (!uri) return;
+
+      const id = `gallery-image-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      const element = {
+        id,
+        type: 'image',
+        x: 140,
+        y: 680,
+        width: 320,
+        height: 320,
+        z: mergedLayout.elements.length,
+        imageUrl: uri,
+      };
+
+      patchLayout({ elements: [...mergedLayout.elements, element] });
+      setSelectedElementId(id);
+      setSelectedElementIds((prev) => (multiSelectMode ? [...prev, id] : []));
+    } catch (_error) {
+      // Silent fallback keeps editor responsive if picker fails on unsupported envs.
+    }
+  };
+
   const deleteSelected = () => {
     const targetIds = multiSelectMode && selectedElementIds.length ? selectedElementIds : selectedElement ? [selectedElement.id] : [];
     if (!targetIds.length) return;
@@ -250,6 +362,7 @@ const InviteDesignCanvas = ({ layout, onLayoutChange }) => {
 
   const onElementDragStart = (element, nativeEvent) => {
     beginInteractionHistory();
+    onDragStateChange(true);
     if (multiSelectMode && !selectedElementIds.includes(element.id)) {
       setSelectedElementIds([element.id]);
     }
@@ -281,6 +394,7 @@ const InviteDesignCanvas = ({ layout, onLayoutChange }) => {
 
   const onResizeStart = (element, nativeEvent) => {
     beginInteractionHistory();
+    onDragStateChange(true);
     dragRef.current = {
       activeElementId: element.id,
       mode: 'resize',
@@ -384,6 +498,7 @@ const InviteDesignCanvas = ({ layout, onLayoutChange }) => {
       dragRef.current.mode = 'move';
       dragRef.current.groupElementIds = [];
       dragRef.current.startPositions = {};
+      onDragStateChange(false);
     }
   };
 
@@ -402,6 +517,26 @@ const InviteDesignCanvas = ({ layout, onLayoutChange }) => {
 
   const showVerticalGuide = selectedMetrics && Math.abs(selectedMetrics.cx - previewWidth / 2) <= 6;
   const showHorizontalGuide = selectedMetrics && Math.abs(selectedMetrics.cy - previewHeight / 2) <= 6;
+
+  const ColorSwatchRow = ({ selected, onSelect, options = COLOR_OPTIONS }) => (
+    <View style={styles.swatchRow}>
+      {options.map((value) => {
+        const isActive = String(selected || '').toLowerCase() === String(value).toLowerCase();
+        return (
+          <TouchableOpacity
+            key={value}
+            onPress={() => onSelect(value)}
+            style={[
+              styles.swatch,
+              { backgroundColor: value },
+              isActive ? styles.swatchActive : null,
+              value === '#ffffff' ? styles.swatchWhite : null,
+            ]}
+          />
+        );
+      })}
+    </View>
+  );
 
   return (
     <View>
@@ -515,9 +650,17 @@ const InviteDesignCanvas = ({ layout, onLayoutChange }) => {
                       ) : null}
 
                       {element.type === 'image' ? (
-                        <View style={styles.imagePlaceholder}>
-                          <Text style={styles.imagePlaceholderText}>Image</Text>
-                        </View>
+                        element.imageUrl ? (
+                          <Image
+                            source={{ uri: element.imageUrl }}
+                            resizeMode="cover"
+                            style={styles.imageFill}
+                          />
+                        ) : (
+                          <View style={styles.imagePlaceholder}>
+                            <Text style={styles.imagePlaceholderText}>Image</Text>
+                          </View>
+                        )
                       ) : null}
 
                       {isSelected ? (
@@ -551,6 +694,36 @@ const InviteDesignCanvas = ({ layout, onLayoutChange }) => {
             <Button mode="contained-tonal" onPress={() => addElement('shape')}>+ Shape</Button>
             <Button mode="contained-tonal" onPress={() => addElement('divider')}>+ Divider</Button>
             <Button mode="contained-tonal" onPress={() => addElement('image')}>+ Image</Button>
+          </View>
+
+          <Divider style={styles.divider} />
+
+          <Text style={styles.sectionTitle}>Emoji & Cartoon Stickers</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <View style={styles.rowWrap}>
+              {STICKER_ASSETS.map((asset) => (
+                <Chip key={asset.key} style={styles.chip} onPress={() => addSticker(asset)}>
+                  {asset.label}
+                </Chip>
+              ))}
+            </View>
+          </ScrollView>
+
+          <View style={{ marginTop: 10 }}>
+            <TextInput
+              mode="outlined"
+              label="Custom character image URL"
+              value={customImageUrl}
+              onChangeText={setCustomImageUrl}
+              style={styles.input}
+              placeholder="https://.../bride-groom.png"
+            />
+            <Button mode="contained-tonal" onPress={addCustomImageSticker} disabled={!customImageUrl.trim()}>
+              Add Custom Sticker
+            </Button>
+            <Button mode="outlined" onPress={addImageFromGallery} style={{ marginTop: 8 }}>
+              Pick From Gallery
+            </Button>
           </View>
         </Card.Content>
       </Card>
@@ -646,26 +819,17 @@ const InviteDesignCanvas = ({ layout, onLayoutChange }) => {
                       onChangeText={(value) => patchElement(selectedElement.id, { fontSize: numberOrFallback(value, 42) })}
                       style={styles.input}
                     />
-                    <TextInput
-                      mode="outlined"
-                      label="Color (#hex)"
-                      value={selectedElement.color || '#2b1d18'}
-                      onChangeText={(value) => patchElement(selectedElement.id, { color: value })}
-                      style={styles.input}
-                    />
                   </View>
+                  <Text style={styles.subtle}>Text Color</Text>
+                  <ColorSwatchRow
+                    selected={selectedElement.color || '#2b1d18'}
+                    onSelect={(value) => patchElement(selectedElement.id, { color: value })}
+                  />
                 </View>
               ) : null}
 
               {selectedElement.type === 'shape' ? (
                 <View style={styles.grid2}>
-                  <TextInput
-                    mode="outlined"
-                    label="Fill (#hex)"
-                    value={selectedElement.fillColor || '#fcd4b5'}
-                    onChangeText={(value) => patchElement(selectedElement.id, { fillColor: value })}
-                    style={styles.input}
-                  />
                   <TextInput
                     mode="outlined"
                     label="Radius"
@@ -677,14 +841,24 @@ const InviteDesignCanvas = ({ layout, onLayoutChange }) => {
                 </View>
               ) : null}
 
+              {selectedElement.type === 'shape' ? (
+                <>
+                  <Text style={styles.subtle}>Shape Fill Color</Text>
+                  <ColorSwatchRow
+                    selected={selectedElement.fillColor || '#fcd4b5'}
+                    onSelect={(value) => patchElement(selectedElement.id, { fillColor: value })}
+                  />
+                </>
+              ) : null}
+
               {selectedElement.type === 'divider' ? (
-                <TextInput
-                  mode="outlined"
-                  label="Color (#hex)"
-                  value={selectedElement.color || '#b45309'}
-                  onChangeText={(value) => patchElement(selectedElement.id, { color: value })}
-                  style={styles.input}
-                />
+                <>
+                  <Text style={styles.subtle}>Divider Color</Text>
+                  <ColorSwatchRow
+                    selected={selectedElement.color || '#b45309'}
+                    onSelect={(value) => patchElement(selectedElement.id, { color: value })}
+                  />
+                </>
               ) : null}
 
               {selectedElement.type === 'image' ? (
@@ -725,12 +899,11 @@ const InviteDesignCanvas = ({ layout, onLayoutChange }) => {
               </Chip>
             ))}
           </View>
-          <TextInput
-            mode="outlined"
-            label="Background Color (#hex)"
-            value={mergedLayout.backgroundColor || '#fff7f2'}
-            onChangeText={(value) => patchLayout({ backgroundColor: value })}
-            style={styles.input}
+          <Text style={styles.subtle}>Background Color</Text>
+          <ColorSwatchRow
+            selected={mergedLayout.backgroundColor || '#fff7f2'}
+            options={BACKGROUND_OPTIONS}
+            onSelect={(value) => patchLayout({ backgroundColor: value })}
           />
         </Card.Content>
       </Card>
@@ -821,6 +994,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: '#f3f4f6',
   },
+  imageFill: {
+    width: '100%',
+    height: '100%',
+  },
   imagePlaceholderText: {
     color: '#6b7280',
     fontSize: 10,
@@ -838,6 +1015,27 @@ const styles = StyleSheet.create({
   input: {
     marginBottom: 10,
     backgroundColor: Colors.surface,
+  },
+  swatchRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 6,
+    marginBottom: 10,
+  },
+  swatch: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+  },
+  swatchActive: {
+    borderWidth: 3,
+    borderColor: '#334155',
+  },
+  swatchWhite: {
+    borderColor: '#94a3b8',
   },
   grid2: {
     flexDirection: 'row',

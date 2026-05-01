@@ -2,7 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Card, Row, Col, Button, Spin, message, Rate, Tag, Divider, List, Modal,
-  Form, Select, DatePicker, InputNumber, Input, Badge, Empty, Image,
+  Form, Select, DatePicker, InputNumber, Input, Badge, Empty, Image, Space, Typography,
 } from 'antd';
 import {
   ShopOutlined, EnvironmentOutlined, PhoneOutlined, MailOutlined,
@@ -16,6 +16,8 @@ import { paymentService } from '../services/paymentService';
 import { AuthContext } from '../context/AuthContext';
 import { formatCurrency, getErrorMessage, getPaymentRequirement } from '../utils/helpers';
 import './VendorDetail.css';
+
+const { Text } = Typography;
 
 const CORE_RULE_KEYS = new Set(['fixed', 'perGuest', 'perPlate', 'perHour', 'minPlates']);
 
@@ -202,9 +204,9 @@ const VendorDetail = () => {
   };
 
   const handleBookVendor = async (values) => {
+    let bookingPrice = selectedPackage ? calculatedPrice : values.price;
     try {
       setBookingLoading(true);
-      const bookingPrice = selectedPackage ? calculatedPrice : values.price;
       const addonSummary = Object.entries(bookingCriteria.addons || {})
         .filter(([, qty]) => Number(qty || 0) > 0)
         .map(([key, qty]) => `${toRuleLabel(key)} x ${qty}`)
