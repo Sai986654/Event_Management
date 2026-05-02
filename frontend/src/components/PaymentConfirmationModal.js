@@ -3,7 +3,7 @@ import { Modal, Divider, Button, Row, Col, Statistic, Card, message, Space, Tag 
 import {
   CheckCircleOutlined,
   CopyOutlined,
-  FileDownloadOutlined,
+  DownloadOutlined,
   CloseOutlined,
 } from '@ant-design/icons';
 import './PaymentConfirmationModal.css';
@@ -99,7 +99,7 @@ Vedika 360 - Event Management Platform
         <Button key="close" type="primary" onClick={onClose}>
           Close
         </Button>,
-        <Button key="receipt" icon={<FileDownloadOutlined />} onClick={handleDownloadReceipt}>
+        <Button key="receipt" icon={<DownloadOutlined />} onClick={handleDownloadReceipt}>
           Download Receipt
         </Button>,
       ]}
