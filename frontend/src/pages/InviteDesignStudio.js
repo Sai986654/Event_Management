@@ -33,6 +33,7 @@ import { guestService } from '../services/guestService';
 import { inviteDesignService } from '../services/inviteDesignService';
 import { getErrorMessage, getPaymentRequirement } from '../utils/helpers';
 import { paymentService } from '../services/paymentService';
+import PaymentConfirmationModal from '../components/PaymentConfirmationModal';
 import InviteDesignCanvas from './InviteDesignCanvas';
 import {
   EVENT_TYPE_OPTIONS,
@@ -80,6 +81,9 @@ const InviteDesignStudio = () => {
   const [duplicating, setDuplicating] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [sending, setSending] = useState(false);
+  const [paymentReceiptVisible, setPaymentReceiptVisible] = useState(false);
+  const [paymentReceipt, setPaymentReceipt] = useState(null);
+  const [loadingReceipt, setLoadingReceipt] = useState(false);
 
   const selectedTemplateMeta = useMemo(
     () => templates.find((template) => template.key === selectedTemplate) || null,
@@ -399,12 +403,19 @@ const InviteDesignStudio = () => {
       const paymentRequirement = getPaymentRequirement(error);
       if (paymentRequirement && !hasRetriedAfterPayment) {
         try {
-          await paymentService.checkoutForEntity({
+          const paymentResult = await paymentService.checkoutForEntity({
             entityType: paymentRequirement.entityType,
             entityId: paymentRequirement.entityId,
             amount: paymentRequirement.config?.amount,
             description: `Invite design #${paymentRequirement.entityId} export`,
           });
+          
+          // Show payment confirmation receipt if available
+          if (paymentResult?.receipt) {
+            setPaymentReceipt(paymentResult.receipt);
+            setPaymentReceiptVisible(true);
+          }
+          
           await handleExportPdf(true);
           return;
         } catch (paymentError) {
@@ -844,6 +855,13 @@ const InviteDesignStudio = () => {
           </Card>
         </Col>
       </Row>
+      
+      <PaymentConfirmationModal
+        visible={paymentReceiptVisible}
+        receipt={paymentReceipt}
+        loading={loadingReceipt}
+        onClose={() => setPaymentReceiptVisible(false)}
+      />
     </div>
   );
 };

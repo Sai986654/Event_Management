@@ -15,6 +15,7 @@ import { aiService } from '../services/aiService';
 import { paymentService } from '../services/paymentService';
 import { AuthContext } from '../context/AuthContext';
 import { formatCurrency, getErrorMessage, getPaymentRequirement } from '../utils/helpers';
+import PaymentConfirmationModal from '../components/PaymentConfirmationModal';
 import './VendorDetail.css';
 
 const { Text } = Typography;
@@ -123,6 +124,9 @@ const VendorDetail = () => {
   const [calculatedPrice, setCalculatedPrice] = useState(0);
   const [reviewSummary, setReviewSummary] = useState(null);
   const [loadingReviewSummary, setLoadingReviewSummary] = useState(false);
+  const [paymentReceiptVisible, setPaymentReceiptVisible] = useState(false);
+  const [paymentReceipt, setPaymentReceipt] = useState(null);
+  const [loadingReceipt, setLoadingReceipt] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -227,12 +231,18 @@ const VendorDetail = () => {
       const paymentRequirement = getPaymentRequirement(error);
       if (paymentRequirement) {
         try {
-          await paymentService.checkoutForEntity({
+          const paymentResult = await paymentService.checkoutForEntity({
             entityType: paymentRequirement.entityType,
             entityId: paymentRequirement.entityId,
             amount: Number(paymentRequirement.config?.amount || bookingPrice || 0),
             description: `Booking #${paymentRequirement.entityId} confirmation`,
           });
+
+          // Show payment confirmation receipt if available
+          if (paymentResult?.receipt) {
+            setPaymentReceipt(paymentResult.receipt);
+            setPaymentReceiptVisible(true);
+          }
 
           await bookingService.updateBookingStatus(paymentRequirement.entityId, 'confirmed');
           message.success('Booking created and payment completed successfully.');
@@ -644,6 +654,13 @@ const VendorDetail = () => {
           </Form.Item>
         </Form>
       </Modal>
+      
+      <PaymentConfirmationModal
+        visible={paymentReceiptVisible}
+        receipt={paymentReceipt}
+        loading={loadingReceipt}
+        onClose={() => setPaymentReceiptVisible(false)}
+      />
     </div>
   );
 };

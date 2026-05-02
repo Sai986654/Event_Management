@@ -7,6 +7,7 @@ import { vendorService } from '../services/vendorService';
 import { aiService } from '../services/aiService';
 import { getErrorMessage, getPaymentRequirement } from '../utils/helpers';
 import { paymentService } from '../services/paymentService';
+import PaymentConfirmationModal from '../components/PaymentConfirmationModal';
 import './PhaseFlows.css';
 
 const { Text } = Typography;
@@ -90,6 +91,9 @@ const EventPlanner = () => {
   const [checklistItems, setChecklistItems] = useState([]);
   const [checklistSaving, setChecklistSaving] = useState(false);
   const [publishingWebsite, setPublishingWebsite] = useState(false);
+  const [paymentReceiptVisible, setPaymentReceiptVisible] = useState(false);
+  const [paymentReceipt, setPaymentReceipt] = useState(null);
+  const [loadingReceipt, setLoadingReceipt] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -510,12 +514,19 @@ const EventPlanner = () => {
       const paymentRequirement = getPaymentRequirement(err);
       if (paymentRequirement && !hasRetriedAfterPayment) {
         try {
-          await paymentService.checkoutForEntity({
+          const paymentResult = await paymentService.checkoutForEntity({
             entityType: paymentRequirement.entityType,
             entityId: paymentRequirement.entityId,
             amount: paymentRequirement.config?.amount,
             description: `Order #${paymentRequirement.entityId} payment`,
           });
+          
+          // Show payment confirmation receipt if available
+          if (paymentResult?.receipt) {
+            setPaymentReceipt(paymentResult.receipt);
+            setPaymentReceiptVisible(true);
+          }
+          
           await placeOrder(true);
           return;
         } catch (paymentError) {
@@ -1039,6 +1050,13 @@ const EventPlanner = () => {
           </div>
         </Card>
       </Space>
+      
+      <PaymentConfirmationModal
+        visible={paymentReceiptVisible}
+        receipt={paymentReceipt}
+        loading={loadingReceipt}
+        onClose={() => setPaymentReceiptVisible(false)}
+      />
     </div>
   );
 };

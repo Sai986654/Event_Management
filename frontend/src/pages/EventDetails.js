@@ -30,6 +30,7 @@ import { notificationService } from '../services/notificationService';
 import { AuthContext } from '../context/AuthContext';
 import InviteVideoManager from '../components/InviteVideoManager';
 import { paymentService } from '../services/paymentService';
+import PaymentConfirmationModal from '../components/PaymentConfirmationModal';
 import './EventDetails.css';
 
 const { TextArea } = Input;
@@ -58,6 +59,9 @@ const EventDetails = () => {
   const [generatingChecklist, setGeneratingChecklist] = useState(false);
   const [loadingInsights, setLoadingInsights] = useState(false);
   const [postEventInsights, setPostEventInsights] = useState(null);
+  const [paymentReceiptVisible, setPaymentReceiptVisible] = useState(false);
+  const [paymentReceipt, setPaymentReceipt] = useState(null);
+  const [loadingReceipt, setLoadingReceipt] = useState(false);
 
   // Real-time handlers
   const handleGuestRsvp = useCallback((data) => {
@@ -163,12 +167,19 @@ const EventDetails = () => {
       const paymentRequirement = getPaymentRequirement(error);
       if (paymentRequirement && !hasRetriedAfterPayment) {
         try {
-          await paymentService.checkoutForEntity({
+          const paymentResult = await paymentService.checkoutForEntity({
             entityType: paymentRequirement.entityType,
             entityId: paymentRequirement.entityId,
             amount: paymentRequirement.config?.amount,
             description: `Booking #${paymentRequirement.entityId} confirmation`,
           });
+          
+          // Show payment confirmation receipt if available
+          if (paymentResult?.receipt) {
+            setPaymentReceipt(paymentResult.receipt);
+            setPaymentReceiptVisible(true);
+          }
+          
           await handleUpdateBookingStatus(bookingId, status, true);
           return;
         } catch (paymentError) {
@@ -761,6 +772,13 @@ const EventDetails = () => {
           />
         </>
       )}
+      
+      <PaymentConfirmationModal
+        visible={paymentReceiptVisible}
+        receipt={paymentReceipt}
+        loading={loadingReceipt}
+        onClose={() => setPaymentReceiptVisible(false)}
+      />
     </div>
   );
 };

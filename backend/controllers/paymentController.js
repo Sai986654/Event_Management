@@ -130,10 +130,21 @@ exports.verifyPayment = asyncHandler(async (req, res) => {
     // Update entity based on type
     await updateEntityAfterPayment(payment.entityType, payment.entityId);
 
+    // Send payment confirmation email asynchronously (don't wait for it)
+    setImmediate(() => {
+      paymentService.sendPaymentConfirmationEmail(updatedPayment.id).catch((err) => {
+        console.error('Failed to send payment confirmation email:', err);
+      });
+    });
+
+    // Get full payment details for response
+    const fullDetails = await paymentService.getFullPaymentDetails(updatedPayment.id, userId);
+
     res.json({
       success: true,
       message: 'Payment verified successfully',
       payment: updatedPayment,
+      receipt: fullDetails,
     });
   } catch (error) {
     console.error('Error verifying payment:', error);
@@ -160,6 +171,24 @@ exports.getPaymentDetails = asyncHandler(async (req, res) => {
   }
 
   res.json({ payment });
+});
+
+// ── Get Payment Receipt with Full Details ───────────────────
+
+exports.getPaymentReceipt = asyncHandler(async (req, res) => {
+  const { paymentId } = req.params;
+  const userId = req.user.id;
+
+  const receipt = await paymentService.getFullPaymentDetails(parseInt(paymentId), userId);
+
+  if (!receipt) {
+    return res.status(404).json({ message: 'Payment receipt not found' });
+  }
+
+  res.json({
+    success: true,
+    receipt,
+  });
 });
 
 // ── Get User Payments ───────────────────────────────────────

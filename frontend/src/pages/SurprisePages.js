@@ -13,6 +13,7 @@ import {
 import { surpriseService } from '../services/surpriseService';
 import { paymentService } from '../services/paymentService';
 import { getErrorMessage, getPaymentRequirement } from '../utils/helpers';
+import PaymentConfirmationModal from '../components/PaymentConfirmationModal';
 
 const { Title, Text, Paragraph } = Typography;
 const { TextArea } = Input;
@@ -47,6 +48,9 @@ const SurprisePages = () => {
   const [form] = Form.useForm();
   const [editForm] = Form.useForm();
   const [filterCategory, setFilterCategory] = useState(null);
+  const [paymentReceiptVisible, setPaymentReceiptVisible] = useState(false);
+  const [paymentReceipt, setPaymentReceipt] = useState(null);
+  const [loadingReceipt, setLoadingReceipt] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -178,12 +182,19 @@ const SurprisePages = () => {
       const paymentRequirement = getPaymentRequirement(err);
       if (paymentRequirement && !hasRetriedAfterPayment) {
         try {
-          await paymentService.checkoutForEntity({
+          const paymentResult = await paymentService.checkoutForEntity({
             entityType: paymentRequirement.entityType,
             entityId: paymentRequirement.entityId,
             amount: paymentRequirement.config?.amount,
             description: `Surprise page #${paymentRequirement.entityId} publish`,
           });
+          
+          // Show payment confirmation receipt if available
+          if (paymentResult?.receipt) {
+            setPaymentReceipt(paymentResult.receipt);
+            setPaymentReceiptVisible(true);
+          }
+          
           await handlePublish(page, true);
           return;
         } catch (paymentError) {
@@ -758,6 +769,13 @@ const SurprisePages = () => {
           </>
         )}
       </Modal>
+      
+      <PaymentConfirmationModal
+        visible={paymentReceiptVisible}
+        receipt={paymentReceipt}
+        loading={loadingReceipt}
+        onClose={() => setPaymentReceiptVisible(false)}
+      />
     </div>
   );
 };

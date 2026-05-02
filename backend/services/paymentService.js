@@ -242,6 +242,102 @@ exports.processWebhookEvent = async (webhookData) => {
   }
 };
 
+// Send payment confirmation email with details
+exports.sendPaymentConfirmationEmail = async (paymentId) => {
+  try {
+    const { sendPaymentConfirmation } = require('./notificationService');
+    
+    const payment = await prisma.payment.findUnique({
+      where: { id: paymentId },
+      include: { user: true },
+    });
+
+    if (!payment || !payment.user.email) {
+      console.warn(`Cannot send payment email for payment ${paymentId}: payment or user email not found`);
+      return false;
+    }
+
+    // Get entity title based on type
+    let entityTitle = '';
+    if (payment.entityType === 'event') {
+      const event = await prisma.event.findUnique({ where: { id: payment.entityId } });
+      entityTitle = event?.title || 'Event';
+    } else if (payment.entityType === 'booking') {
+      const booking = await prisma.booking.findUnique({ where: { id: payment.entityId } });
+      entityTitle = booking?.vendorName || 'Booking';
+    } else if (payment.entityType === 'order') {
+      const order = await prisma.order.findUnique({ where: { id: payment.entityId } });
+      entityTitle = order?.vendorName || 'Order';
+    }
+
+    return await sendPaymentConfirmation({
+      to: payment.user.email,
+      paymentData: payment,
+      entityType: payment.entityType,
+      entityTitle,
+    });
+  } catch (error) {
+    console.error('Error sending payment confirmation email:', error);
+    return false;
+  }
+};
+
+// Get full payment details with related information
+exports.getFullPaymentDetails = async (paymentId, userId) => {
+  try {
+    const payment = await prisma.payment.findUnique({
+      where: { id: paymentId },
+      include: { user: { select: { id: true, email: true, name: true, phone: true } } },
+    });
+
+    if (!payment) {
+      return null;
+    }
+
+    if (payment.userId !== userId) {
+      return null; // Unauthorized
+    }
+
+    // Get entity details
+    let entityDetails = null;
+    if (payment.entityType === 'event') {
+      entityDetails = await prisma.event.findUnique({
+        where: { id: payment.entityId },
+        select: { id: true, title: true, date: true, location: true },
+      });
+    } else if (payment.entityType === 'booking') {
+      entityDetails = await prisma.booking.findUnique({
+        where: { id: payment.entityId },
+        select: { id: true, vendorName: true, serviceType: true, amount: true },
+      });
+    } else if (payment.entityType === 'order') {
+      entityDetails = await prisma.order.findUnique({
+        where: { id: payment.entityId },
+        select: { id: true, vendorName: true, serviceType: true, totalAmount: true },
+      });
+    }
+
+    return {
+      payment,
+      entityDetails,
+      formattedAmount: `₹${payment.amount} ${payment.currency || 'INR'}`,
+      statusDisplay: payment.status.toUpperCase(),
+      completedAtFormatted: payment.completedAt 
+        ? new Date(payment.completedAt).toLocaleDateString('en-IN', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+          })
+        : null,
+    };
+  } catch (error) {
+    console.error('Error fetching full payment details:', error);
+    return null;
+  }
+};
+
 module.exports = exports;
 
 exports.PAYMENT_ENTITY_TYPES = PAYMENT_ENTITY_TYPES;

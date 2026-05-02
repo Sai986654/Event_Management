@@ -28,6 +28,9 @@ router.put('/configurations/:entityType', authorize('admin'), paymentController.
 // Get payment details
 router.get('/:paymentId', paymentController.getPaymentDetails);
 
+// Get payment receipt with full details
+router.get('/:paymentId/receipt', paymentController.getPaymentReceipt);
+
 // Get user's payment history
 router.get('/', paymentController.getUserPayments);
 

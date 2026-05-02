@@ -55,6 +55,11 @@ export const paymentService = {
     return response.data;
   },
 
+  getPaymentReceipt: async (paymentId) => {
+    const response = await api.get(`/payments/${paymentId}/receipt`);
+    return response.data;
+  },
+
   checkoutForEntity: async ({ entityType, entityId, amount, description }) => {
     await loadRazorpayScript();
 
