@@ -640,23 +640,7 @@ const Dashboard = () => {
     <Layout.Content className="dashboard-container">
       {role === 'vendor' && <VendorDashboard user={user} />}
       {role === 'guest' && <GuestDashboard user={user} />}
-      {(role === 'admin' || role === 'organizer') && (
-        <>
-          <OrganizerDashboard user={user} />
-          <Card title="Organizer tools" style={{ marginTop: 24 }}>
-            <p style={{ marginBottom: 12, color: '#667085' }}>
-              Manage events, invitations, and vendor coordination all from one place.
-            </p>
-            <Space wrap>
-              <Link to="/activities"><Button type="primary">Activity Tracker</Button></Link>
-              <Link to={activeEvents.length > 0 ? `/events/${activeEvents[0].id}/invite-studio` : '#'} onClick={(e) => activeEvents.length === 0 && e.preventDefault()}>
-                <Button disabled={activeEvents.length === 0}>Invite Studio</Button>
-              </Link>
-              <Link to="/planner"><Button>Event Planner &amp; quotes</Button></Link>
-            </Space>
-          </Card>
-        </>
-      )}
+      {(role === 'admin' || role === 'organizer') && <OrganizerDashboard user={user} />}
       {role === 'customer' && <CustomerDashboard user={user} />}
     </Layout.Content>
   );
