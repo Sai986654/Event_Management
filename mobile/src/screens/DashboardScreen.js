@@ -2,6 +2,8 @@ import React, { useContext, useEffect, useState, useCallback, useLayoutEffect } 
 import { View, StyleSheet, ScrollView, RefreshControl, Linking, TouchableOpacity, Alert } from 'react-native';
 import { Text, Card, Button, Chip, FAB, ActivityIndicator, IconButton, Menu } from 'react-native-paper';
 import * as Location from 'expo-location';
+import { MotiView } from 'moti';
+import { Easing } from 'react-native-reanimated';
 import { AuthContext } from '../context/AuthContext';
 import { eventService } from '../services/eventService';
 import { bookingService } from '../services/bookingService';
@@ -54,6 +56,32 @@ const qStyles = StyleSheet.create({
   title: { fontWeight: '700', color: Colors.textPrimary },
   sub: { color: Colors.textSecondary, marginTop: 2, fontSize: 12 },
 });
+
+const AnimatedEntrance = ({ children, delay = 0, style }) => (
+  <MotiView
+    from={{ opacity: 0, translateY: 18, scale: 0.98 }}
+    animate={{ opacity: 1, translateY: 0, scale: 1 }}
+    transition={{ type: 'timing', duration: 480, delay, easing: Easing.out(Easing.cubic) }}
+    style={style}
+  >
+    {children}
+  </MotiView>
+);
+
+const AmbientOrbs = () => (
+  <View pointerEvents="none" style={styles.ambientLayer}>
+    <MotiView
+      style={[styles.orb, styles.orbOne]}
+      animate={{ translateX: [0, 14, 0], translateY: [0, -12, 0], opacity: [0.2, 0.34, 0.2] }}
+      transition={{ type: 'timing', duration: 7000, loop: true, easing: Easing.inOut(Easing.ease) }}
+    />
+    <MotiView
+      style={[styles.orb, styles.orbTwo]}
+      animate={{ translateX: [0, -16, 0], translateY: [0, 10, 0], opacity: [0.14, 0.28, 0.14] }}
+      transition={{ type: 'timing', duration: 8600, loop: true, easing: Easing.inOut(Easing.ease) }}
+    />
+  </View>
+);
 
 /* ── Organizer / Admin / Customer Dashboard ── */
 const SORT_OPTIONS = [
@@ -173,23 +201,29 @@ const EventsDashboard = ({ user, navigation }) => {
 
   return (
     <View style={styles.container}>
+      <AmbientOrbs />
       <ScrollView
+        contentContainerStyle={styles.scrollContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchEvents(); }} colors={[Colors.primary]} />}
       >
         {/* Hero */}
-        <Card style={styles.heroCard}>
-          <Card.Content>
-            <Text variant="headlineSmall" style={styles.greeting}>Welcome, {user?.name}! 👋</Text>
-            <Text variant="bodySmall" style={styles.heroSubtext}>Track budgets, orders, and execution in one place.</Text>
-          </Card.Content>
-        </Card>
+        <AnimatedEntrance delay={60}>
+          <Card style={styles.heroCard}>
+            <Card.Content>
+              <Text variant="headlineSmall" style={styles.greeting}>Welcome, {user?.name}! 👋</Text>
+              <Text variant="bodySmall" style={styles.heroSubtext}>Track budgets, orders, and execution in one place.</Text>
+            </Card.Content>
+          </Card>
+        </AnimatedEntrance>
 
         {/* Stats */}
-        <View style={styles.statsRow}>
-          <StatCard label="Events" value={events.length} accent />
-          <StatCard label="Upcoming" value={upcoming} color={Colors.primary} />
-          <StatCard label="Total Budget" value={formatCurrency(totalBudget)} color={Colors.success} />
-        </View>
+        <AnimatedEntrance delay={120}>
+          <View style={styles.statsRow}>
+            <StatCard label="Events" value={events.length} accent />
+            <StatCard label="Upcoming" value={upcoming} color={Colors.primary} />
+            <StatCard label="Total Budget" value={formatCurrency(totalBudget)} color={Colors.success} />
+          </View>
+        </AnimatedEntrance>
 
         {/* Event Tabs */}
         <View style={sortStyles.headerRow}>
@@ -256,39 +290,42 @@ const EventsDashboard = ({ user, navigation }) => {
         </View>
 
         {visibleEvents.length === 0 ? (
-          <Card style={styles.emptyCard}>
-            <Card.Content>
-              <Text style={styles.emptyText}>
-                {activeTab === 'active'
-                  ? 'No active events yet. Book a vendor to move events here!'
-                  : activeTab === 'completed'
-                    ? 'No completed events yet. Completed events will appear here for tracking.'
-                    : 'No draft events. Tap + to create your first event!'}
-              </Text>
-            </Card.Content>
-          </Card>
-        ) : (
-          visibleEvents.map((event) => (
-            <Card
-              key={event.id}
-              style={styles.eventCard}
-              onPress={() => navigation.navigate('EventDetail', { eventId: event.id })}
-            >
+          <AnimatedEntrance delay={190}>
+            <Card style={styles.emptyCard}>
               <Card.Content>
-                <View style={styles.eventRow}>
-                  <Text variant="titleMedium" numberOfLines={1} style={styles.eventTitle}>{event.title}</Text>
-                  <Chip compact textStyle={styles.statusChipText} style={[styles.statusChip, { backgroundColor: getStatusColor(event.status) + '18' }]}>
-                    {event.status}
-                  </Chip>
-                </View>
-                <Text variant="bodySmall" style={styles.eventMeta}>
-                  📅 {formatDate(event.date)}  •  📍 {event.venue || event.location}
+                <Text style={styles.emptyText}>
+                  {activeTab === 'active'
+                    ? 'No active events yet. Book a vendor to move events here!'
+                    : activeTab === 'completed'
+                      ? 'No completed events yet. Completed events will appear here for tracking.'
+                      : 'No draft events. Tap + to create your first event!'}
                 </Text>
-                {event.budget ? (
-                  <Text variant="bodySmall" style={styles.eventBudget}>💰 {formatCurrency(event.budget)}</Text>
-                ) : null}
               </Card.Content>
             </Card>
+          </AnimatedEntrance>
+        ) : (
+          visibleEvents.map((event, index) => (
+            <AnimatedEntrance key={event.id} delay={180 + index * 60}>
+              <Card
+                style={styles.eventCard}
+                onPress={() => navigation.navigate('EventDetail', { eventId: event.id })}
+              >
+                <Card.Content>
+                  <View style={styles.eventRow}>
+                    <Text variant="titleMedium" numberOfLines={1} style={styles.eventTitle}>{event.title}</Text>
+                    <Chip compact textStyle={styles.statusChipText} style={[styles.statusChip, { backgroundColor: getStatusColor(event.status) + '18' }]}>
+                      {event.status}
+                    </Chip>
+                  </View>
+                  <Text variant="bodySmall" style={styles.eventMeta}>
+                    📅 {formatDate(event.date)}  •  📍 {event.venue || event.location}
+                  </Text>
+                  {event.budget ? (
+                    <Text variant="bodySmall" style={styles.eventBudget}>💰 {formatCurrency(event.budget)}</Text>
+                  ) : null}
+                </Card.Content>
+              </Card>
+            </AnimatedEntrance>
           ))
         )}
 
@@ -296,52 +333,64 @@ const EventsDashboard = ({ user, navigation }) => {
         <Text variant="titleMedium" style={styles.sectionTitle}>Quick Actions</Text>
 
         {(user?.role === 'customer' || user?.role === 'admin') && (
-          <ActionCard
-            icon="clipboard-check-outline"
-            title="Plan Event End-to-End"
-            subtitle="Build quotation and place order"
-            onPress={() => navigation.navigate('Planner')}
-          />
+          <AnimatedEntrance delay={280}>
+            <ActionCard
+              icon="clipboard-check-outline"
+              title="Plan Event End-to-End"
+              subtitle="Build quotation and place order"
+              onPress={() => navigation.navigate('Planner')}
+            />
+          </AnimatedEntrance>
         )}
         {(user?.role === 'organizer' || user?.role === 'admin') && (
-          <ActionCard
-            icon="chart-timeline-variant"
-            title="Update Activity Progress"
-            subtitle="Track spend and progress transparently"
-            onPress={() => navigation.navigate('ActivityTracker')}
-          />
+          <AnimatedEntrance delay={320}>
+            <ActionCard
+              icon="chart-timeline-variant"
+              title="Update Activity Progress"
+              subtitle="Track spend and progress transparently"
+              onPress={() => navigation.navigate('ActivityTracker')}
+            />
+          </AnimatedEntrance>
         )}
         {(user?.role === 'organizer' || user?.role === 'admin') && events.length > 0 && (
-          <ActionCard
-            icon="account-group-outline"
-            title="Guest Management"
-            subtitle="Add guests, track RSVPs, check-ins"
-            onPress={() => navigation.navigate('GuestManagement', { eventId: events[0].id })}
-          />
+          <AnimatedEntrance delay={360}>
+            <ActionCard
+              icon="account-group-outline"
+              title="Guest Management"
+              subtitle="Add guests, track RSVPs, check-ins"
+              onPress={() => navigation.navigate('GuestManagement', { eventId: events[0].id })}
+            />
+          </AnimatedEntrance>
         )}
         {(user?.role === 'organizer' || user?.role === 'admin') && events.length > 0 && (
-          <ActionCard
-            icon="cash-multiple"
-            title="Budget Dashboard"
-            subtitle="Track allocations and spending"
-            onPress={() => navigation.navigate('BudgetDashboard', { eventId: events[0].id })}
-          />
+          <AnimatedEntrance delay={400}>
+            <ActionCard
+              icon="cash-multiple"
+              title="Budget Dashboard"
+              subtitle="Track allocations and spending"
+              onPress={() => navigation.navigate('BudgetDashboard', { eventId: events[0].id })}
+            />
+          </AnimatedEntrance>
         )}
 
         {user?.role === 'admin' && (
-          <ActionCard
-            icon="shield-check-outline"
-            title="Admin Control Center"
-            subtitle="Verify vendors and create users"
-            onPress={() => navigation.navigate('AdminControl')}
-          />
+          <AnimatedEntrance delay={440}>
+            <ActionCard
+              icon="shield-check-outline"
+              title="Admin Control Center"
+              subtitle="Verify vendors and create users"
+              onPress={() => navigation.navigate('AdminControl')}
+            />
+          </AnimatedEntrance>
         )}
-        <ActionCard
-          icon="party-popper"
-          title="Surprise Pages ✨"
-          subtitle="Create viral interactive surprise experiences"
-          onPress={() => navigation.navigate('SurprisePages')}
-        />
+        <AnimatedEntrance delay={480}>
+          <ActionCard
+            icon="party-popper"
+            title="Surprise Pages ✨"
+            subtitle="Create viral interactive surprise experiences"
+            onPress={() => navigation.navigate('SurprisePages')}
+          />
+        </AnimatedEntrance>
         <View style={{ height: 90 }} />
       </ScrollView>
 
@@ -566,6 +615,29 @@ const DashboardScreen = ({ navigation }) => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
+  scrollContent: { paddingBottom: Spacing.sm },
+  ambientLayer: {
+    ...StyleSheet.absoluteFillObject,
+    overflow: 'hidden',
+  },
+  orb: {
+    position: 'absolute',
+    borderRadius: 999,
+  },
+  orbOne: {
+    width: 220,
+    height: 220,
+    backgroundColor: '#6D7CFF',
+    top: -56,
+    right: -64,
+  },
+  orbTwo: {
+    width: 190,
+    height: 190,
+    backgroundColor: '#18B6B6',
+    bottom: 120,
+    left: -76,
+  },
   loader: { flex: 1, justifyContent: 'center' },
   heroCard: {
     marginHorizontal: Spacing.lg,

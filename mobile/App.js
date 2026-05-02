@@ -1,3 +1,4 @@
+import 'react-native-reanimated';
 import React, { useContext, useCallback, useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { View, StyleSheet, ActivityIndicator, Image } from 'react-native';
