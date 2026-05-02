@@ -126,7 +126,7 @@ const VendorDetail = () => {
   const [loadingReviewSummary, setLoadingReviewSummary] = useState(false);
   const [paymentReceiptVisible, setPaymentReceiptVisible] = useState(false);
   const [paymentReceipt, setPaymentReceipt] = useState(null);
-  const [loadingReceipt, setLoadingReceipt] = useState(false);
+  const [loadingReceipt] = useState(false);
 
   useEffect(() => {
     const load = async () => {

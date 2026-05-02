@@ -61,7 +61,7 @@ const EventDetails = () => {
   const [postEventInsights, setPostEventInsights] = useState(null);
   const [paymentReceiptVisible, setPaymentReceiptVisible] = useState(false);
   const [paymentReceipt, setPaymentReceipt] = useState(null);
-  const [loadingReceipt, setLoadingReceipt] = useState(false);
+  const [loadingReceipt] = useState(false);
 
   // Real-time handlers
   const handleGuestRsvp = useCallback((data) => {

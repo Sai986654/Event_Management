@@ -50,7 +50,7 @@ const SurprisePages = () => {
   const [filterCategory, setFilterCategory] = useState(null);
   const [paymentReceiptVisible, setPaymentReceiptVisible] = useState(false);
   const [paymentReceipt, setPaymentReceipt] = useState(null);
-  const [loadingReceipt, setLoadingReceipt] = useState(false);
+  const [loadingReceipt] = useState(false);
 
   useEffect(() => {
     loadData();

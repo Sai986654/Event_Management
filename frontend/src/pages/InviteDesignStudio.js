@@ -83,7 +83,7 @@ const InviteDesignStudio = () => {
   const [sending, setSending] = useState(false);
   const [paymentReceiptVisible, setPaymentReceiptVisible] = useState(false);
   const [paymentReceipt, setPaymentReceipt] = useState(null);
-  const [loadingReceipt, setLoadingReceipt] = useState(false);
+  const [loadingReceipt] = useState(false);
 
   const selectedTemplateMeta = useMemo(
     () => templates.find((template) => template.key === selectedTemplate) || null,

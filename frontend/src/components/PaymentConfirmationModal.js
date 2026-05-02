@@ -1,10 +1,9 @@
 import React from 'react';
-import { Modal, Divider, Button, Row, Col, Statistic, Card, message, Space, Tag } from 'antd';
+import { Modal, Divider, Button, Row, Col, Statistic, Card, message, Tag } from 'antd';
 import {
   CheckCircleOutlined,
   CopyOutlined,
   DownloadOutlined,
-  CloseOutlined,
 } from '@ant-design/icons';
 import './PaymentConfirmationModal.css';
 

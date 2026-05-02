@@ -93,7 +93,7 @@ const EventPlanner = () => {
   const [publishingWebsite, setPublishingWebsite] = useState(false);
   const [paymentReceiptVisible, setPaymentReceiptVisible] = useState(false);
   const [paymentReceipt, setPaymentReceipt] = useState(null);
-  const [loadingReceipt, setLoadingReceipt] = useState(false);
+  const [loadingReceipt] = useState(false);
 
   useEffect(() => {
     (async () => {
