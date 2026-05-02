@@ -380,7 +380,7 @@ const OrganizerDashboard = ({ user }) => {
       ? [{ key: 'activities', label: 'Activity Tracker', to: '/activities', kind: 'default' }]
       : []),
     ...((user?.role === 'organizer' || user?.role === 'admin')
-      ? [{ key: 'contact-intelligence', label: 'Contact Intelligence', to: '/contact-intelligence', kind: 'default' }]
+      ? [{ key: 'invite-studio', label: 'Invite Studio', to: events.length > 0 ? `/events/${events[0].id}/invite-studio` : '#', kind: 'default', disabled: events.length === 0 }]
       : []),
     ...(user?.role === 'organizer' ? [{ key: 'planner', label: 'Event Planner', to: '/planner', kind: 'default' }] : []),
   ];
@@ -405,8 +405,8 @@ const OrganizerDashboard = ({ user }) => {
         <div className="dashboard-action-rail-header">Quick Actions</div>
         <Space wrap size={[10, 10]}>
           {quickActions.map((item) => (
-            <Link key={item.key} to={item.to}>
-              <Button type={item.kind === 'primary' ? 'primary' : 'default'}>{item.label}</Button>
+            <Link key={item.key} to={item.disabled ? '#' : item.to} onClick={(e) => item.disabled && e.preventDefault()}>
+              <Button type={item.kind === 'primary' ? 'primary' : 'default'} disabled={item.disabled}>{item.label}</Button>
             </Link>
           ))}
         </Space>
@@ -640,17 +640,18 @@ const Dashboard = () => {
     <Layout.Content className="dashboard-container">
       {role === 'vendor' && <VendorDashboard user={user} />}
       {role === 'guest' && <GuestDashboard user={user} />}
-      {role === 'admin' && <OrganizerDashboard user={user} />}
-      {role === 'organizer' && (
+      {(role === 'admin' || role === 'organizer') && (
         <>
           <OrganizerDashboard user={user} />
           <Card title="Organizer tools" style={{ marginTop: 24 }}>
             <p style={{ marginBottom: 12, color: '#667085' }}>
-              Track vendor activities, contact segments, and WhatsApp reminders from here.
+              Manage events, invitations, and vendor coordination all from one place.
             </p>
             <Space wrap>
               <Link to="/activities"><Button type="primary">Activity Tracker</Button></Link>
-              <Link to="/contact-intelligence"><Button>Contact Intelligence &amp; WhatsApp</Button></Link>
+              <Link to={activeEvents.length > 0 ? `/events/${activeEvents[0].id}/invite-studio` : '#'} onClick={(e) => activeEvents.length === 0 && e.preventDefault()}>
+                <Button disabled={activeEvents.length === 0}>Invite Studio</Button>
+              </Link>
               <Link to="/planner"><Button>Event Planner &amp; quotes</Button></Link>
             </Space>
           </Card>
