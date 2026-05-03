@@ -3,7 +3,6 @@
     "name": "Vedika 360",
     "slug": "vedika360-mobile",
     "version": "1.0.0",
-    "newArchEnabled": false,
     "scheme": "vedika360",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -28,6 +27,10 @@
         "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#0a4f7a"
       },
+      "notification": {
+        "icon": "./assets/notification-icon.png",
+        "color": "#0a4f7a"
+      },
       "package": "com.vedika360.myapp",
       "versionCode": 1,
       "permissions": [
@@ -44,7 +47,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/icon.png",
+          "icon": "./assets/notification-icon.png",
           "color": "#0a4f7a",
           "defaultChannel": "default"
         }

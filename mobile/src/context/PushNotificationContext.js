@@ -29,6 +29,13 @@ function getProjectId() {
   );
 }
 
+function isExpoGoClient() {
+  return (
+    Constants.appOwnership === 'expo' ||
+    Constants.executionEnvironment === 'storeClient'
+  );
+}
+
 function routeFromNotificationData(data) {
   if (!navigationRef.isReady()) return;
 
@@ -58,7 +65,7 @@ async function ensureAndroidChannel() {
 
 async function getExpoPushToken() {
   const projectId = getProjectId();
-  if (!projectId || !Device.isDevice) return null;
+  if (!projectId || !Device.isDevice || isExpoGoClient()) return null;
 
   const permission = await Notifications.getPermissionsAsync();
   let status = permission.status;
