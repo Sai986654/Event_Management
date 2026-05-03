@@ -1,5 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from './api';
+import { appNotificationService } from './appNotificationService';
+
+const EXPO_PUSH_TOKEN_KEY = 'expoPushToken';
 
 export const authService = {
   register: async (userData) => {
@@ -21,7 +24,15 @@ export const authService = {
   },
 
   logout: async () => {
-    await AsyncStorage.multiRemove(['token', 'user']);
+    const expoPushToken = await AsyncStorage.getItem(EXPO_PUSH_TOKEN_KEY);
+    if (expoPushToken) {
+      try {
+        await appNotificationService.unregisterDevice(expoPushToken);
+      } catch (error) {
+        console.warn('Failed to unregister push token during logout', error?.message || error);
+      }
+    }
+    await AsyncStorage.multiRemove(['token', 'user', EXPO_PUSH_TOKEN_KEY]);
   },
 
   getCurrentUser: async () => {

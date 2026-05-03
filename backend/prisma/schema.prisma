@@ -132,6 +132,7 @@ model User {
   reviews       Review[]
   media         Media[]
   appNotifications AppNotification[]
+  pushTokens    PushToken[]
   instantPhotos InstantPhoto[]
   chatThreadsStarted ChatThread[] @relation("ThreadCreator")
   chatMessages       ChatMessage[]
@@ -155,6 +156,24 @@ model AppNotification {
 
   @@index([userId, read, createdAt(sort: Desc)])
   @@map("app_notifications")
+}
+
+model PushToken {
+  id            Int      @id @default(autoincrement())
+  userId        Int      @map("user_id")
+  expoPushToken String   @unique @map("expo_push_token") @db.VarChar(255)
+  platform      String   @db.VarChar(20)
+  deviceName    String?  @map("device_name") @db.VarChar(120)
+  appVersion    String?  @map("app_version") @db.VarChar(40)
+  isActive      Boolean  @default(true) @map("is_active")
+  lastSeenAt    DateTime @default(now()) @map("last_seen_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isActive])
+  @@map("push_tokens")
 }
 
 model AiRecommendationSnapshot {

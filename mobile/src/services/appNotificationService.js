@@ -6,6 +6,18 @@ export const appNotificationService = {
     return response.data;
   },
 
+  registerDevice: async (payload) => {
+    const response = await api.post('app-notifications/devices', payload);
+    return response.data;
+  },
+
+  unregisterDevice: async (expoPushToken) => {
+    const response = await api.delete('app-notifications/devices', {
+      data: { expoPushToken },
+    });
+    return response.data;
+  },
+
   markRead: async (id) => {
     const response = await api.put(`app-notifications/${id}/read`);
     return response.data;

@@ -1,5 +1,6 @@
 const { prisma } = require('../config/db');
 const asyncHandler = require('../utils/asyncHandler');
+const { isExpoPushToken } = require('../services/pushNotificationService');
 
 // GET /api/app-notifications
 exports.listNotifications = asyncHandler(async (req, res) => {
@@ -59,5 +60,59 @@ exports.deleteNotification = asyncHandler(async (req, res) => {
 // DELETE /api/app-notifications
 exports.deleteAllNotifications = asyncHandler(async (req, res) => {
   await prisma.appNotification.deleteMany({ where: { userId: req.user.id } });
+  res.json({ ok: true });
+});
+
+// POST /api/app-notifications/devices
+exports.registerPushDevice = asyncHandler(async (req, res) => {
+  const expoPushToken = String(req.body?.expoPushToken || '').trim();
+  const platform = String(req.body?.platform || '').trim().toLowerCase();
+  const deviceName = req.body?.deviceName ? String(req.body.deviceName).trim().slice(0, 120) : null;
+  const appVersion = req.body?.appVersion ? String(req.body.appVersion).trim().slice(0, 40) : null;
+
+  if (!isExpoPushToken(expoPushToken)) {
+    return res.status(400).json({ message: 'Invalid Expo push token' });
+  }
+
+  if (!['android', 'ios'].includes(platform)) {
+    return res.status(400).json({ message: 'Invalid platform' });
+  }
+
+  const token = await prisma.pushToken.upsert({
+    where: { expoPushToken },
+    update: {
+      userId: req.user.id,
+      platform,
+      deviceName,
+      appVersion,
+      isActive: true,
+      lastSeenAt: new Date(),
+    },
+    create: {
+      userId: req.user.id,
+      expoPushToken,
+      platform,
+      deviceName,
+      appVersion,
+      isActive: true,
+      lastSeenAt: new Date(),
+    },
+  });
+
+  res.json({ ok: true, token });
+});
+
+// DELETE /api/app-notifications/devices
+exports.unregisterPushDevice = asyncHandler(async (req, res) => {
+  const expoPushToken = String(req.body?.expoPushToken || '').trim();
+  if (!expoPushToken) {
+    return res.status(400).json({ message: 'Expo push token is required' });
+  }
+
+  await prisma.pushToken.updateMany({
+    where: { userId: req.user.id, expoPushToken },
+    data: { isActive: false, lastSeenAt: new Date() },
+  });
+
   res.json({ ok: true });
 });

@@ -1,5 +1,6 @@
 const { prisma } = require('../config/db');
 const { sendEmail } = require('./notificationService');
+const { sendPushToUser } = require('./pushNotificationService');
 
 function emitToUser(io, userId, payload) {
   if (!io) return;
@@ -14,6 +15,15 @@ async function createNotification(io, { userId, type, title, body, metadata = {}
     data: { userId, type, title, body, metadata },
   });
   emitToUser(io, userId, { notification: row });
+  sendPushToUser(userId, {
+    title,
+    body,
+    data: {
+      notificationId: row.id,
+      type,
+      ...(metadata || {}),
+    },
+  }).catch(() => {});
   return row;
 }
 

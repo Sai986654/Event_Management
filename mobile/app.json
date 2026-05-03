@@ -3,6 +3,7 @@
     "name": "Vedika 360",
     "slug": "vedika360-mobile",
     "version": "1.0.0",
+    "newArchEnabled": false,
     "scheme": "vedika360",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -33,12 +34,21 @@
         "android.permission.RECORD_AUDIO",
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.CAMERA"
+        "android.permission.CAMERA",
+        "android.permission.POST_NOTIFICATIONS"
       ]
     },
     "plugins": [
       "expo-asset",
       "expo-font",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#0a4f7a",
+          "defaultChannel": "default"
+        }
+      ],
       [
         "expo-location",
         {

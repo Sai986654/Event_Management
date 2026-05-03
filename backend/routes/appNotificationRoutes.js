@@ -1,9 +1,19 @@
 const router = require('express').Router();
 const { protect } = require('../middleware/auth');
-const { listNotifications, markRead, markAllRead, deleteNotification, deleteAllNotifications } = require('../controllers/appNotificationController');
+const {
+	listNotifications,
+	markRead,
+	markAllRead,
+	deleteNotification,
+	deleteAllNotifications,
+	registerPushDevice,
+	unregisterPushDevice,
+} = require('../controllers/appNotificationController');
 
 router.use(protect);
 
+router.post('/devices', registerPushDevice);
+router.delete('/devices', unregisterPushDevice);
 router.get('/', listNotifications);
 router.put('/read-all', markAllRead);
 router.delete('/delete-all', deleteAllNotifications);

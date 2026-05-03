@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { View, StyleSheet, ActivityIndicator, Image } from 'react-native';
 import { PaperProvider, Text } from 'react-native-paper';
 import { AuthProvider, AuthContext } from './src/context/AuthContext';
+import { PushNotificationProvider } from './src/context/PushNotificationContext';
 import { SocketProvider } from './src/context/SocketContext';
 import AppNavigator from './src/navigation/AppNavigator';
 import { AppTheme, Colors } from './src/theme';
@@ -47,11 +48,13 @@ const AppInner = () => {
 export default function App() {
   return (
     <AuthProvider>
-      <SocketProvider>
-        <PaperProvider theme={AppTheme}>
-          <AppInner />
-        </PaperProvider>
-      </SocketProvider>
+      <PushNotificationProvider>
+        <SocketProvider>
+          <PaperProvider theme={AppTheme}>
+            <AppInner />
+          </PaperProvider>
+        </SocketProvider>
+      </PushNotificationProvider>
     </AuthProvider>
   );
 }
