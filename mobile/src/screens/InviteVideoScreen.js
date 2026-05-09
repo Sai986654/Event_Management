@@ -7,6 +7,7 @@ import {
   Image,
   Share,
   Linking,
+  TouchableOpacity,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
@@ -521,16 +522,26 @@ const InviteVideoScreen = ({ route }) => {
               {inviteTemplates.map((template) => {
                 const selected = selectedTemplateKey === template.key;
                 const sceneCount = getTemplateTimeline(template).length;
+                const previewUrl = getTemplatePreviewImageUrl(template);
                 return (
-                  <Chip
+                  <TouchableOpacity
                     key={template.key}
-                    selected={selected}
                     onPress={() => setSelectedTemplateKey(template.key)}
-                    style={[styles.templateChip, selected && styles.templateChipSelected]}
-                    textStyle={selected ? styles.templateChipTextSelected : undefined}
+                    style={[styles.templateOptionCard, selected && styles.templateOptionCardSelected]}
+                    activeOpacity={0.85}
                   >
-                    {template.name || template.key}{sceneCount ? ` • ${sceneCount} scenes` : ''}
-                  </Chip>
+                    {previewUrl ? (
+                      <Image source={{ uri: previewUrl }} style={styles.templateOptionThumb} />
+                    ) : (
+                      <View style={styles.templateOptionThumbFallback} />
+                    )}
+                    <Text numberOfLines={1} style={[styles.templateOptionName, selected && styles.templateOptionNameSelected]}>
+                      {template.name || template.key}
+                    </Text>
+                    <Text numberOfLines={1} style={[styles.templateOptionMeta, selected && styles.templateOptionMetaSelected]}>
+                      {sceneCount ? `${sceneCount} scenes` : 'Template'}
+                    </Text>
+                  </TouchableOpacity>
                 );
               })}
             </ScrollView>
@@ -862,9 +873,39 @@ const styles = StyleSheet.create({
   quickTplRow: { flexDirection: 'row', gap: Spacing.xs, marginBottom: Spacing.sm, flexWrap: 'wrap' },
   tplChip: { marginBottom: 4 },
   hintBold: { fontWeight: '700', color: Colors.primary },
-  templateChip: { marginRight: Spacing.sm, backgroundColor: Colors.surfaceVariant },
-  templateChipSelected: { backgroundColor: Colors.primary },
-  templateChipTextSelected: { color: '#fff' },
+  templateOptionCard: {
+    width: 126,
+    marginRight: Spacing.sm,
+    padding: 8,
+    borderRadius: Radius.sm,
+    backgroundColor: Colors.surfaceVariant,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  templateOptionCardSelected: {
+    borderColor: Colors.primary,
+    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+  },
+  templateOptionThumb: {
+    width: '100%',
+    height: 78,
+    borderRadius: Radius.sm,
+    marginBottom: 8,
+    backgroundColor: Colors.surface,
+  },
+  templateOptionThumbFallback: {
+    width: '100%',
+    height: 78,
+    borderRadius: Radius.sm,
+    marginBottom: 8,
+    backgroundColor: 'rgba(124, 45, 18, 0.16)',
+    borderWidth: 1,
+    borderColor: 'rgba(124, 45, 18, 0.35)',
+  },
+  templateOptionName: { fontSize: 12, fontWeight: '700', color: Colors.textPrimary },
+  templateOptionNameSelected: { color: Colors.primary },
+  templateOptionMeta: { marginTop: 2, fontSize: 11, color: Colors.textSecondary },
+  templateOptionMetaSelected: { color: Colors.primary },
   templatePreviewCard: {
     backgroundColor: Colors.surfaceVariant,
     borderRadius: Radius.sm,
