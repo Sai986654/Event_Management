@@ -1,0 +1,240 @@
+{
+  "manifestVersion": "1.0",
+  "templateKey": "telugu-wedding-dual-style",
+  "templateName": "Telugu Wedding - Floral and Modern",
+  "engine": "adobe-express",
+  "version": 1,
+  "category": "wedding",
+  "source": {
+    "tool": "adobe-express-premium",
+    "projectLink": "https://new.express.adobe.com/",
+    "exportedAt": "2026-05-09T00:00:00.000Z"
+  },
+  "editableFields": [
+    {
+      "id": "eventTitle",
+      "label": "Event Title",
+      "type": "text",
+      "required": true,
+      "maxLength": 80,
+      "bindings": [
+        { "sceneId": "floral-cover", "target": "textLayer.eventTitle" },
+        { "sceneId": "modern-note", "target": "textLayer.eventTitle" }
+      ]
+    },
+    {
+      "id": "brideName",
+      "label": "Bride Name",
+      "type": "text",
+      "required": true,
+      "maxLength": 40,
+      "bindings": [
+        { "sceneId": "floral-cover", "target": "textLayer.bride" }
+      ]
+    },
+    {
+      "id": "groomName",
+      "label": "Groom Name",
+      "type": "text",
+      "required": true,
+      "maxLength": 40,
+      "bindings": [
+        { "sceneId": "floral-cover", "target": "textLayer.groom" }
+      ]
+    },
+    {
+      "id": "eventDate",
+      "label": "Event Date",
+      "type": "date",
+      "required": true,
+      "bindings": [
+        { "sceneId": "floral-cover", "target": "textLayer.date" }
+      ]
+    },
+    {
+      "id": "eventTime",
+      "label": "Event Time",
+      "type": "text",
+      "required": false,
+      "maxLength": 32,
+      "bindings": [
+        { "sceneId": "floral-cover", "target": "textLayer.time" }
+      ]
+    },
+    {
+      "id": "venueName",
+      "label": "Venue Name",
+      "type": "text",
+      "required": true,
+      "maxLength": 120,
+      "bindings": [
+        { "sceneId": "floral-cover", "target": "textLayer.venue" }
+      ]
+    },
+    {
+      "id": "customMessage",
+      "label": "Custom Message",
+      "type": "text",
+      "required": false,
+      "maxLength": 240,
+      "bindings": [
+        { "sceneId": "modern-note", "target": "textLayer.message" }
+      ]
+    },
+    {
+      "id": "rsvpLink",
+      "label": "RSVP Link",
+      "type": "qrcode",
+      "required": true,
+      "bindings": [
+        { "sceneId": "modern-note", "target": "imageLayer.qr" }
+      ]
+    }
+  ],
+  "variantProfiles": [
+    {
+      "key": "floral-traditional",
+      "label": "Floral Traditional",
+      "palette": {
+        "primary": "#B15B70",
+        "secondary": "#F8EFE8",
+        "accent": "#D8A2B0",
+        "text": "#2F2A26"
+      },
+      "fontPairing": {
+        "heading": "Noto Serif Telugu",
+        "body": "Noto Sans Telugu"
+      }
+    },
+    {
+      "key": "modern-minimal",
+      "label": "Modern Minimal",
+      "palette": {
+        "primary": "#111827",
+        "secondary": "#F3F4F6",
+        "accent": "#14B8A6",
+        "text": "#0F172A"
+      },
+      "fontPairing": {
+        "heading": "Noto Serif Telugu",
+        "body": "Noto Sans Telugu"
+      }
+    }
+  ],
+  "outputProfiles": [
+    {
+      "key": "story-video",
+      "format": "mp4",
+      "width": 1080,
+      "height": 1920,
+      "fps": 30,
+      "videoBitrateKbps": 7000,
+      "audioBitrateKbps": 256
+    },
+    {
+      "key": "invite-poster",
+      "format": "png",
+      "width": 1080,
+      "height": 1920,
+      "fps": 1
+    }
+  ],
+  "timeline": [
+    {
+      "sceneId": "floral-cover",
+      "startMs": 0,
+      "durationMs": 6000,
+      "baseVideo": "scenes/floral-traditional-telugu.png",
+      "textLayers": [
+        {
+          "id": "floral-title-layer",
+          "fieldId": "eventTitle",
+          "x": 0.5,
+          "y": 0.16,
+          "maxWidth": 0.8,
+          "maxHeight": 0.08,
+          "align": "center"
+        },
+        {
+          "id": "floral-bride-layer",
+          "fieldId": "brideName",
+          "x": 0.44,
+          "y": 0.86,
+          "maxWidth": 0.34,
+          "maxHeight": 0.06,
+          "align": "center"
+        },
+        {
+          "id": "floral-groom-layer",
+          "fieldId": "groomName",
+          "x": 0.56,
+          "y": 0.86,
+          "maxWidth": 0.34,
+          "maxHeight": 0.06,
+          "align": "center"
+        },
+        {
+          "id": "floral-date-layer",
+          "fieldId": "eventDate",
+          "x": 0.5,
+          "y": 0.33,
+          "maxWidth": 0.7,
+          "maxHeight": 0.06,
+          "align": "center"
+        },
+        {
+          "id": "floral-time-layer",
+          "fieldId": "eventTime",
+          "x": 0.5,
+          "y": 0.37,
+          "maxWidth": 0.6,
+          "maxHeight": 0.05,
+          "align": "center"
+        },
+        {
+          "id": "floral-venue-layer",
+          "fieldId": "venueName",
+          "x": 0.5,
+          "y": 0.41,
+          "maxWidth": 0.78,
+          "maxHeight": 0.08,
+          "align": "center"
+        }
+      ]
+    },
+    {
+      "sceneId": "modern-note",
+      "startMs": 6000,
+      "durationMs": 6000,
+      "baseVideo": "scenes/modern-minimal-telugu.png",
+      "textLayers": [
+        {
+          "id": "modern-title-layer",
+          "fieldId": "eventTitle",
+          "x": 0.5,
+          "y": 0.13,
+          "maxWidth": 0.7,
+          "maxHeight": 0.08,
+          "align": "center"
+        },
+        {
+          "id": "modern-message-layer",
+          "fieldId": "customMessage",
+          "x": 0.27,
+          "y": 0.29,
+          "maxWidth": 0.44,
+          "maxHeight": 0.2,
+          "align": "left"
+        }
+      ]
+    }
+  ],
+  "assets": {
+    "videos": [],
+    "images": [
+      "scenes/floral-traditional-telugu.png",
+      "scenes/modern-minimal-telugu.png"
+    ],
+    "audio": []
+  }
+}

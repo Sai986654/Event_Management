@@ -1,0 +1,283 @@
+{
+  "manifestVersion": "1.0",
+  "templateKey": "luxury-wedding-01",
+  "templateName": "Luxury Wedding Cinematic",
+  "engine": "adobe-express",
+  "version": 1,
+  "category": "wedding",
+  "source": {
+    "tool": "adobe-express-premium",
+    "projectLink": "https://new.express.adobe.com/project/example",
+    "exportedAt": "2026-05-09T10:00:00.000Z"
+  },
+  "editableFields": [
+    {
+      "id": "brideName",
+      "label": "Bride Name",
+      "type": "text",
+      "required": true,
+      "maxLength": 40,
+      "bindings": [
+        { "sceneId": "intro", "target": "textLayer.bride" },
+        { "sceneId": "title", "target": "textLayer.bride" }
+      ]
+    },
+    {
+      "id": "groomName",
+      "label": "Groom Name",
+      "type": "text",
+      "required": true,
+      "maxLength": 40,
+      "bindings": [
+        { "sceneId": "intro", "target": "textLayer.groom" },
+        { "sceneId": "title", "target": "textLayer.groom" }
+      ]
+    },
+    {
+      "id": "guestName",
+      "label": "Guest Name",
+      "type": "text",
+      "required": false,
+      "maxLength": 60,
+      "bindings": [
+        { "sceneId": "greeting", "target": "textLayer.guest" }
+      ]
+    },
+    {
+      "id": "eventDate",
+      "label": "Event Date",
+      "type": "date",
+      "required": true,
+      "bindings": [
+        { "sceneId": "details", "target": "textLayer.date" }
+      ]
+    },
+    {
+      "id": "venueName",
+      "label": "Venue",
+      "type": "text",
+      "required": true,
+      "maxLength": 120,
+      "bindings": [
+        { "sceneId": "details", "target": "textLayer.venue" }
+      ]
+    },
+    {
+      "id": "customMessage",
+      "label": "Custom Message",
+      "type": "text",
+      "required": false,
+      "maxLength": 240,
+      "bindings": [
+        { "sceneId": "greeting", "target": "textLayer.message" }
+      ]
+    },
+    {
+      "id": "qrUrl",
+      "label": "RSVP QR URL",
+      "type": "qrcode",
+      "required": true,
+      "bindings": [
+        { "sceneId": "rsvp", "target": "imageLayer.qr" }
+      ]
+    }
+  ],
+  "variantProfiles": [
+    {
+      "key": "royal-gold",
+      "label": "Royal Gold",
+      "palette": {
+        "primary": "#7A4A16",
+        "secondary": "#E8D2A9",
+        "accent": "#C79C3B",
+        "text": "#F9F5ED"
+      },
+      "fontPairing": {
+        "heading": "Playfair Display",
+        "body": "Lora"
+      },
+      "assetOverrides": [
+        { "from": "overlays/common-glow.mp4", "to": "overlays/royal-gold-glow.mp4" }
+      ]
+    },
+    {
+      "key": "floral-pastel",
+      "label": "Floral Pastel",
+      "palette": {
+        "primary": "#7C4F6A",
+        "secondary": "#FDEFF4",
+        "accent": "#D49AAA",
+        "text": "#3B2A34"
+      },
+      "fontPairing": {
+        "heading": "Cormorant Garamond",
+        "body": "Nunito"
+      },
+      "assetOverrides": [
+        { "from": "graphics/frame-main.png", "to": "graphics/frame-floral.png" }
+      ]
+    },
+    {
+      "key": "telugu-traditional",
+      "label": "Telugu Traditional",
+      "palette": {
+        "primary": "#8E2E17",
+        "secondary": "#FFF3D8",
+        "accent": "#D88B2A",
+        "text": "#341A0F"
+      },
+      "fontPairing": {
+        "heading": "Noto Serif Telugu",
+        "body": "Noto Sans Telugu"
+      },
+      "assetOverrides": [
+        { "from": "overlays/common-particles.mp4", "to": "overlays/temple-lights.mp4" }
+      ]
+    }
+  ],
+  "outputProfiles": [
+    {
+      "key": "story-video",
+      "format": "mp4",
+      "width": 1080,
+      "height": 1920,
+      "fps": 30,
+      "videoBitrateKbps": 10000,
+      "audioBitrateKbps": 320
+    },
+    {
+      "key": "square-video",
+      "format": "mp4",
+      "width": 1080,
+      "height": 1080,
+      "fps": 30,
+      "videoBitrateKbps": 9000,
+      "audioBitrateKbps": 320
+    },
+    {
+      "key": "invite-poster",
+      "format": "png",
+      "width": 1080,
+      "height": 1350,
+      "fps": 1
+    }
+  ],
+  "timeline": [
+    {
+      "sceneId": "intro",
+      "startMs": 0,
+      "durationMs": 5000,
+      "baseVideo": "scenes/intro-textless.mp4",
+      "overlayAssets": ["overlays/common-particles.mp4"],
+      "textLayers": [
+        {
+          "id": "intro-bride",
+          "fieldId": "brideName",
+          "x": 0.5,
+          "y": 0.44,
+          "maxWidth": 0.8,
+          "maxHeight": 0.08,
+          "align": "center"
+        },
+        {
+          "id": "intro-groom",
+          "fieldId": "groomName",
+          "x": 0.5,
+          "y": 0.54,
+          "maxWidth": 0.8,
+          "maxHeight": 0.08,
+          "align": "center"
+        }
+      ],
+      "musicTrack": "audio/music-main.mp3"
+    },
+    {
+      "sceneId": "greeting",
+      "startMs": 5000,
+      "durationMs": 4000,
+      "baseVideo": "scenes/greeting-textless.mp4",
+      "textLayers": [
+        {
+          "id": "greeting-guest",
+          "fieldId": "guestName",
+          "x": 0.5,
+          "y": 0.38,
+          "maxWidth": 0.75,
+          "maxHeight": 0.07,
+          "align": "center"
+        },
+        {
+          "id": "greeting-message",
+          "fieldId": "customMessage",
+          "x": 0.5,
+          "y": 0.52,
+          "maxWidth": 0.82,
+          "maxHeight": 0.18,
+          "align": "center"
+        }
+      ]
+    },
+    {
+      "sceneId": "details",
+      "startMs": 9000,
+      "durationMs": 5000,
+      "baseVideo": "scenes/details-textless.mp4",
+      "textLayers": [
+        {
+          "id": "details-date",
+          "fieldId": "eventDate",
+          "x": 0.5,
+          "y": 0.4,
+          "maxWidth": 0.7,
+          "maxHeight": 0.06,
+          "align": "center"
+        },
+        {
+          "id": "details-venue",
+          "fieldId": "venueName",
+          "x": 0.5,
+          "y": 0.5,
+          "maxWidth": 0.82,
+          "maxHeight": 0.12,
+          "align": "center"
+        }
+      ]
+    },
+    {
+      "sceneId": "rsvp",
+      "startMs": 14000,
+      "durationMs": 4000,
+      "baseVideo": "scenes/rsvp-textless.mp4",
+      "textLayers": [],
+      "overlayAssets": ["graphics/qr-frame.png"]
+    }
+  ],
+  "assets": {
+    "videos": [
+      "scenes/intro-textless.mp4",
+      "scenes/greeting-textless.mp4",
+      "scenes/details-textless.mp4",
+      "scenes/rsvp-textless.mp4",
+      "overlays/common-particles.mp4",
+      "overlays/royal-gold-glow.mp4",
+      "overlays/temple-lights.mp4"
+    ],
+    "images": [
+      "graphics/frame-main.png",
+      "graphics/frame-floral.png",
+      "graphics/qr-frame.png",
+      "preview/thumb.jpg"
+    ],
+    "audio": [
+      "audio/music-main.mp3"
+    ],
+    "fonts": [
+      "Playfair Display",
+      "Lora",
+      "Cormorant Garamond",
+      "Nunito",
+      "Noto Serif Telugu",
+      "Noto Sans Telugu"
+    ]
+  }
+}

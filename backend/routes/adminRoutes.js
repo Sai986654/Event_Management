@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const { body } = require('express-validator');
 const validate = require('../middleware/validate');
+const upload = require('../middleware/upload');
 const { protect, authorize } = require('../middleware/auth');
 const {
   verifyVendor,
@@ -12,6 +13,9 @@ const {
   createInviteTemplate,
   updateInviteTemplate,
   deleteInviteTemplate,
+  validateAdobeExpressTemplateManifest,
+  importAdobeExpressTemplateManifest,
+  uploadAdobeExpressTemplateAsset,
   getAllVendors,
   deleteVendor,
   syncVendorsFromGoogleForms,
@@ -73,6 +77,25 @@ router.post(
   validate,
   createInviteTemplate
 );
+router.post(
+  '/invite-templates/adobe-express/validate',
+  [body('manifest').optional().isObject().withMessage('manifest must be an object')],
+  validate,
+  validateAdobeExpressTemplateManifest
+);
+router.post(
+  '/invite-templates/adobe-express/import',
+  [
+    body('manifest').optional().isObject().withMessage('manifest must be an object'),
+    body('upsert').optional().isBoolean().withMessage('upsert must be boolean'),
+    body('variantKey').optional().trim(),
+    body('isActive').optional().isBoolean().withMessage('isActive must be boolean'),
+    body('sortOrder').optional().isInt().withMessage('sortOrder must be an integer'),
+  ],
+  validate,
+  importAdobeExpressTemplateManifest
+);
+router.post('/invite-templates/adobe-express/assets', upload.single('file'), uploadAdobeExpressTemplateAsset);
 router.patch(
   '/invite-templates/:id',
   [

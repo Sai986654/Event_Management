@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, Button, Card, Col, Form, Input, InputNumber, Modal, Popconfirm, Row, Select, Space, Switch, Table, Tabs, Tag, message } from 'antd';
-import { DeleteOutlined, EditOutlined, PlusOutlined, AppstoreOutlined, CloudUploadOutlined, EnvironmentOutlined, ShopOutlined, TeamOutlined, UserAddOutlined } from '@ant-design/icons';
+import { Alert, Button, Card, Col, Form, Input, InputNumber, Modal, Popconfirm, Row, Select, Space, Switch, Table, Tabs, Tag, Upload, message } from 'antd';
+import { DeleteOutlined, EditOutlined, PlusOutlined, AppstoreOutlined, CloudUploadOutlined, EnvironmentOutlined, ShopOutlined, TeamOutlined, UploadOutlined, UserAddOutlined, ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons';
 import { adminService } from '../services/adminService';
 import { vendorService } from '../services/vendorService';
 import LocationAutocomplete from '../components/LocationAutocomplete';
@@ -89,6 +89,15 @@ const AdminControlCenter = () => {
   const [editingTemplate, setEditingTemplate] = useState(null);
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [templateForm] = Form.useForm();
+  const [manifestBuilderForm] = Form.useForm();
+  const [adobeForm] = Form.useForm();
+  const [validatingAdobeManifest, setValidatingAdobeManifest] = useState(false);
+  const [importingAdobeManifest, setImportingAdobeManifest] = useState(false);
+  const [adobeValidationResult, setAdobeValidationResult] = useState(null);
+  const [adobeImportResult, setAdobeImportResult] = useState(null);
+  const [generatedManifestJson, setGeneratedManifestJson] = useState('');
+  const [uploadedAdobeAssets, setUploadedAdobeAssets] = useState([]);
+  const [uploadingAdobeAsset, setUploadingAdobeAsset] = useState(false);
 
   const loadInviteTemplates = useCallback(async () => {
     setLoadingInviteTemplates(true);
@@ -160,6 +169,263 @@ const AdminControlCenter = () => {
       await loadInviteTemplates();
     } catch (err) {
       message.error(getErrorMessage(err));
+    }
+  };
+
+  const parseManifestJson = (manifestJson) => {
+    try {
+      return JSON.parse(manifestJson);
+    } catch (_error) {
+      throw new Error('Manifest JSON is invalid');
+    }
+  };
+
+  const parseCsv = (raw) =>
+    String(raw || '')
+      .split(',')
+      .map((v) => v.trim())
+      .filter(Boolean);
+
+  const toKebabCase = (value) =>
+    String(value || '')
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+
+  const buildManifestFromAdminUi = async () => {
+    const values = await manifestBuilderForm.validateFields();
+
+    const fieldCatalog = {
+      eventTitle: { label: 'Event Title', type: 'text', required: true, maxLength: 80 },
+      brideName: { label: 'Bride Name', type: 'text', required: true, maxLength: 40 },
+      groomName: { label: 'Groom Name', type: 'text', required: true, maxLength: 40 },
+      eventDate: { label: 'Event Date', type: 'date', required: true },
+      eventTime: { label: 'Event Time', type: 'text', required: false, maxLength: 32 },
+      venueName: { label: 'Venue Name', type: 'text', required: true, maxLength: 120 },
+      customMessage: { label: 'Custom Message', type: 'text', required: false, maxLength: 240 },
+      rsvpLink: { label: 'RSVP Link', type: 'qrcode', required: true },
+      guestName: { label: 'Guest Name', type: 'text', required: false, maxLength: 60 },
+    };
+
+    const selectedAssetFiles = Array.isArray(values.selectedAssetFiles) ? values.selectedAssetFiles : [];
+    const manualAssetFiles = parseCsv(values.assetFilesManual);
+    const assetFiles = [...new Set([...selectedAssetFiles, ...manualAssetFiles])];
+    if (!assetFiles.length) {
+      throw new Error('Add at least one scene asset file');
+    }
+
+    const variantKeys = parseCsv(values.variantKeys).map(toKebabCase).filter(Boolean);
+    if (!variantKeys.length) {
+      throw new Error('Add at least one variant key');
+    }
+
+    const selectedFields = Array.isArray(values.selectedFields) ? values.selectedFields : [];
+    if (!selectedFields.length) {
+      throw new Error('Select at least one editable field');
+    }
+
+    const selectedTextFields = selectedFields.filter((fieldId) => fieldCatalog[fieldId]?.type !== 'qrcode');
+
+    const timeline = assetFiles.map((asset, index) => {
+      const sceneId = `scene-${index + 1}`;
+      const startMs = index * 6000;
+      const textLayers = index === 0
+        ? selectedTextFields.slice(0, 6).map((fieldId, layerIndex) => ({
+            id: `${sceneId}-layer-${layerIndex + 1}`,
+            fieldId,
+            x: 0.5,
+            y: Number((0.18 + layerIndex * 0.1).toFixed(2)),
+            maxWidth: 0.82,
+            maxHeight: 0.08,
+            align: 'center',
+          }))
+        : [];
+
+      return {
+        sceneId,
+        startMs,
+        durationMs: 6000,
+        baseVideo: asset,
+        textLayers,
+      };
+    });
+
+    const editableFields = selectedFields.map((fieldId) => {
+      const meta = fieldCatalog[fieldId];
+      return {
+        id: fieldId,
+        label: meta?.label || fieldId,
+        type: meta?.type || 'text',
+        required: typeof meta?.required === 'boolean' ? meta.required : false,
+        ...(meta?.maxLength ? { maxLength: meta.maxLength } : {}),
+        bindings: [{ sceneId: timeline[0].sceneId, target: `textLayer.${fieldId}` }],
+      };
+    });
+
+    const variantProfiles = variantKeys.map((variantKey, index) => ({
+      key: variantKey,
+      label: variantKey,
+      palette: {
+        primary: index % 2 === 0 ? '#B15B70' : '#111827',
+        secondary: index % 2 === 0 ? '#F8EFE8' : '#F3F4F6',
+        accent: index % 2 === 0 ? '#D8A2B0' : '#14B8A6',
+        text: index % 2 === 0 ? '#2F2A26' : '#0F172A',
+      },
+      fontPairing: {
+        heading: 'Noto Serif Telugu',
+        body: 'Noto Sans Telugu',
+      },
+    }));
+
+    const manifest = {
+      manifestVersion: '1.0',
+      templateKey: toKebabCase(values.templateKey),
+      templateName: String(values.templateName || '').trim(),
+      engine: 'adobe-express',
+      version: 1,
+      category: values.category,
+      source: {
+        tool: 'adobe-express-premium',
+        projectLink: values.projectLink || 'https://new.express.adobe.com/',
+        exportedAt: new Date().toISOString(),
+      },
+      editableFields,
+      variantProfiles,
+      outputProfiles: [
+        {
+          key: 'story-video',
+          format: 'mp4',
+          width: 1080,
+          height: 1920,
+          fps: 30,
+          videoBitrateKbps: 7000,
+          audioBitrateKbps: 256,
+        },
+      ],
+      timeline,
+      assets: {
+        videos: assetFiles.filter((name) => /\.mp4$/i.test(name)),
+        images: assetFiles.filter((name) => /\.(png|jpg|jpeg)$/i.test(name)),
+        audio: [],
+      },
+    };
+
+    const manifestJson = JSON.stringify(manifest, null, 2);
+    setGeneratedManifestJson(manifestJson);
+    adobeForm.setFieldsValue({ manifestJson });
+    setAdobeValidationResult(null);
+    setAdobeImportResult(null);
+    message.success('Manifest generated and copied to import form');
+  };
+
+  const moveSelectedAsset = (assetPath, direction) => {
+    const current = manifestBuilderForm.getFieldValue('selectedAssetFiles') || [];
+    const index = current.indexOf(assetPath);
+    if (index < 0) return;
+
+    const nextIndex = direction === 'up' ? index - 1 : index + 1;
+    if (nextIndex < 0 || nextIndex >= current.length) return;
+
+    const reordered = [...current];
+    const [item] = reordered.splice(index, 1);
+    reordered.splice(nextIndex, 0, item);
+    manifestBuilderForm.setFieldsValue({ selectedAssetFiles: reordered });
+  };
+
+  const removeSelectedAsset = (assetPath) => {
+    const current = manifestBuilderForm.getFieldValue('selectedAssetFiles') || [];
+    const next = current.filter((item) => item !== assetPath);
+    manifestBuilderForm.setFieldsValue({ selectedAssetFiles: next });
+  };
+
+  const handleAdobeAssetUpload = async ({ file, onSuccess, onError }) => {
+    setUploadingAdobeAsset(true);
+    try {
+      const templateKey = manifestBuilderForm.getFieldValue('templateKey');
+      const res = await adminService.uploadAdobeExpressAsset({ file, templateKey });
+      const asset = res?.asset;
+      if (!asset?.assetPath) {
+        throw new Error('Upload response missing asset path');
+      }
+
+      setUploadedAdobeAssets((prev) => {
+        const withoutDuplicate = prev.filter((item) => item.assetPath !== asset.assetPath);
+        return [...withoutDuplicate, asset];
+      });
+
+      const existingSelections = manifestBuilderForm.getFieldValue('selectedAssetFiles') || [];
+      manifestBuilderForm.setFieldsValue({
+        selectedAssetFiles: [...new Set([...existingSelections, asset.assetPath])],
+      });
+
+      message.success(`${asset.name} uploaded`);
+      if (onSuccess) onSuccess(asset);
+    } catch (err) {
+      message.error(getErrorMessage(err));
+      if (onError) onError(err);
+    } finally {
+      setUploadingAdobeAsset(false);
+    }
+  };
+
+  const validateAdobeManifest = async () => {
+    setValidatingAdobeManifest(true);
+    try {
+      const { manifestJson } = await adobeForm.validateFields(['manifestJson']);
+      const manifest = parseManifestJson(manifestJson);
+      const result = await adminService.validateAdobeExpressManifest({ manifest });
+      setAdobeValidationResult(result);
+      message.success('Manifest validation passed');
+    } catch (err) {
+      const responseData = err?.response?.data;
+      if (responseData && Array.isArray(responseData.errors)) {
+        setAdobeValidationResult({
+          valid: false,
+          errors: responseData.errors || [],
+          warnings: responseData.warnings || [],
+        });
+        message.error('Manifest validation failed');
+      } else {
+        message.error(getErrorMessage(err));
+      }
+    } finally {
+      setValidatingAdobeManifest(false);
+    }
+  };
+
+  const importAdobeManifest = async (values) => {
+    setImportingAdobeManifest(true);
+    try {
+      const manifest = parseManifestJson(values.manifestJson);
+      const payload = {
+        manifest,
+        upsert: values.upsert,
+        isActive: values.isActive,
+      };
+
+      if (values.variantKey) payload.variantKey = String(values.variantKey).trim();
+      if (values.sortOrder !== undefined && values.sortOrder !== null) {
+        payload.sortOrder = Number(values.sortOrder);
+      }
+
+      const result = await adminService.importAdobeExpressManifest(payload);
+      setAdobeImportResult(result);
+      setAdobeValidationResult((prev) => prev || { valid: true, errors: [], warnings: [] });
+      message.success(result?.message || 'Adobe Express template imported successfully');
+      await loadInviteTemplates();
+    } catch (err) {
+      const responseData = err?.response?.data;
+      if (responseData && Array.isArray(responseData.errors)) {
+        setAdobeValidationResult({
+          valid: false,
+          errors: responseData.errors || [],
+          warnings: responseData.warnings || [],
+        });
+      }
+      message.error(getErrorMessage(err));
+    } finally {
+      setImportingAdobeManifest(false);
     }
   };
 
@@ -452,55 +718,340 @@ const AdminControlCenter = () => {
       key: 'invite-templates',
       label: <span><AppstoreOutlined /> Invite Templates</span>,
       children: (
-        <Card
-          className="phase-card"
-          title="Invite Card Designs"
-          extra={<Button type="primary" icon={<PlusOutlined />} onClick={() => openTemplateModal()}>Add Template</Button>}
-        >
-          <Table
-            loading={loadingInviteTemplates}
-            rowKey="id"
-            dataSource={inviteTemplates}
-            pagination={false}
-            locale={{ emptyText: <div className="phase-empty">No invite templates yet.</div> }}
-            columns={[
-              { title: '#', dataIndex: 'sortOrder', width: 60 },
-              { title: 'Key', dataIndex: 'key', render: (v) => <code>{v}</code> },
-              { title: 'Name', dataIndex: 'name' },
-              { title: 'Description', dataIndex: 'description', ellipsis: true },
-              {
-                title: 'Preview',
-                render: (_, r) => (
-                  <span
-                    style={{
-                      display: 'inline-block',
-                      width: 54,
-                      height: 20,
-                      borderRadius: 12,
-                      border: `1px solid ${r.palette?.frame || '#d9d9d9'}`,
-                      background: `linear-gradient(135deg, ${r.palette?.frame || '#999'} 0%, ${r.palette?.accent || '#ccc'} 100%)`,
-                    }}
+        <Row gutter={[16, 16]}>
+          <Col xs={24} xl={12}>
+            <Card className="phase-card" title="Manifest Builder (UI)">
+              <Form
+                form={manifestBuilderForm}
+                layout="vertical"
+                initialValues={{
+                  templateKey: 'telugu-wedding-template',
+                  templateName: 'Telugu Wedding Template',
+                  category: 'wedding',
+                  variantKeys: 'floral-traditional,modern-minimal',
+                  selectedAssetFiles: [],
+                  assetFilesManual: '',
+                  selectedFields: ['eventTitle', 'brideName', 'groomName', 'eventDate', 'venueName', 'rsvpLink'],
+                }}
+              >
+                <Row gutter={12}>
+                  <Col xs={24} md={12}>
+                    <Form.Item
+                      name="templateKey"
+                      label="Template Key"
+                      rules={[
+                        { required: true, message: 'Template key is required' },
+                        { pattern: /^[a-z0-9-]{3,64}$/, message: 'Use kebab-case (3-64 chars)' },
+                      ]}
+                    >
+                      <Input placeholder="telugu-wedding-template" />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={24} md={12}>
+                    <Form.Item name="templateName" label="Template Name" rules={[{ required: true, message: 'Template name is required' }]}>
+                      <Input placeholder="Telugu Wedding Template" />
+                    </Form.Item>
+                  </Col>
+                </Row>
+                <Row gutter={12}>
+                  <Col xs={24} md={12}>
+                    <Form.Item name="category" label="Category" rules={[{ required: true, message: 'Category is required' }]}>
+                      <Select options={[
+                        { value: 'wedding', label: 'wedding' },
+                        { value: 'engagement', label: 'engagement' },
+                        { value: 'birthday', label: 'birthday' },
+                        { value: 'corporate', label: 'corporate' },
+                        { value: 'other', label: 'other' },
+                      ]} />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={24} md={12}>
+                    <Form.Item name="projectLink" label="Adobe Project Link (optional)">
+                      <Input placeholder="https://new.express.adobe.com/project/..." />
+                    </Form.Item>
+                  </Col>
+                </Row>
+                <Form.Item
+                  name="variantKeys"
+                  label="Variant Keys (comma separated)"
+                  rules={[{ required: true, message: 'Add at least one variant key' }]}
+                >
+                  <Input placeholder="floral-traditional,modern-minimal" />
+                </Form.Item>
+                <Form.Item
+                  label="Upload Scene Assets"
+                >
+                  <Upload
+                    accept="image/*,video/*"
+                    showUploadList={false}
+                    customRequest={handleAdobeAssetUpload}
+                    disabled={uploadingAdobeAsset}
+                  >
+                    <Button icon={<UploadOutlined />} loading={uploadingAdobeAsset}>Upload Asset</Button>
+                  </Upload>
+                </Form.Item>
+                <Form.Item
+                  name="selectedAssetFiles"
+                  label="Select Uploaded Assets"
+                  rules={[{ required: true, message: 'Upload/select at least one scene asset' }]}
+                >
+                  <Select
+                    mode="multiple"
+                    placeholder="Select uploaded assets"
+                    options={uploadedAdobeAssets.map((asset) => ({
+                      value: asset.assetPath,
+                      label: `${asset.name} (${asset.mediaType || 'asset'})`,
+                    }))}
                   />
-                ),
-              },
-              { title: 'Active', dataIndex: 'isActive', render: (v) => <Tag color={v ? 'green' : 'red'}>{v ? 'Yes' : 'No'}</Tag> },
-              {
-                title: 'Actions',
-                width: 150,
-                render: (_, r) => (
-                  <Space>
-                    <Button size="small" icon={<EditOutlined />} onClick={() => openTemplateModal(r)}>
-                      Edit
-                    </Button>
-                    <Popconfirm title="Delete this invite template?" onConfirm={() => removeTemplate(r.id)} okText="Delete" okButtonProps={{ danger: true }}>
-                      <Button size="small" danger icon={<DeleteOutlined />} />
-                    </Popconfirm>
-                  </Space>
-                ),
-              },
-            ]}
-          />
-        </Card>
+                </Form.Item>
+                <Form.Item shouldUpdate noStyle>
+                  {() => {
+                    const selectedAssetFiles = manifestBuilderForm.getFieldValue('selectedAssetFiles') || [];
+                    if (!selectedAssetFiles.length) return null;
+
+                    const uploadedByPath = new Map(uploadedAdobeAssets.map((asset) => [asset.assetPath, asset]));
+                    return (
+                      <div style={{ marginBottom: 16 }}>
+                        <div style={{ marginBottom: 8, fontWeight: 500 }}>Scene Order (top to bottom)</div>
+                        <Space direction="vertical" style={{ width: '100%' }}>
+                          {selectedAssetFiles.map((assetPath, index) => {
+                            const asset = uploadedByPath.get(assetPath);
+                            const label = asset ? `${asset.name} (${asset.mediaType || 'asset'})` : assetPath;
+                            return (
+                              <div
+                                key={assetPath}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  border: '1px solid #f0f0f0',
+                                  borderRadius: 8,
+                                  padding: '8px 10px',
+                                }}
+                              >
+                                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginRight: 10 }}>
+                                  {index + 1}. {label}
+                                </span>
+                                <Space>
+                                  <Button
+                                    size="small"
+                                    icon={<ArrowUpOutlined />}
+                                    disabled={index === 0}
+                                    onClick={() => moveSelectedAsset(assetPath, 'up')}
+                                  />
+                                  <Button
+                                    size="small"
+                                    icon={<ArrowDownOutlined />}
+                                    disabled={index === selectedAssetFiles.length - 1}
+                                    onClick={() => moveSelectedAsset(assetPath, 'down')}
+                                  />
+                                  <Button
+                                    size="small"
+                                    danger
+                                    icon={<DeleteOutlined />}
+                                    onClick={() => removeSelectedAsset(assetPath)}
+                                  />
+                                </Space>
+                              </div>
+                            );
+                          })}
+                        </Space>
+                      </div>
+                    );
+                  }}
+                </Form.Item>
+                <Form.Item
+                  name="assetFilesManual"
+                  label="Additional Asset Paths (optional, comma separated)"
+                >
+                  <Input.TextArea rows={2} placeholder="scenes/scene-1.png,scenes/scene-2.png" />
+                </Form.Item>
+                <Form.Item name="selectedFields" label="Editable Fields" rules={[{ required: true, message: 'Select editable fields' }]}>
+                  <Select
+                    mode="multiple"
+                    options={[
+                      { value: 'eventTitle', label: 'eventTitle' },
+                      { value: 'brideName', label: 'brideName' },
+                      { value: 'groomName', label: 'groomName' },
+                      { value: 'eventDate', label: 'eventDate' },
+                      { value: 'eventTime', label: 'eventTime' },
+                      { value: 'venueName', label: 'venueName' },
+                      { value: 'customMessage', label: 'customMessage' },
+                      { value: 'rsvpLink', label: 'rsvpLink' },
+                      { value: 'guestName', label: 'guestName' },
+                    ]}
+                  />
+                </Form.Item>
+                <Space>
+                  <Button type="primary" onClick={buildManifestFromAdminUi}>Generate Manifest</Button>
+                  <Button
+                    onClick={() => {
+                      if (!generatedManifestJson) {
+                        message.warning('Generate a manifest first');
+                        return;
+                      }
+                      adobeForm.setFieldsValue({ manifestJson: generatedManifestJson });
+                      message.success('Generated manifest copied to import form');
+                    }}
+                  >
+                    Use In Import Form
+                  </Button>
+                </Space>
+                {generatedManifestJson ? (
+                  <Input.TextArea
+                    style={{ marginTop: 16 }}
+                    rows={8}
+                    value={generatedManifestJson}
+                    readOnly
+                  />
+                ) : null}
+              </Form>
+            </Card>
+          </Col>
+          <Col xs={24} xl={12}>
+            <Card className="phase-card" title="Import Adobe Express Manifest">
+              <Form
+                form={adobeForm}
+                layout="vertical"
+                onFinish={importAdobeManifest}
+                initialValues={{
+                  upsert: true,
+                  isActive: true,
+                }}
+              >
+                <Form.Item
+                  name="manifestJson"
+                  label="Manifest JSON"
+                  rules={[{ required: true, message: 'Paste Adobe manifest JSON' }]}
+                >
+                  <Input.TextArea rows={10} placeholder="Paste exported Adobe Express manifest JSON here" />
+                </Form.Item>
+                <Row gutter={12}>
+                  <Col xs={24} md={8}>
+                    <Form.Item name="variantKey" label="Variant Key (optional)">
+                      <Input placeholder="e.g. premium-gold" />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={24} md={8}>
+                    <Form.Item name="sortOrder" label="Sort Order (optional)">
+                      <InputNumber min={0} style={{ width: '100%' }} />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={24} md={4}>
+                    <Form.Item name="upsert" label="Upsert Existing" valuePropName="checked">
+                      <Switch />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={24} md={4}>
+                    <Form.Item name="isActive" label="Activate Template" valuePropName="checked">
+                      <Switch />
+                    </Form.Item>
+                  </Col>
+                </Row>
+                <Space>
+                  <Button onClick={validateAdobeManifest} loading={validatingAdobeManifest}>
+                    Validate Manifest
+                  </Button>
+                  <Button type="primary" htmlType="submit" loading={importingAdobeManifest}>
+                    Import Template
+                  </Button>
+                </Space>
+              </Form>
+
+              {adobeValidationResult ? (
+                <div style={{ marginTop: 16 }}>
+                  <Alert
+                    type={adobeValidationResult.valid ? 'success' : 'error'}
+                    showIcon
+                    message={adobeValidationResult.valid ? 'Manifest is valid' : 'Manifest validation failed'}
+                    description={
+                      adobeValidationResult.valid
+                        ? `Warnings: ${(adobeValidationResult.warnings || []).length}`
+                        : `Errors: ${(adobeValidationResult.errors || []).length}`
+                    }
+                  />
+                  {Array.isArray(adobeValidationResult.errors) && adobeValidationResult.errors.length > 0 ? (
+                    <Input.TextArea
+                      readOnly
+                      rows={Math.min(8, adobeValidationResult.errors.length + 1)}
+                      style={{ marginTop: 12 }}
+                      value={adobeValidationResult.errors.join('\n')}
+                    />
+                  ) : null}
+                  {Array.isArray(adobeValidationResult.warnings) && adobeValidationResult.warnings.length > 0 ? (
+                    <Input.TextArea
+                      readOnly
+                      rows={Math.min(8, adobeValidationResult.warnings.length + 1)}
+                      style={{ marginTop: 12 }}
+                      value={adobeValidationResult.warnings.join('\n')}
+                    />
+                  ) : null}
+                </div>
+              ) : null}
+
+              {adobeImportResult?.template ? (
+                <Alert
+                  style={{ marginTop: 16 }}
+                  type="info"
+                  showIcon
+                  message={adobeImportResult.message || 'Template import completed'}
+                  description={`Template: ${adobeImportResult.template.name} (${adobeImportResult.template.key})`}
+                />
+              ) : null}
+            </Card>
+          </Col>
+          <Col span={24}>
+            <Card
+              className="phase-card"
+              title="Invite Card Designs"
+              extra={<Button type="primary" icon={<PlusOutlined />} onClick={() => openTemplateModal()}>Add Template</Button>}
+            >
+              <Table
+                loading={loadingInviteTemplates}
+                rowKey="id"
+                dataSource={inviteTemplates}
+                pagination={false}
+                locale={{ emptyText: <div className="phase-empty">No invite templates yet.</div> }}
+                columns={[
+                  { title: '#', dataIndex: 'sortOrder', width: 60 },
+                  { title: 'Key', dataIndex: 'key', render: (v) => <code>{v}</code> },
+                  { title: 'Name', dataIndex: 'name' },
+                  { title: 'Description', dataIndex: 'description', ellipsis: true },
+                  {
+                    title: 'Preview',
+                    render: (_, r) => (
+                      <span
+                        style={{
+                          display: 'inline-block',
+                          width: 54,
+                          height: 20,
+                          borderRadius: 12,
+                          border: `1px solid ${r.palette?.frame || '#d9d9d9'}`,
+                          background: `linear-gradient(135deg, ${r.palette?.frame || '#999'} 0%, ${r.palette?.accent || '#ccc'} 100%)`,
+                        }}
+                      />
+                    ),
+                  },
+                  { title: 'Active', dataIndex: 'isActive', render: (v) => <Tag color={v ? 'green' : 'red'}>{v ? 'Yes' : 'No'}</Tag> },
+                  {
+                    title: 'Actions',
+                    width: 150,
+                    render: (_, r) => (
+                      <Space>
+                        <Button size="small" icon={<EditOutlined />} onClick={() => openTemplateModal(r)}>
+                          Edit
+                        </Button>
+                        <Popconfirm title="Delete this invite template?" onConfirm={() => removeTemplate(r.id)} okText="Delete" okButtonProps={{ danger: true }}>
+                          <Button size="small" danger icon={<DeleteOutlined />} />
+                        </Popconfirm>
+                      </Space>
+                    ),
+                  },
+                ]}
+              />
+            </Card>
+          </Col>
+        </Row>
       ),
     },
     {

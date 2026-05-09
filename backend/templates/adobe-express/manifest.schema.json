@@ -1,0 +1,203 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vedika360.local/schemas/adobe-express-template-manifest.json",
+  "title": "Adobe Express Template Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "manifestVersion",
+    "templateKey",
+    "templateName",
+    "engine",
+    "version",
+    "editableFields",
+    "variantProfiles",
+    "outputProfiles",
+    "timeline"
+  ],
+  "properties": {
+    "manifestVersion": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+$"
+    },
+    "templateKey": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]{3,64}$"
+    },
+    "templateName": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 120
+    },
+    "engine": {
+      "type": "string",
+      "const": "adobe-express"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "category": {
+      "type": "string",
+      "enum": ["wedding", "birthday", "anniversary", "engagement", "other"]
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tool": { "type": "string" },
+        "projectLink": { "type": "string" },
+        "exportedAt": { "type": "string" }
+      }
+    },
+    "editableFields": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "label", "type", "required"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z][a-zA-Z0-9_]{1,50}$"
+          },
+          "label": { "type": "string", "minLength": 1, "maxLength": 60 },
+          "type": {
+            "type": "string",
+            "enum": ["text", "date", "image", "audio", "color", "font", "qrcode"]
+          },
+          "required": { "type": "boolean" },
+          "maxLength": { "type": "integer", "minimum": 1, "maximum": 500 },
+          "defaultValue": {},
+          "bindings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["sceneId", "target"],
+              "properties": {
+                "sceneId": { "type": "string" },
+                "target": { "type": "string" },
+                "styleRef": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "variantProfiles": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["key", "label", "palette", "fontPairing"],
+        "properties": {
+          "key": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]{3,40}$"
+          },
+          "label": { "type": "string", "minLength": 1, "maxLength": 60 },
+          "palette": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["primary", "secondary", "accent", "text"],
+            "properties": {
+              "primary": { "type": "string" },
+              "secondary": { "type": "string" },
+              "accent": { "type": "string" },
+              "text": { "type": "string" }
+            }
+          },
+          "fontPairing": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["heading", "body"],
+            "properties": {
+              "heading": { "type": "string" },
+              "body": { "type": "string" }
+            }
+          },
+          "assetOverrides": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["from", "to"],
+              "properties": {
+                "from": { "type": "string" },
+                "to": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "outputProfiles": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["key", "format", "width", "height", "fps"],
+        "properties": {
+          "key": { "type": "string" },
+          "format": { "type": "string", "enum": ["mp4", "png", "jpg", "pdf"] },
+          "width": { "type": "integer", "minimum": 320, "maximum": 4096 },
+          "height": { "type": "integer", "minimum": 320, "maximum": 4096 },
+          "fps": { "type": "integer", "minimum": 1, "maximum": 60 },
+          "videoBitrateKbps": { "type": "integer", "minimum": 500, "maximum": 50000 },
+          "audioBitrateKbps": { "type": "integer", "minimum": 64, "maximum": 512 }
+        }
+      }
+    },
+    "timeline": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["sceneId", "startMs", "durationMs", "baseVideo"],
+        "properties": {
+          "sceneId": { "type": "string" },
+          "startMs": { "type": "integer", "minimum": 0 },
+          "durationMs": { "type": "integer", "minimum": 500 },
+          "baseVideo": { "type": "string" },
+          "overlayAssets": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "textLayers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["id", "fieldId", "x", "y", "maxWidth", "maxHeight"],
+              "properties": {
+                "id": { "type": "string" },
+                "fieldId": { "type": "string" },
+                "x": { "type": "number", "minimum": 0, "maximum": 1 },
+                "y": { "type": "number", "minimum": 0, "maximum": 1 },
+                "maxWidth": { "type": "number", "minimum": 0.05, "maximum": 1 },
+                "maxHeight": { "type": "number", "minimum": 0.02, "maximum": 1 },
+                "align": { "type": "string", "enum": ["left", "center", "right"] }
+              }
+            }
+          },
+          "musicTrack": { "type": "string" }
+        }
+      }
+    },
+    "assets": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "videos": { "type": "array", "items": { "type": "string" } },
+        "images": { "type": "array", "items": { "type": "string" } },
+        "audio": { "type": "array", "items": { "type": "string" } },
+        "fonts": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}

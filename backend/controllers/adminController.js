@@ -1,6 +1,9 @@
 const bcrypt = require('bcryptjs');
+const path = require('path');
 const { prisma } = require('../config/db');
 const asyncHandler = require('../utils/asyncHandler');
+const { validateManifest: validateAdobeExpressManifest } = require('../scripts/validate-adobe-express-manifest');
+const { uploadFile } = require('../services/fileService');
 
 exports.verifyVendor = asyncHandler(async (req, res) => {
   const vendorId = Number(req.params.vendorId);
@@ -104,6 +107,175 @@ const normalizeTemplateKey = (value = '') =>
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
+
+exports.uploadAdobeExpressTemplateAsset = asyncHandler(async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ message: 'No file uploaded' });
+  }
+
+  const templateKey = normalizeTemplateKey(req.body?.templateKey || 'adobe-template');
+  const uploadFolder = `vedika360/adobe-templates/${templateKey}/assets`;
+
+  const uploaded = await uploadFile(req.file.buffer, uploadFolder, {
+    contentType: req.file.mimetype,
+    originalname: req.file.originalname,
+  });
+
+  const extension = path.extname(req.file.originalname || '').toLowerCase();
+  const mimeType = String(req.file.mimetype || '').toLowerCase();
+  const mediaType = mimeType.startsWith('video/')
+    ? 'video'
+    : mimeType.startsWith('audio/')
+      ? 'audio'
+      : 'image';
+
+  return res.status(201).json({
+    message: 'Asset uploaded successfully',
+    asset: {
+      name: req.file.originalname || uploaded.publicId.split('/').pop(),
+      mimeType: req.file.mimetype,
+      extension,
+      size: req.file.size,
+      mediaType,
+      assetPath: uploaded.publicId,
+      publicId: uploaded.publicId,
+      url: uploaded.url,
+    },
+  });
+});
+
+const ADOBE_REQUIRED_WEDDING_FIELDS = ['brideName', 'groomName', 'eventDate', 'venueName', 'qrUrl'];
+
+const normalizeAdobePalette = (manifest, variantKey) => {
+  const variants = Array.isArray(manifest?.variantProfiles) ? manifest.variantProfiles : [];
+  const preferred = variants.find((item) => item?.key === variantKey) || variants[0] || {};
+  const palette = preferred.palette || {};
+
+  const primary = String(palette.primary || '#7c2d12');
+  const secondary = String(palette.secondary || '#fff7f2');
+  const accent = String(palette.accent || '#b45309');
+  const text = String(palette.text || '#1f2937');
+
+  return {
+    background: secondary,
+    frame: primary,
+    innerBorder: accent,
+    header: primary,
+    headerText: secondary,
+    accent,
+    title: primary,
+    subtitle: accent,
+    body: text,
+    subtle: '#6b7280',
+    divider: accent,
+    link: accent,
+    badge: secondary,
+    badgeText: primary,
+    __templateEngine: 'adobe-express',
+    __adobeExpress: {
+      manifestVersion: manifest.manifestVersion,
+      templateName: manifest.templateName,
+      source: manifest.source || null,
+      editableFields: manifest.editableFields || [],
+      variantProfiles: variants,
+      outputProfiles: manifest.outputProfiles || [],
+      timeline: manifest.timeline || [],
+      assets: manifest.assets || {},
+      importedAt: new Date().toISOString(),
+    },
+  };
+};
+
+const buildAdobeManifestWarnings = (manifest) => {
+  const warnings = [];
+
+  if (manifest?.category === 'wedding') {
+    const fieldIds = new Set((manifest.editableFields || []).map((field) => field?.id));
+    const missing = ADOBE_REQUIRED_WEDDING_FIELDS.filter((fieldId) => !fieldIds.has(fieldId));
+    if (missing.length) {
+      warnings.push(`Wedding template is missing recommended fields: ${missing.join(', ')}`);
+    }
+  }
+
+  if (!Array.isArray(manifest?.variantProfiles) || manifest.variantProfiles.length < 2) {
+    warnings.push('Template has fewer than 2 variants. Consider adding more style variants for better personalization.');
+  }
+
+  return warnings;
+};
+
+exports.validateAdobeExpressTemplateManifest = asyncHandler(async (req, res) => {
+  const manifest = req.body?.manifest && typeof req.body.manifest === 'object' ? req.body.manifest : req.body;
+  const errors = validateAdobeExpressManifest(manifest);
+  const warnings = errors.length ? [] : buildAdobeManifestWarnings(manifest);
+
+  return res.status(errors.length ? 400 : 200).json({
+    valid: errors.length === 0,
+    errors,
+    warnings,
+  });
+});
+
+exports.importAdobeExpressTemplateManifest = asyncHandler(async (req, res) => {
+  const manifest = req.body?.manifest && typeof req.body.manifest === 'object' ? req.body.manifest : req.body;
+  const errors = validateAdobeExpressManifest(manifest);
+  if (errors.length) {
+    return res.status(400).json({
+      message: 'Invalid Adobe Express manifest',
+      valid: false,
+      errors,
+    });
+  }
+
+  const upsert = req.body?.upsert !== undefined ? Boolean(req.body.upsert) : true;
+  const variantKey = req.body?.variantKey ? String(req.body.variantKey).trim() : '';
+  const key = normalizeTemplateKey(manifest.templateKey || manifest.templateName);
+
+  if (!key) {
+    return res.status(400).json({ message: 'templateKey is required in manifest' });
+  }
+
+  const data = {
+    key,
+    name: String(manifest.templateName || key).trim(),
+    description: String(manifest.description || `Imported from Adobe Express (v${manifest.version || 1})`).trim(),
+    palette: normalizeAdobePalette(manifest, variantKey),
+    isActive: req.body?.isActive !== undefined ? Boolean(req.body.isActive) : true,
+  };
+
+  const existing = await prisma.inviteTemplate.findUnique({ where: { key } });
+  let template;
+
+  if (existing) {
+    if (!upsert) {
+      return res.status(409).json({
+        message: 'Template key already exists. Set upsert=true to update it.',
+        template: existing,
+      });
+    }
+
+    template = await prisma.inviteTemplate.update({
+      where: { id: existing.id },
+      data,
+    });
+  } else {
+    const maxSort = await prisma.inviteTemplate.aggregate({ _max: { sortOrder: true } });
+    template = await prisma.inviteTemplate.create({
+      data: {
+        ...data,
+        sortOrder: req.body?.sortOrder !== undefined ? Number(req.body.sortOrder) : (maxSort._max.sortOrder || 0) + 1,
+      },
+    });
+  }
+
+  const warnings = buildAdobeManifestWarnings(manifest);
+
+  return res.status(existing ? 200 : 201).json({
+    message: existing ? 'Adobe Express template updated successfully' : 'Adobe Express template imported successfully',
+    template,
+    warnings,
+  });
+});
 
 exports.getInviteTemplates = asyncHandler(async (_req, res) => {
   const templates = await prisma.inviteTemplate.findMany({

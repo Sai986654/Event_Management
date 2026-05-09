@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const path = require('path');
 const { PutObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
 const { r2Client, R2_BUCKET, R2_PUBLIC_URL } = require('../config/r2');
 
@@ -10,7 +11,9 @@ const { r2Client, R2_BUCKET, R2_PUBLIC_URL } = require('../config/r2');
  * @param {{ contentType?: string, originalname?: string }} opts
  */
 const uploadFile = async (fileBuffer, folder = 'vedika360', opts = {}) => {
-  const uniqueName = `${Date.now()}-${crypto.randomBytes(8).toString('hex')}`;
+  const ext = opts.originalname ? path.extname(String(opts.originalname)).toLowerCase() : '';
+  const safeExt = /^[.][a-z0-9]{1,10}$/i.test(ext) ? ext : '';
+  const uniqueName = `${Date.now()}-${crypto.randomBytes(8).toString('hex')}${safeExt}`;
   const key = `${folder}/${uniqueName}`;
 
   await r2Client.send(
