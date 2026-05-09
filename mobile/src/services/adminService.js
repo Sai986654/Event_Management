@@ -30,6 +30,27 @@ export const adminService = {
     const response = await api.get('/admin/invite-templates');
     return response.data;
   },
+  validateAdobeExpressManifest: async (manifestPayload) => {
+    const response = await api.post('/admin/invite-templates/adobe-express/validate', manifestPayload);
+    return response.data;
+  },
+  importAdobeExpressManifest: async (payload) => {
+    const response = await api.post('/admin/invite-templates/adobe-express/import', payload);
+    return response.data;
+  },
+  uploadAdobeExpressAsset: async ({ file, templateKey }) => {
+    const formData = new FormData();
+    formData.append('file', {
+      uri: file.uri,
+      name: file.fileName || 'asset.png',
+      type: file.mimeType || 'image/png',
+    });
+    if (templateKey) formData.append('templateKey', templateKey);
+    const response = await api.post('/admin/invite-templates/adobe-express/assets', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
   createInviteTemplate: async (payload) => {
     const response = await api.post('/admin/invite-templates', payload);
     return response.data;

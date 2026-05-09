@@ -1,5 +1,7 @@
-import React, { useContext, useEffect, useState, useCallback } from 'react';
-import { ScrollView, StyleSheet, View, Alert, RefreshControl } from 'react-native';
+import React, { useContext, useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { ScrollView, StyleSheet, View, Alert, RefreshControl, Image, TouchableOpacity, PanResponder } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   ActivityIndicator, Button, Card, Chip, Text, TextInput, Portal, Modal, IconButton, Divider,
   SegmentedButtons,
@@ -13,6 +15,22 @@ import LocationPicker from '../components/LocationPicker';
 
 const roles = ['admin', 'organizer', 'customer', 'vendor', 'guest'];
 const tagColors = ['default', 'red', 'orange', 'gold', 'green', 'cyan', 'blue', 'purple', 'magenta', 'pink'];
+const INVITE_FIELD_CATALOG = [
+  { key: 'hostName', label: 'Host Name' },
+  { key: 'partnerName', label: 'Partner Name' },
+  { key: 'eventDate', label: 'Event Date' },
+  { key: 'eventTime', label: 'Event Time' },
+  { key: 'eventVenue', label: 'Event Venue' },
+  { key: 'eventAddress', label: 'Event Address' },
+  { key: 'rsvpName', label: 'RSVP Name' },
+  { key: 'rsvpPhone', label: 'RSVP Phone' },
+  { key: 'coverTitle', label: 'Cover Title' },
+  { key: 'coverSubtitle', label: 'Cover Subtitle' },
+  { key: 'specialNote', label: 'Special Note' },
+];
+
+const DEFAULT_LAYER = { x: 0.2, y: 0.2, width: 0.6, height: 0.08 };
+const BUILDER_DRAFT_KEY = '@admin_adobe_builder_draft';
 
 const AdminControlScreen = () => {
   const { user } = useContext(AuthContext);
@@ -55,6 +73,93 @@ const AdminControlScreen = () => {
   const [paymentConfigs, setPaymentConfigs] = useState([]);
   const [loadingPaymentConfigs, setLoadingPaymentConfigs] = useState(false);
   const [savingPaymentConfig, setSavingPaymentConfig] = useState('');
+
+  // ── Invite Templates (Adobe Express) ──────────────────────────
+  const [inviteTemplates, setInviteTemplates] = useState([]);
+  const [loadingInviteTemplates, setLoadingInviteTemplates] = useState(false);
+  const [uploadingAdobeAsset, setUploadingAdobeAsset] = useState(false);
+  const [validatingAdobeManifest, setValidatingAdobeManifest] = useState(false);
+  const [importingAdobeManifest, setImportingAdobeManifest] = useState(false);
+  const [uploadedAdobeAssets, setUploadedAdobeAssets] = useState([]);
+  const [previewSize, setPreviewSize] = useState({ width: 260, height: 462 });
+
+  const [builderForm, setBuilderForm] = useState({
+    templateKey: '',
+    templateName: '',
+    category: '',
+    musicAssetUrl: '',
+    selectedFields: ['hostName', 'partnerName', 'eventDate', 'eventVenue'],
+    selectedAssets: [],
+    fieldMappings: {},
+  });
+
+  const [selectedSceneIndex, setSelectedSceneIndex] = useState(0);
+  const [activeFieldForMapping, setActiveFieldForMapping] = useState('hostName');
+  const [generatedManifestPayload, setGeneratedManifestPayload] = useState(null);
+  const [manifestInputText, setManifestInputText] = useState('');
+  const [manifestValidationResult, setManifestValidationResult] = useState(null);
+  const [manifestImportResult, setManifestImportResult] = useState(null);
+  const suppressPreviewTapRef = useRef(false);
+  const gestureStartRef = useRef(null);
+  const builderDraftLoadedRef = useRef(false);
+
+  const clamp = useCallback((value, min, max) => Math.min(max, Math.max(min, value)), []);
+
+  // ── Draft persistence ──────────────────────────────────────────
+  useEffect(() => {
+    if (builderDraftLoadedRef.current) return;
+    AsyncStorage.getItem(BUILDER_DRAFT_KEY)
+      .then((raw) => {
+        if (!raw) return;
+        try {
+          const draft = JSON.parse(raw);
+          if (draft && typeof draft === 'object') {
+            setBuilderForm((prev) => ({
+              ...prev,
+              templateKey: draft.templateKey ?? prev.templateKey,
+              templateName: draft.templateName ?? prev.templateName,
+              category: draft.category ?? prev.category,
+              musicAssetUrl: draft.musicAssetUrl ?? prev.musicAssetUrl,
+              selectedFields: Array.isArray(draft.selectedFields) ? draft.selectedFields : prev.selectedFields,
+              selectedAssets: Array.isArray(draft.selectedAssets) ? draft.selectedAssets : prev.selectedAssets,
+              fieldMappings: draft.fieldMappings && typeof draft.fieldMappings === 'object' ? draft.fieldMappings : prev.fieldMappings,
+            }));
+            if (draft.uploadedAssets) {
+              setUploadedAdobeAssets((prev) => {
+                const existing = new Set(prev.map((a) => a.assetPath));
+                const newOnes = (draft.uploadedAssets || []).filter((a) => !existing.has(a.assetPath));
+                return [...prev, ...newOnes];
+              });
+            }
+            if (draft.manifestInputText) setManifestInputText(draft.manifestInputText);
+          }
+        } catch (_) {}
+      })
+      .catch(() => {})
+      .finally(() => {
+        builderDraftLoadedRef.current = true;
+      });
+  }, []);
+
+  useEffect(() => {
+    if (!builderDraftLoadedRef.current) return;
+    const draft = {
+      templateKey: builderForm.templateKey,
+      templateName: builderForm.templateName,
+      category: builderForm.category,
+      musicAssetUrl: builderForm.musicAssetUrl,
+      selectedFields: builderForm.selectedFields,
+      selectedAssets: builderForm.selectedAssets,
+      fieldMappings: builderForm.fieldMappings,
+      uploadedAssets: uploadedAdobeAssets,
+      manifestInputText,
+    };
+    AsyncStorage.setItem(BUILDER_DRAFT_KEY, JSON.stringify(draft)).catch(() => {});
+  }, [builderForm, uploadedAdobeAssets, manifestInputText]);
+
+  const clearBuilderDraft = useCallback(() => {
+    AsyncStorage.removeItem(BUILDER_DRAFT_KEY).catch(() => {});
+  }, []);
 
   // ── Load Functions ──────────────────────────────────────────────
   const loadVerificationQueue = useCallback(async () => {
@@ -127,10 +232,29 @@ const AdminControlScreen = () => {
     }
   }, []);
 
+  const loadInviteTemplates = useCallback(async () => {
+    setLoadingInviteTemplates(true);
+    try {
+      const res = await adminService.getInviteTemplates();
+      setInviteTemplates(res.templates || []);
+    } catch (err) {
+      setMessage(getErrorMessage(err));
+      setMessageType('error');
+    } finally {
+      setLoadingInviteTemplates(false);
+    }
+  }, []);
+
   const loadAll = useCallback(async () => {
-    await Promise.all([loadVerificationQueue(), loadCategories(), loadAllVendors(), loadPaymentConfigurations()]);
+    await Promise.all([
+      loadVerificationQueue(),
+      loadCategories(),
+      loadAllVendors(),
+      loadPaymentConfigurations(),
+      loadInviteTemplates(),
+    ]);
     setRefreshing(false);
-  }, [loadVerificationQueue, loadCategories, loadAllVendors, loadPaymentConfigurations]);
+  }, [loadVerificationQueue, loadCategories, loadAllVendors, loadPaymentConfigurations, loadInviteTemplates]);
 
   const updatePaymentConfiguration = async (entityType, patch) => {
     setSavingPaymentConfig(entityType);
@@ -290,6 +414,409 @@ const AdminControlScreen = () => {
       setMessage(getErrorMessage(err)); setMessageType('error');
     } finally {
       setCreating(false);
+    }
+  };
+
+  // ── Invite Template (Adobe Express) Actions ───────────────────
+  const normalizeTemplateKey = (value) =>
+    String(value || '')
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+
+  const toggleBuilderField = (fieldKey) => {
+    setBuilderForm((prev) => {
+      const exists = prev.selectedFields.includes(fieldKey);
+      const nextFields = exists
+        ? prev.selectedFields.filter((key) => key !== fieldKey)
+        : [...prev.selectedFields, fieldKey];
+
+      const nextMappings = { ...prev.fieldMappings };
+      if (exists) delete nextMappings[fieldKey];
+
+      return {
+        ...prev,
+        selectedFields: nextFields,
+        fieldMappings: nextMappings,
+      };
+    });
+  };
+
+  const pickAndUploadAdobeAsset = async () => {
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('Permission required', 'Media library permission is required to upload assets.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.All,
+        quality: 1,
+      });
+
+      if (result.canceled || !result.assets?.length) return;
+
+      const picked = result.assets[0];
+      const fileName = picked.fileName || picked.uri.split('/').pop() || 'asset.png';
+      const mimeType = picked.mimeType || (picked.type === 'video' ? 'video/mp4' : 'image/png');
+
+      setUploadingAdobeAsset(true);
+      const uploadRes = await adminService.uploadAdobeExpressAsset({
+        file: { uri: picked.uri, fileName, mimeType },
+        templateKey: normalizeTemplateKey(builderForm.templateKey) || undefined,
+      });
+
+      const uploaded = uploadRes.asset || null;
+      if (!uploaded?.assetPath) {
+        throw new Error('Asset upload response missing asset path');
+      }
+
+      setUploadedAdobeAssets((prev) => {
+        if (prev.some((item) => item.assetPath === uploaded.assetPath)) return prev;
+        return [...prev, uploaded];
+      });
+
+      setBuilderForm((prev) => {
+        if (prev.selectedAssets.includes(uploaded.assetPath)) return prev;
+        return { ...prev, selectedAssets: [...prev.selectedAssets, uploaded.assetPath] };
+      });
+
+      setMessage('Asset uploaded and added to scenes');
+      setMessageType('success');
+    } catch (err) {
+      setMessage(getErrorMessage(err));
+      setMessageType('error');
+    } finally {
+      setUploadingAdobeAsset(false);
+    }
+  };
+
+  const moveSelectedAsset = (index, direction) => {
+    setBuilderForm((prev) => {
+      const next = [...prev.selectedAssets];
+      const target = index + direction;
+      if (target < 0 || target >= next.length) return prev;
+      [next[index], next[target]] = [next[target], next[index]];
+      return { ...prev, selectedAssets: next };
+    });
+  };
+
+  const removeSelectedAsset = (assetPath) => {
+    setBuilderForm((prev) => {
+      const nextAssets = prev.selectedAssets.filter((path) => path !== assetPath);
+      const nextMappings = { ...prev.fieldMappings };
+
+      Object.keys(nextMappings).forEach((fieldKey) => {
+        nextMappings[fieldKey] = (nextMappings[fieldKey] || []).filter((layer) => layer.sceneAsset !== assetPath);
+      });
+
+      return {
+        ...prev,
+        selectedAssets: nextAssets,
+        fieldMappings: nextMappings,
+      };
+    });
+
+    setSelectedSceneIndex(0);
+  };
+
+  const upsertActiveLayerForField = (fieldKey, sceneAsset, patch) => {
+    setBuilderForm((prev) => {
+      const existing = prev.fieldMappings[fieldKey] || [];
+      const current = existing.find((layer) => layer.sceneAsset === sceneAsset);
+      const nextLayer = {
+        sceneAsset,
+        ...DEFAULT_LAYER,
+        ...(current || {}),
+        ...(patch || {}),
+      };
+
+      const others = existing.filter((layer) => layer.sceneAsset !== sceneAsset);
+      return {
+        ...prev,
+        fieldMappings: {
+          ...prev.fieldMappings,
+          [fieldKey]: [...others, nextLayer],
+        },
+      };
+    });
+  };
+
+  const handlePreviewTap = (event) => {
+    if (suppressPreviewTapRef.current) {
+      suppressPreviewTapRef.current = false;
+      return;
+    }
+
+    if (!activeFieldForMapping) return;
+    const sceneAsset = builderForm.selectedAssets[selectedSceneIndex];
+    if (!sceneAsset) return;
+
+    const width = Math.max(1, previewSize.width);
+    const height = Math.max(1, previewSize.height);
+    const normalizedX = Math.max(0, Math.min(1, event.nativeEvent.locationX / width));
+    const normalizedY = Math.max(0, Math.min(1, event.nativeEvent.locationY / height));
+    const layer = (builderForm.fieldMappings[activeFieldForMapping] || []).find((item) => item.sceneAsset === sceneAsset);
+    const layerWidth = Number(layer?.width ?? DEFAULT_LAYER.width);
+    const layerHeight = Number(layer?.height ?? DEFAULT_LAYER.height);
+
+    const x = clamp(normalizedX - layerWidth / 2, 0, 1 - layerWidth);
+    const y = clamp(normalizedY - layerHeight / 2, 0, 1 - layerHeight);
+
+    upsertActiveLayerForField(activeFieldForMapping, sceneAsset, { x: Number(x.toFixed(4)), y: Number(y.toFixed(4)) });
+  };
+
+  const getActiveLayerInCurrentScene = useCallback(() => {
+    const sceneAsset = builderForm.selectedAssets[selectedSceneIndex];
+    if (!sceneAsset || !activeFieldForMapping) return null;
+    const layer = (builderForm.fieldMappings[activeFieldForMapping] || []).find((item) => item.sceneAsset === sceneAsset);
+    if (!layer) return null;
+    return {
+      sceneAsset,
+      layer,
+    };
+  }, [activeFieldForMapping, builderForm.fieldMappings, builderForm.selectedAssets, selectedSceneIndex]);
+
+  const moveLayerPanResponder = useMemo(() => PanResponder.create({
+    onStartShouldSetPanResponder: () => Boolean(getActiveLayerInCurrentScene()),
+    onMoveShouldSetPanResponder: (_, gestureState) => Boolean(getActiveLayerInCurrentScene()) && (Math.abs(gestureState.dx) > 1 || Math.abs(gestureState.dy) > 1),
+    onPanResponderGrant: () => {
+      const current = getActiveLayerInCurrentScene();
+      if (!current) return;
+      suppressPreviewTapRef.current = true;
+      gestureStartRef.current = {
+        type: 'move',
+        sceneAsset: current.sceneAsset,
+        x: Number(current.layer.x ?? DEFAULT_LAYER.x),
+        y: Number(current.layer.y ?? DEFAULT_LAYER.y),
+        width: Number(current.layer.width ?? DEFAULT_LAYER.width),
+        height: Number(current.layer.height ?? DEFAULT_LAYER.height),
+      };
+    },
+    onPanResponderMove: (_, gestureState) => {
+      const start = gestureStartRef.current;
+      if (!start || start.type !== 'move' || !activeFieldForMapping) return;
+      const width = Math.max(1, previewSize.width);
+      const height = Math.max(1, previewSize.height);
+      const dx = gestureState.dx / width;
+      const dy = gestureState.dy / height;
+      const nextX = clamp(start.x + dx, 0, 1 - start.width);
+      const nextY = clamp(start.y + dy, 0, 1 - start.height);
+      upsertActiveLayerForField(activeFieldForMapping, start.sceneAsset, {
+        x: Number(nextX.toFixed(4)),
+        y: Number(nextY.toFixed(4)),
+      });
+    },
+    onPanResponderRelease: () => {
+      gestureStartRef.current = null;
+      setTimeout(() => {
+        suppressPreviewTapRef.current = false;
+      }, 0);
+    },
+    onPanResponderTerminate: () => {
+      gestureStartRef.current = null;
+      setTimeout(() => {
+        suppressPreviewTapRef.current = false;
+      }, 0);
+    },
+  }), [activeFieldForMapping, clamp, getActiveLayerInCurrentScene, previewSize.height, previewSize.width]);
+
+  const resizeLayerPanResponder = useMemo(() => PanResponder.create({
+    onStartShouldSetPanResponder: () => Boolean(getActiveLayerInCurrentScene()),
+    onMoveShouldSetPanResponder: (_, gestureState) => Boolean(getActiveLayerInCurrentScene()) && (Math.abs(gestureState.dx) > 1 || Math.abs(gestureState.dy) > 1),
+    onPanResponderGrant: () => {
+      const current = getActiveLayerInCurrentScene();
+      if (!current) return;
+      suppressPreviewTapRef.current = true;
+      gestureStartRef.current = {
+        type: 'resize',
+        sceneAsset: current.sceneAsset,
+        x: Number(current.layer.x ?? DEFAULT_LAYER.x),
+        y: Number(current.layer.y ?? DEFAULT_LAYER.y),
+        width: Number(current.layer.width ?? DEFAULT_LAYER.width),
+        height: Number(current.layer.height ?? DEFAULT_LAYER.height),
+      };
+    },
+    onPanResponderMove: (_, gestureState) => {
+      const start = gestureStartRef.current;
+      if (!start || start.type !== 'resize' || !activeFieldForMapping) return;
+      const viewWidth = Math.max(1, previewSize.width);
+      const viewHeight = Math.max(1, previewSize.height);
+      const dx = gestureState.dx / viewWidth;
+      const dy = gestureState.dy / viewHeight;
+      const nextWidth = clamp(start.width + dx, 0.05, 1);
+      const nextHeight = clamp(start.height + dy, 0.05, 1);
+      const nextX = clamp(start.x, 0, 1 - nextWidth);
+      const nextY = clamp(start.y, 0, 1 - nextHeight);
+      upsertActiveLayerForField(activeFieldForMapping, start.sceneAsset, {
+        x: Number(nextX.toFixed(4)),
+        y: Number(nextY.toFixed(4)),
+        width: Number(nextWidth.toFixed(4)),
+        height: Number(nextHeight.toFixed(4)),
+      });
+    },
+    onPanResponderRelease: () => {
+      gestureStartRef.current = null;
+      setTimeout(() => {
+        suppressPreviewTapRef.current = false;
+      }, 0);
+    },
+    onPanResponderTerminate: () => {
+      gestureStartRef.current = null;
+      setTimeout(() => {
+        suppressPreviewTapRef.current = false;
+      }, 0);
+    },
+  }), [activeFieldForMapping, clamp, getActiveLayerInCurrentScene, previewSize.height, previewSize.width]);
+
+  const buildManifestFromBuilder = () => {
+    const templateKey = normalizeTemplateKey(builderForm.templateKey);
+    if (!templateKey) {
+      Alert.alert('Validation', 'Template key is required.');
+      return null;
+    }
+    if (!builderForm.templateName.trim()) {
+      Alert.alert('Validation', 'Template name is required.');
+      return null;
+    }
+    if (!builderForm.selectedAssets.length) {
+      Alert.alert('Validation', 'Upload and select at least one scene asset.');
+      return null;
+    }
+
+    const selectedFields = builderForm.selectedFields.length
+      ? builderForm.selectedFields
+      : ['hostName', 'partnerName', 'eventDate', 'eventVenue'];
+
+    const timelineScenes = builderForm.selectedAssets.map((assetPath, index) => ({
+      id: `scene_${index + 1}`,
+      durationMs: 3500,
+      asset: assetPath,
+      transitions: {
+        in: index === 0 ? 'fade' : 'crossfade',
+        out: 'crossfade',
+      },
+    }));
+
+    const bindings = [];
+    selectedFields.forEach((fieldKey) => {
+      const layers = builderForm.fieldMappings[fieldKey] || [];
+      layers.forEach((layer, idx) => {
+        if (!layer?.sceneAsset) return;
+        const sceneIndex = builderForm.selectedAssets.findIndex((asset) => asset === layer.sceneAsset);
+        if (sceneIndex === -1) return;
+        bindings.push({
+          id: `bind_${fieldKey}_${sceneIndex}_${idx}`,
+          fieldKey,
+          target: {
+            sceneId: `scene_${sceneIndex + 1}`,
+            property: 'text',
+            layer: {
+              x: Number(layer.x ?? DEFAULT_LAYER.x),
+              y: Number(layer.y ?? DEFAULT_LAYER.y),
+              width: Number(layer.width ?? DEFAULT_LAYER.width),
+              height: Number(layer.height ?? DEFAULT_LAYER.height),
+            },
+          },
+          style: {
+            fontFamily: 'Poppins',
+            fontSize: fieldKey === 'hostName' || fieldKey === 'partnerName' ? 52 : 34,
+            color: '#ffffff',
+            align: 'center',
+            weight: fieldKey === 'hostName' || fieldKey === 'partnerName' ? '700' : '500',
+          },
+        });
+      });
+    });
+
+    return {
+      version: '1.0.0',
+      template: {
+        key: templateKey,
+        name: builderForm.templateName.trim(),
+        category: builderForm.category.trim() || 'wedding',
+        supportedVariants: ['default'],
+      },
+      fields: selectedFields.map((fieldKey) => {
+        const field = INVITE_FIELD_CATALOG.find((item) => item.key === fieldKey);
+        return {
+          key: fieldKey,
+          label: field?.label || fieldKey,
+          type: 'text',
+          required: ['hostName', 'partnerName', 'eventDate', 'eventVenue'].includes(fieldKey),
+          maxLength: 120,
+        };
+      }),
+      timeline: {
+        fps: 30,
+        scenes: timelineScenes,
+      },
+      bindings,
+      output: {
+        format: 'mp4',
+        width: 1080,
+        height: 1920,
+        codec: 'h264',
+        audio: {
+          musicAsset: builderForm.musicAssetUrl.trim() || undefined,
+        },
+      },
+    };
+  };
+
+  const generateManifestFromBuilder = () => {
+    const manifest = buildManifestFromBuilder();
+    if (!manifest) return;
+    setGeneratedManifestPayload(manifest);
+    setManifestInputText(JSON.stringify(manifest, null, 2));
+    setManifestValidationResult(null);
+    setManifestImportResult(null);
+    setMessage('Manifest generated from mobile builder');
+    setMessageType('success');
+  };
+
+  const validateManifestInput = async () => {
+    if (!manifestInputText.trim()) {
+      Alert.alert('Validation', 'Generate or paste a manifest JSON first.');
+      return;
+    }
+    try {
+      const manifest = JSON.parse(manifestInputText);
+      setValidatingAdobeManifest(true);
+      const res = await adminService.validateAdobeExpressManifest({ manifest });
+      setManifestValidationResult(res);
+      setMessage(res?.valid ? 'Manifest validation passed' : 'Manifest validation failed');
+      setMessageType(res?.valid ? 'success' : 'error');
+    } catch (err) {
+      setManifestValidationResult({ valid: false, errors: [getErrorMessage(err)] });
+      setMessage(getErrorMessage(err));
+      setMessageType('error');
+    } finally {
+      setValidatingAdobeManifest(false);
+    }
+  };
+
+  const importManifestInput = async () => {
+    if (!manifestInputText.trim()) {
+      Alert.alert('Validation', 'Generate or paste a manifest JSON first.');
+      return;
+    }
+    try {
+      const manifest = JSON.parse(manifestInputText);
+      setImportingAdobeManifest(true);
+      const res = await adminService.importAdobeExpressManifest({ manifest });
+      setManifestImportResult(res);
+      setMessage('Adobe template imported successfully');
+      setMessageType('success');
+      clearBuilderDraft();
+      await loadInviteTemplates();
+    } catch (err) {
+      setMessage(getErrorMessage(err));
+      setMessageType('error');
+    } finally {
+      setImportingAdobeManifest(false);
     }
   };
 
@@ -564,6 +1091,339 @@ const AdminControlScreen = () => {
     </View>
   );
 
+  const renderInviteTemplates = () => {
+    const currentSceneAsset = builderForm.selectedAssets[selectedSceneIndex] || null;
+    const currentSceneUploaded = uploadedAdobeAssets.find((asset) => asset.assetPath === currentSceneAsset);
+    const activeLayers = builderForm.selectedFields
+      .map((fieldKey) => {
+        const layer = (builderForm.fieldMappings[fieldKey] || []).find((item) => item.sceneAsset === currentSceneAsset);
+        return layer ? { fieldKey, layer } : null;
+      })
+      .filter(Boolean);
+
+    const activeFieldLayer = activeFieldForMapping
+      ? (builderForm.fieldMappings[activeFieldForMapping] || []).find((item) => item.sceneAsset === currentSceneAsset)
+      : null;
+
+    return (
+      <View>
+        <Text variant="titleMedium" style={styles.sectionTitle}>Invite Templates (Adobe Express)</Text>
+
+        <Card style={styles.itemCard}>
+          <Card.Content>
+            <Text variant="titleSmall" style={{ fontWeight: '700', marginBottom: Spacing.md }}>Builder</Text>
+            <TextInput
+              label="Template Key"
+              mode="outlined"
+              value={builderForm.templateKey}
+              onChangeText={(v) => setBuilderForm((prev) => ({ ...prev, templateKey: normalizeTemplateKey(v) }))}
+              placeholder="e.g. premium-royal-wedding"
+              style={styles.input}
+              outlineStyle={styles.outline}
+            />
+            <TextInput
+              label="Template Name"
+              mode="outlined"
+              value={builderForm.templateName}
+              onChangeText={(v) => setBuilderForm((prev) => ({ ...prev, templateName: v }))}
+              placeholder="Premium Royal Wedding"
+              style={styles.input}
+              outlineStyle={styles.outline}
+            />
+            <TextInput
+              label="Category"
+              mode="outlined"
+              value={builderForm.category}
+              onChangeText={(v) => setBuilderForm((prev) => ({ ...prev, category: v }))}
+              placeholder="wedding"
+              style={styles.input}
+              outlineStyle={styles.outline}
+            />
+            <TextInput
+              label="Music Asset URL (optional)"
+              mode="outlined"
+              value={builderForm.musicAssetUrl}
+              onChangeText={(v) => setBuilderForm((prev) => ({ ...prev, musicAssetUrl: v }))}
+              placeholder="https://.../music.mp3"
+              style={styles.input}
+              outlineStyle={styles.outline}
+            />
+
+            <Text variant="labelMedium" style={styles.fieldLabel}>Fields</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: Spacing.md }}>
+              {INVITE_FIELD_CATALOG.map((field) => (
+                <Chip
+                  key={field.key}
+                  selected={builderForm.selectedFields.includes(field.key)}
+                  onPress={() => toggleBuilderField(field.key)}
+                  style={styles.chip}
+                >
+                  {field.label}
+                </Chip>
+              ))}
+            </ScrollView>
+
+            <Button
+              mode="contained-tonal"
+              icon="upload"
+              loading={uploadingAdobeAsset}
+              disabled={uploadingAdobeAsset}
+              onPress={pickAndUploadAdobeAsset}
+              style={styles.btnSoft}
+            >
+              Upload Scene Asset
+            </Button>
+
+            {builderForm.selectedAssets.map((assetPath, index) => (
+              <Card key={assetPath} style={styles.assetCard}>
+                <Card.Content style={styles.assetRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text numberOfLines={1} style={{ fontWeight: '600' }}>{assetPath}</Text>
+                    <Text style={{ color: Colors.textSecondary, fontSize: 12 }}>Scene {index + 1}</Text>
+                  </View>
+                  <View style={{ flexDirection: 'row' }}>
+                    <IconButton icon="arrow-up" size={18} onPress={() => moveSelectedAsset(index, -1)} disabled={index === 0} />
+                    <IconButton icon="arrow-down" size={18} onPress={() => moveSelectedAsset(index, 1)} disabled={index === builderForm.selectedAssets.length - 1} />
+                    <IconButton icon="delete-outline" size={18} iconColor={Colors.danger} onPress={() => removeSelectedAsset(assetPath)} />
+                  </View>
+                </Card.Content>
+              </Card>
+            ))}
+
+            <View style={styles.mappingControlsRow}>
+              <Button mode="contained" onPress={generateManifestFromBuilder} style={{ flex: 1 }}>Generate Manifest JSON</Button>
+              <Button
+                mode="outlined"
+                textColor={Colors.danger}
+                onPress={() =>
+                  Alert.alert(
+                    'Discard Draft',
+                    'Clear the current builder form and delete the saved draft?',
+                    [
+                      { text: 'Cancel' },
+                      {
+                        text: 'Discard',
+                        style: 'destructive',
+                        onPress: () => {
+                          setBuilderForm({
+                            templateKey: '',
+                            templateName: '',
+                            category: '',
+                            musicAssetUrl: '',
+                            selectedFields: ['hostName', 'partnerName', 'eventDate', 'eventVenue'],
+                            selectedAssets: [],
+                            fieldMappings: {},
+                          });
+                          setUploadedAdobeAssets([]);
+                          setManifestInputText('');
+                          setManifestValidationResult(null);
+                          setManifestImportResult(null);
+                          setSelectedSceneIndex(0);
+                          clearBuilderDraft();
+                          setMessage('Draft discarded');
+                          setMessageType('info');
+                        },
+                      },
+                    ],
+                  )
+                }
+              >
+                Discard Draft
+              </Button>
+            </View>
+          </Card.Content>
+        </Card>
+
+        <Card style={styles.itemCard}>
+          <Card.Content>
+            <Text variant="titleSmall" style={{ fontWeight: '700', marginBottom: Spacing.md }}>Placeholder Mapper</Text>
+            {builderForm.selectedAssets.length === 0 ? (
+              <Text style={styles.emptyText}>Upload and select at least one scene asset to map placeholders.</Text>
+            ) : (
+              <>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: Spacing.sm }}>
+                  {builderForm.selectedAssets.map((assetPath, idx) => (
+                    <Chip
+                      key={`${assetPath}_${idx}`}
+                      selected={idx === selectedSceneIndex}
+                      onPress={() => setSelectedSceneIndex(idx)}
+                      style={styles.chip}
+                    >
+                      Scene {idx + 1}
+                    </Chip>
+                  ))}
+                </ScrollView>
+
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: Spacing.sm }}>
+                  {builderForm.selectedFields.map((fieldKey) => (
+                    <Chip
+                      key={fieldKey}
+                      selected={activeFieldForMapping === fieldKey}
+                      onPress={() => setActiveFieldForMapping(fieldKey)}
+                      style={styles.chip}
+                    >
+                      {INVITE_FIELD_CATALOG.find((f) => f.key === fieldKey)?.label || fieldKey}
+                    </Chip>
+                  ))}
+                </ScrollView>
+
+                <TouchableOpacity
+                  activeOpacity={0.95}
+                  onPress={handlePreviewTap}
+                  onLayout={(event) => {
+                    const { width, height } = event.nativeEvent.layout;
+                    setPreviewSize({ width, height });
+                  }}
+                  style={styles.mapperPreview}
+                >
+                  {currentSceneUploaded?.url ? (
+                    <Image source={{ uri: currentSceneUploaded.url }} style={styles.mapperPreviewImage} resizeMode="cover" />
+                  ) : (
+                    <View style={styles.mapperFallback}><Text style={{ color: Colors.textSecondary }}>No preview available</Text></View>
+                  )}
+
+                  {activeLayers.map(({ fieldKey, layer }) => {
+                    const isActiveLayer = activeFieldForMapping === fieldKey;
+                    const layerWidth = Math.max(0.05, Math.min(1, Number(layer.width || DEFAULT_LAYER.width)));
+                    const layerHeight = Math.max(0.05, Math.min(1, Number(layer.height || DEFAULT_LAYER.height)));
+                    const layerX = Math.max(0, Math.min(1 - layerWidth, Number(layer.x || 0)));
+                    const layerY = Math.max(0, Math.min(1 - layerHeight, Number(layer.y || 0)));
+
+                    if (isActiveLayer) {
+                      return (
+                        <View
+                          key={`${fieldKey}_${layer.sceneAsset}`}
+                          {...moveLayerPanResponder.panHandlers}
+                          style={[
+                            styles.mappingBox,
+                            styles.mappingBoxActive,
+                            {
+                              left: `${layerX * 100}%`,
+                              top: `${layerY * 100}%`,
+                              width: `${layerWidth * 100}%`,
+                              height: `${layerHeight * 100}%`,
+                            },
+                          ]}
+                        >
+                          <Text style={styles.mappingBoxText} numberOfLines={1}>{fieldKey}</Text>
+                          <View style={styles.mappingResizeHandle} {...resizeLayerPanResponder.panHandlers} />
+                        </View>
+                      );
+                    }
+
+                    return (
+                      <TouchableOpacity
+                        key={`${fieldKey}_${layer.sceneAsset}`}
+                        activeOpacity={0.9}
+                        onPressIn={() => {
+                          suppressPreviewTapRef.current = true;
+                        }}
+                        onPress={() => {
+                          setActiveFieldForMapping(fieldKey);
+                          setTimeout(() => {
+                            suppressPreviewTapRef.current = false;
+                          }, 0);
+                        }}
+                        style={[
+                          styles.mappingBox,
+                          {
+                            left: `${layerX * 100}%`,
+                            top: `${layerY * 100}%`,
+                            width: `${layerWidth * 100}%`,
+                            height: `${layerHeight * 100}%`,
+                            borderColor: '#38bdf8',
+                          },
+                        ]}
+                      >
+                        <Text style={styles.mappingBoxText} numberOfLines={1}>{fieldKey}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </TouchableOpacity>
+                <Text style={{ color: Colors.textSecondary, marginTop: Spacing.xs, fontSize: 12 }}>
+                  Tap to place, drag active box to move, drag corner handle to resize.
+                </Text>
+
+                {activeFieldLayer && (
+                  <View style={{ marginTop: Spacing.md }}>
+                    <Text variant="labelMedium" style={styles.fieldLabel}>Selected Field Box Size</Text>
+                    <View style={styles.mappingControlsRow}>
+                      <Button mode="outlined" compact onPress={() => upsertActiveLayerForField(activeFieldForMapping, currentSceneAsset, { width: Math.max(0.05, Number(activeFieldLayer.width || DEFAULT_LAYER.width) - 0.02) })}>W-</Button>
+                      <Button mode="outlined" compact onPress={() => upsertActiveLayerForField(activeFieldForMapping, currentSceneAsset, { width: Math.min(1, Number(activeFieldLayer.width || DEFAULT_LAYER.width) + 0.02) })}>W+</Button>
+                      <Button mode="outlined" compact onPress={() => upsertActiveLayerForField(activeFieldForMapping, currentSceneAsset, { height: Math.max(0.05, Number(activeFieldLayer.height || DEFAULT_LAYER.height) - 0.02) })}>H-</Button>
+                      <Button mode="outlined" compact onPress={() => upsertActiveLayerForField(activeFieldForMapping, currentSceneAsset, { height: Math.min(1, Number(activeFieldLayer.height || DEFAULT_LAYER.height) + 0.02) })}>H+</Button>
+                    </View>
+                  </View>
+                )}
+              </>
+            )}
+          </Card.Content>
+        </Card>
+
+        <Card style={styles.itemCard}>
+          <Card.Content>
+            <Text variant="titleSmall" style={{ fontWeight: '700', marginBottom: Spacing.md }}>Manifest Review & Import</Text>
+            <TextInput
+              label="Manifest JSON"
+              mode="outlined"
+              value={manifestInputText}
+              onChangeText={setManifestInputText}
+              multiline
+              numberOfLines={12}
+              style={styles.codeInput}
+              outlineStyle={styles.outline}
+            />
+            <View style={styles.mappingControlsRow}>
+              <Button mode="contained-tonal" loading={validatingAdobeManifest} disabled={validatingAdobeManifest} onPress={validateManifestInput}>Validate</Button>
+              <Button mode="contained" loading={importingAdobeManifest} disabled={importingAdobeManifest} onPress={importManifestInput}>Import</Button>
+            </View>
+
+            {manifestValidationResult && (
+              <View style={{ marginTop: Spacing.md }}>
+                <Text style={{ fontWeight: '700', color: manifestValidationResult.valid ? Colors.success : Colors.danger }}>
+                  {manifestValidationResult.valid ? 'Validation passed' : 'Validation failed'}
+                </Text>
+                {Array.isArray(manifestValidationResult.errors) && manifestValidationResult.errors.length > 0 && (
+                  <Text style={styles.codeBlock}>{manifestValidationResult.errors.join('\n')}</Text>
+                )}
+              </View>
+            )}
+
+            {manifestImportResult && (
+              <View style={{ marginTop: Spacing.md }}>
+                <Text style={{ fontWeight: '700', color: Colors.success }}>Imported</Text>
+                <Text style={{ color: Colors.textSecondary }}>
+                  Template: {manifestImportResult.template?.name || manifestImportResult.template?.key || 'Imported'}
+                </Text>
+              </View>
+            )}
+          </Card.Content>
+        </Card>
+
+        <Card style={styles.itemCard}>
+          <Card.Content>
+            <View style={styles.tabHeader}>
+              <Text variant="titleSmall" style={{ fontWeight: '700' }}>Existing Invite Templates</Text>
+              {loadingInviteTemplates && <ActivityIndicator size="small" color={Colors.primary} />}
+            </View>
+            {inviteTemplates.length === 0 && !loadingInviteTemplates ? (
+              <Text style={styles.emptyText}>No invite templates available.</Text>
+            ) : (
+              inviteTemplates.map((tpl) => (
+                <Card key={tpl.id} style={styles.assetCard}>
+                  <Card.Content>
+                    <Text style={{ fontWeight: '700' }}>{tpl.name}</Text>
+                    <Text style={{ color: Colors.textSecondary, fontSize: 12 }}>{tpl.key} • {tpl.category || 'wedding'}</Text>
+                  </Card.Content>
+                </Card>
+              ))
+            )}
+          </Card.Content>
+        </Card>
+      </View>
+    );
+  };
+
   return (
     <ScrollView
       style={styles.container}
@@ -574,7 +1434,7 @@ const AdminControlScreen = () => {
       <Card style={styles.heroCard}>
         <Card.Content>
           <Text variant="headlineSmall" style={styles.heroTitle}>Admin Control Center</Text>
-          <Text style={styles.heroSubtitle}>Manage categories, vendors, verification, and users.</Text>
+            <Text style={styles.heroSubtitle}>Manage categories, vendors, users, payments, and invite templates.</Text>
         </Card.Content>
       </Card>
 
@@ -586,6 +1446,7 @@ const AdminControlScreen = () => {
           { value: 'vendors', label: 'Vendors' },
           { value: 'verification', label: 'Verification' },
           { value: 'onboarding', label: 'Onboarding' },
+          { value: 'invite-templates', label: 'Invite Templates' },
           { value: 'users', label: 'Create User' },
         ].map((tab) => (
           <Chip
@@ -608,6 +1469,7 @@ const AdminControlScreen = () => {
           {activeTab === 'vendors' && renderVendorManagement()}
           {activeTab === 'verification' && renderVerificationQueue()}
           {activeTab === 'onboarding' && renderOnboarding()}
+          {activeTab === 'invite-templates' && renderInviteTemplates()}
           {activeTab === 'users' && renderCreateUser()}
         </Card.Content>
       </Card>
@@ -692,8 +1554,59 @@ const styles = StyleSheet.create({
   outline: { borderRadius: Radius.sm },
   chip: { marginRight: Spacing.sm },
   btn: { marginTop: Spacing.sm, backgroundColor: Colors.primary, borderRadius: Radius.sm },
+  btnSoft: { marginBottom: Spacing.md, borderRadius: Radius.sm },
   msgError: { color: Colors.danger, marginTop: Spacing.sm, fontSize: 13 },
   msgSuccess: { color: Colors.success, marginTop: Spacing.sm, fontSize: 13 },
+  assetCard: { marginBottom: Spacing.sm, borderRadius: Radius.sm, backgroundColor: Colors.surface },
+  assetRow: { flexDirection: 'row', alignItems: 'center' },
+  mapperPreview: {
+    width: '100%',
+    aspectRatio: 9 / 16,
+    borderRadius: Radius.sm,
+    overflow: 'hidden',
+    backgroundColor: '#111827',
+    position: 'relative',
+  },
+  mapperPreviewImage: { width: '100%', height: '100%' },
+  mapperFallback: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#e5e7eb',
+  },
+  mappingBox: {
+    position: 'absolute',
+    borderWidth: 2,
+    borderColor: '#38bdf8',
+    backgroundColor: 'rgba(56, 189, 248, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  mappingBoxActive: {
+    borderColor: '#f59e0b',
+    backgroundColor: 'rgba(245, 158, 11, 0.18)',
+  },
+  mappingResizeHandle: {
+    position: 'absolute',
+    right: -1,
+    bottom: -1,
+    width: 14,
+    height: 14,
+    borderTopLeftRadius: 4,
+    backgroundColor: '#f59e0b',
+    borderWidth: 1,
+    borderColor: '#ffffff',
+  },
+  mappingBoxText: { fontSize: 10, color: '#ffffff', fontWeight: '700' },
+  mappingControlsRow: { flexDirection: 'row', gap: Spacing.sm, alignItems: 'center', marginTop: Spacing.sm, flexWrap: 'wrap' },
+  codeInput: {
+    marginBottom: Spacing.md,
+    backgroundColor: '#f8fafc',
+    minHeight: 220,
+    textAlignVertical: 'top',
+    fontFamily: 'monospace',
+  },
   codeBlock: {
     backgroundColor: '#0f172a',
     color: '#e2e8f0',

@@ -98,6 +98,12 @@ const AdminControlCenter = () => {
   const [generatedManifestJson, setGeneratedManifestJson] = useState('');
   const [uploadedAdobeAssets, setUploadedAdobeAssets] = useState([]);
   const [uploadingAdobeAsset, setUploadingAdobeAsset] = useState(false);
+  const [sceneFieldMappings, setSceneFieldMappings] = useState({});
+  const [mappingSceneAsset, setMappingSceneAsset] = useState('');
+  const [mappingFieldId, setMappingFieldId] = useState('');
+  const [activeLayerId, setActiveLayerId] = useState('');
+  const [dragState, setDragState] = useState(null);
+  const selectedAssetFilesWatched = Form.useWatch('selectedAssetFiles', manifestBuilderForm) || [];
 
   const loadInviteTemplates = useCallback(async () => {
     setLoadingInviteTemplates(true);
@@ -230,7 +236,21 @@ const AdminControlCenter = () => {
     const timeline = assetFiles.map((asset, index) => {
       const sceneId = `scene-${index + 1}`;
       const startMs = index * 6000;
-      const textLayers = index === 0
+      const mappedLayers = Array.isArray(sceneFieldMappings[asset])
+        ? sceneFieldMappings[asset]
+            .filter((layer) => selectedFields.includes(layer.fieldId))
+            .map((layer, layerIndex) => ({
+              id: layer.id || `${sceneId}-layer-${layerIndex + 1}`,
+              fieldId: layer.fieldId,
+              x: typeof layer.x === 'number' ? layer.x : 0.5,
+              y: typeof layer.y === 'number' ? layer.y : 0.5,
+              maxWidth: typeof layer.maxWidth === 'number' ? layer.maxWidth : 0.82,
+              maxHeight: typeof layer.maxHeight === 'number' ? layer.maxHeight : 0.08,
+              align: layer.align || 'center',
+            }))
+        : [];
+
+      const fallbackLayers = index === 0
         ? selectedTextFields.slice(0, 6).map((fieldId, layerIndex) => ({
             id: `${sceneId}-layer-${layerIndex + 1}`,
             fieldId,
@@ -247,19 +267,26 @@ const AdminControlCenter = () => {
         startMs,
         durationMs: 6000,
         baseVideo: asset,
-        textLayers,
+        textLayers: mappedLayers.length ? mappedLayers : fallbackLayers,
       };
     });
 
     const editableFields = selectedFields.map((fieldId) => {
       const meta = fieldCatalog[fieldId];
+      const bindings = timeline
+        .filter((scene) => Array.isArray(scene.textLayers) && scene.textLayers.some((layer) => layer.fieldId === fieldId))
+        .map((scene) => ({
+          sceneId: scene.sceneId,
+          target: (meta?.type === 'qrcode' || meta?.type === 'image') ? `imageLayer.${fieldId}` : `textLayer.${fieldId}`,
+        }));
+
       return {
         id: fieldId,
         label: meta?.label || fieldId,
         type: meta?.type || 'text',
         required: typeof meta?.required === 'boolean' ? meta.required : false,
         ...(meta?.maxLength ? { maxLength: meta.maxLength } : {}),
-        bindings: [{ sceneId: timeline[0].sceneId, target: `textLayer.${fieldId}` }],
+        bindings,
       };
     });
 
@@ -337,6 +364,173 @@ const AdminControlCenter = () => {
     const current = manifestBuilderForm.getFieldValue('selectedAssetFiles') || [];
     const next = current.filter((item) => item !== assetPath);
     manifestBuilderForm.setFieldsValue({ selectedAssetFiles: next });
+    setSceneFieldMappings((prev) => {
+      const copy = { ...prev };
+      delete copy[assetPath];
+      return copy;
+    });
+    if (mappingSceneAsset === assetPath) {
+      setMappingSceneAsset(next[0] || '');
+      setActiveLayerId('');
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedAssetFilesWatched.length) {
+      setMappingSceneAsset('');
+      setActiveLayerId('');
+      return;
+    }
+
+    if (!mappingSceneAsset || !selectedAssetFilesWatched.includes(mappingSceneAsset)) {
+      setMappingSceneAsset(selectedAssetFilesWatched[0]);
+      setActiveLayerId('');
+    }
+  }, [selectedAssetFilesWatched, mappingSceneAsset]);
+
+  const addLayerMapping = async () => {
+    const values = await manifestBuilderForm.validateFields(['selectedFields']);
+    const selectedFields = values.selectedFields || [];
+    if (!mappingSceneAsset) {
+      message.warning('Select a scene first');
+      return;
+    }
+    if (!mappingFieldId) {
+      message.warning('Choose a field to map');
+      return;
+    }
+    if (!selectedFields.includes(mappingFieldId)) {
+      message.warning('Selected field is not included in editable fields list');
+      return;
+    }
+
+    const newLayer = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      fieldId: mappingFieldId,
+      x: 0.5,
+      y: 0.5,
+      maxWidth: 0.82,
+      maxHeight: 0.08,
+      align: 'center',
+    };
+
+    setSceneFieldMappings((prev) => {
+      const currentLayers = Array.isArray(prev[mappingSceneAsset]) ? prev[mappingSceneAsset] : [];
+      return {
+        ...prev,
+        [mappingSceneAsset]: [...currentLayers, newLayer],
+      };
+    });
+    setActiveLayerId(newLayer.id);
+  };
+
+  const updateActiveLayer = (patch) => {
+    if (!mappingSceneAsset || !activeLayerId) return;
+    setSceneFieldMappings((prev) => {
+      const currentLayers = Array.isArray(prev[mappingSceneAsset]) ? prev[mappingSceneAsset] : [];
+      return {
+        ...prev,
+        [mappingSceneAsset]: currentLayers.map((layer) => (layer.id === activeLayerId ? { ...layer, ...patch } : layer)),
+      };
+    });
+  };
+
+  const updateLayerById = (sceneAsset, layerId, patch) => {
+    if (!sceneAsset || !layerId) return;
+    setSceneFieldMappings((prev) => {
+      const currentLayers = Array.isArray(prev[sceneAsset]) ? prev[sceneAsset] : [];
+      return {
+        ...prev,
+        [sceneAsset]: currentLayers.map((layer) => (layer.id === layerId ? { ...layer, ...patch } : layer)),
+      };
+    });
+  };
+
+  const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+
+  const startLayerDrag = (event, layer, mode = 'move') => {
+    const previewEl = event.currentTarget.closest('[data-mapper-preview="true"]');
+    if (!previewEl) return;
+    const rect = previewEl.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    setActiveLayerId(layer.id);
+    setDragState({
+      mode,
+      sceneAsset: mappingSceneAsset,
+      layerId: layer.id,
+      startX: event.clientX,
+      startY: event.clientY,
+      rect,
+      startLayer: {
+        x: layer.x || 0.5,
+        y: layer.y || 0.5,
+        maxWidth: layer.maxWidth || 0.82,
+        maxHeight: layer.maxHeight || 0.08,
+      },
+    });
+  };
+
+  const stopLayerDrag = () => {
+    if (dragState) setDragState(null);
+  };
+
+  const handlePreviewMouseMove = (event) => {
+    if (!dragState || !mappingSceneAsset || dragState.sceneAsset !== mappingSceneAsset) return;
+    const dx = (event.clientX - dragState.startX) / dragState.rect.width;
+    const dy = (event.clientY - dragState.startY) / dragState.rect.height;
+
+    if (dragState.mode === 'move') {
+      const width = dragState.startLayer.maxWidth;
+      const height = dragState.startLayer.maxHeight;
+      const x = clamp(dragState.startLayer.x + dx, width / 2, 1 - width / 2);
+      const y = clamp(dragState.startLayer.y + dy, height / 2, 1 - height / 2);
+      updateLayerById(mappingSceneAsset, dragState.layerId, {
+        x: Number(x.toFixed(4)),
+        y: Number(y.toFixed(4)),
+      });
+      return;
+    }
+
+    const nextWidth = clamp(dragState.startLayer.maxWidth + dx, 0.05, 1);
+    const nextHeight = clamp(dragState.startLayer.maxHeight + dy, 0.04, 0.5);
+    const x = clamp(dragState.startLayer.x, nextWidth / 2, 1 - nextWidth / 2);
+    const y = clamp(dragState.startLayer.y, nextHeight / 2, 1 - nextHeight / 2);
+    updateLayerById(mappingSceneAsset, dragState.layerId, {
+      x: Number(x.toFixed(4)),
+      y: Number(y.toFixed(4)),
+      maxWidth: Number(nextWidth.toFixed(4)),
+      maxHeight: Number(nextHeight.toFixed(4)),
+    });
+  };
+
+  const removeActiveLayer = () => {
+    if (!mappingSceneAsset || !activeLayerId) return;
+    setSceneFieldMappings((prev) => {
+      const currentLayers = Array.isArray(prev[mappingSceneAsset]) ? prev[mappingSceneAsset] : [];
+      return {
+        ...prev,
+        [mappingSceneAsset]: currentLayers.filter((layer) => layer.id !== activeLayerId),
+      };
+    });
+    setActiveLayerId('');
+    if (dragState?.layerId === activeLayerId) setDragState(null);
+  };
+
+  const handlePreviewClick = (event) => {
+    if (!activeLayerId || !mappingSceneAsset) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+
+    const x = (event.clientX - rect.left) / rect.width;
+    const y = (event.clientY - rect.top) / rect.height;
+
+    updateActiveLayer({
+      x: Number(Math.min(Math.max(x, 0), 1).toFixed(4)),
+      y: Number(Math.min(Math.max(y, 0), 1).toFixed(4)),
+    });
   };
 
   const handleAdobeAssetUpload = async ({ file, onSuccess, onError }) => {
@@ -881,6 +1075,169 @@ const AdminControlCenter = () => {
                       { value: 'guestName', label: 'guestName' },
                     ]}
                   />
+                </Form.Item>
+                <Form.Item shouldUpdate noStyle>
+                  {() => {
+                    const selectedFields = manifestBuilderForm.getFieldValue('selectedFields') || [];
+                    const selectedAssets = manifestBuilderForm.getFieldValue('selectedAssetFiles') || [];
+                    if (!selectedFields.length || !selectedAssets.length) return null;
+
+                    const uploadedByPath = new Map(uploadedAdobeAssets.map((asset) => [asset.assetPath, asset]));
+                    const layers = Array.isArray(sceneFieldMappings[mappingSceneAsset]) ? sceneFieldMappings[mappingSceneAsset] : [];
+                    const activeLayer = layers.find((layer) => layer.id === activeLayerId);
+                    const previewAsset = uploadedByPath.get(mappingSceneAsset);
+
+                    return (
+                      <Card size="small" style={{ marginBottom: 16 }} title="Placeholder Mapper (Click Preview To Place)">
+                        <Row gutter={12}>
+                          <Col xs={24} md={12}>
+                            <Form.Item label="Scene" style={{ marginBottom: 8 }}>
+                              <Select
+                                value={mappingSceneAsset || undefined}
+                                onChange={(value) => {
+                                  setMappingSceneAsset(value);
+                                  setActiveLayerId('');
+                                }}
+                                options={selectedAssets.map((assetPath, index) => ({
+                                  value: assetPath,
+                                  label: `${index + 1}. ${(uploadedByPath.get(assetPath)?.name || assetPath)}`,
+                                }))}
+                              />
+                            </Form.Item>
+                          </Col>
+                          <Col xs={24} md={12}>
+                            <Form.Item label="Field" style={{ marginBottom: 8 }}>
+                              <Select
+                                value={mappingFieldId || undefined}
+                                onChange={setMappingFieldId}
+                                options={selectedFields.map((fieldId) => ({ value: fieldId, label: fieldId }))}
+                              />
+                            </Form.Item>
+                          </Col>
+                        </Row>
+                        <Space style={{ marginBottom: 8 }}>
+                          <Button onClick={addLayerMapping} disabled={!mappingSceneAsset || !mappingFieldId}>Add Layer</Button>
+                          <Button danger onClick={removeActiveLayer} disabled={!activeLayerId}>Remove Active Layer</Button>
+                        </Space>
+                        <div
+                          data-mapper-preview="true"
+                          onClick={handlePreviewClick}
+                          onMouseMove={handlePreviewMouseMove}
+                          onMouseUp={stopLayerDrag}
+                          onMouseLeave={stopLayerDrag}
+                          style={{
+                            position: 'relative',
+                            width: '100%',
+                            maxWidth: 320,
+                            aspectRatio: '9 / 16',
+                            border: '1px solid #f0f0f0',
+                            borderRadius: 8,
+                            overflow: 'hidden',
+                            background: '#fafafa',
+                            marginBottom: 10,
+                            cursor: activeLayerId ? 'crosshair' : 'default',
+                          }}
+                        >
+                          {previewAsset?.mediaType === 'video' ? (
+                            <video src={previewAsset.url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} muted playsInline />
+                          ) : previewAsset?.url ? (
+                            <img src={previewAsset.url} alt="Scene preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          ) : (
+                            <div style={{ padding: 12, color: '#999' }}>No preview available for this asset path.</div>
+                          )}
+
+                          {layers.map((layer) => (
+                            <div
+                              key={layer.id}
+                              onMouseDown={(e) => startLayerDrag(e, layer, 'move')}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveLayerId(layer.id);
+                              }}
+                              style={{
+                                position: 'absolute',
+                                left: `${Math.max(0, Math.min(1, (layer.x || 0.5) - (layer.maxWidth || 0.82) / 2)) * 100}%`,
+                                top: `${Math.max(0, Math.min(1, (layer.y || 0.5) - (layer.maxHeight || 0.08) / 2)) * 100}%`,
+                                width: `${Math.min(1, layer.maxWidth || 0.82) * 100}%`,
+                                height: `${Math.min(1, layer.maxHeight || 0.08) * 100}%`,
+                                border: layer.id === activeLayerId ? '2px solid #1677ff' : '1px solid rgba(22,119,255,0.65)',
+                                background: 'rgba(22,119,255,0.10)',
+                                color: '#0f172a',
+                                fontSize: 11,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                textAlign: 'center',
+                                padding: 2,
+                                overflow: 'hidden',
+                                cursor: 'move',
+                              }}
+                            >
+                              {layer.fieldId}
+                              <div
+                                onMouseDown={(e) => startLayerDrag(e, layer, 'resize')}
+                                style={{
+                                  position: 'absolute',
+                                  right: 0,
+                                  bottom: 0,
+                                  width: 10,
+                                  height: 10,
+                                  background: layer.id === activeLayerId ? '#1677ff' : 'rgba(22,119,255,0.7)',
+                                  cursor: 'nwse-resize',
+                                  borderTopLeftRadius: 3,
+                                }}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                        {layers.length ? (
+                          <div style={{ marginBottom: 8 }}>
+                            <div style={{ marginBottom: 6, fontWeight: 500 }}>Layers</div>
+                            <Space wrap>
+                              {layers.map((layer) => (
+                                <Tag
+                                  key={layer.id}
+                                  color={layer.id === activeLayerId ? 'blue' : 'default'}
+                                  style={{ cursor: 'pointer' }}
+                                  onClick={() => setActiveLayerId(layer.id)}
+                                >
+                                  {layer.fieldId}
+                                </Tag>
+                              ))}
+                            </Space>
+                          </div>
+                        ) : null}
+                        <Row gutter={12}>
+                          <Col xs={12}>
+                            <Form.Item label="Width" style={{ marginBottom: 0 }}>
+                              <InputNumber
+                                min={0.05}
+                                max={1}
+                                step={0.01}
+                                value={activeLayer?.maxWidth ?? 0.82}
+                                style={{ width: '100%' }}
+                                disabled={!activeLayer}
+                                onChange={(value) => updateActiveLayer({ maxWidth: Number(value) || 0.82 })}
+                              />
+                            </Form.Item>
+                          </Col>
+                          <Col xs={12}>
+                            <Form.Item label="Height" style={{ marginBottom: 0 }}>
+                              <InputNumber
+                                min={0.04}
+                                max={0.5}
+                                step={0.01}
+                                value={activeLayer?.maxHeight ?? 0.08}
+                                style={{ width: '100%' }}
+                                disabled={!activeLayer}
+                                onChange={(value) => updateActiveLayer({ maxHeight: Number(value) || 0.08 })}
+                              />
+                            </Form.Item>
+                          </Col>
+                        </Row>
+                      </Card>
+                    );
+                  }}
                 </Form.Item>
                 <Space>
                   <Button type="primary" onClick={buildManifestFromAdminUi}>Generate Manifest</Button>
