@@ -103,7 +103,7 @@ const AdminControlCenter = () => {
   const [mappingFieldId, setMappingFieldId] = useState('');
   const [activeLayerId, setActiveLayerId] = useState('');
   const [dragState, setDragState] = useState(null);
-  const selectedAssetFilesWatched = Form.useWatch('selectedAssetFiles', manifestBuilderForm) || [];
+  const selectedAssetFilesWatched = Form.useWatch('selectedAssetFiles', manifestBuilderForm);
 
   const loadInviteTemplates = useCallback(async () => {
     setLoadingInviteTemplates(true);
@@ -376,14 +376,15 @@ const AdminControlCenter = () => {
   };
 
   useEffect(() => {
-    if (!selectedAssetFilesWatched.length) {
+    const watched = selectedAssetFilesWatched || [];
+    if (!watched.length) {
       setMappingSceneAsset('');
       setActiveLayerId('');
       return;
     }
 
-    if (!mappingSceneAsset || !selectedAssetFilesWatched.includes(mappingSceneAsset)) {
-      setMappingSceneAsset(selectedAssetFilesWatched[0]);
+    if (!mappingSceneAsset || !watched.includes(mappingSceneAsset)) {
+      setMappingSceneAsset(watched[0]);
       setActiveLayerId('');
     }
   }, [selectedAssetFilesWatched, mappingSceneAsset]);
