@@ -1,0 +1,17 @@
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /vendor/workspace
+Disallow: /profile
+Disallow: /bookings
+Disallow: /events/*/control-panel
+Disallow: /events/*/invite-studio
+Disallow: /events/*/guests
+Disallow: /events/*/budget
+Disallow: /events/*/photo-booth
+
+# Crawl delay to avoid overloading server
+Crawl-delay: 1
+
+# Sitemaps
+Sitemap: https://vedika360.vercel.app/sitemap.xml

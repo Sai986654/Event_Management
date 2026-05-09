@@ -9,11 +9,31 @@
         "env": {
           "EXPO_PUBLIC_APP_ENV": "preview"
         }
+      },
+      "ios": {
+        "simulator": true,
+        "env": {
+          "EXPO_PUBLIC_APP_ENV": "preview"
+        }
+      }
+    },
+    "preview-device": {
+      "distribution": "internal",
+      "ios": {
+        "resourceClass": "m-medium",
+        "env": {
+          "EXPO_PUBLIC_APP_ENV": "preview"
+        }
       }
     },
     "production": {
       "android": {
         "buildType": "app-bundle",
+        "env": {
+          "EXPO_PUBLIC_APP_ENV": "production"
+        }
+      },
+      "ios": {
         "env": {
           "EXPO_PUBLIC_APP_ENV": "production"
         }
