@@ -8,9 +8,10 @@ const {
   retryFailedGuests,
 } = require('../controllers/inviteVideoController');
 
-// Accept up to 5 images + 1 music file
+// Accept up to 5 images + 1 music file + 1 base video template file
 const inviteUpload = upload.fields([
   { name: 'images', maxCount: 5 },
+  { name: 'templateVideo', maxCount: 1 },
   { name: 'music', maxCount: 1 },
 ]);
 

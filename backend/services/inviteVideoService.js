@@ -8,6 +8,7 @@ const TTS_PROVIDER = process.env.TTS_PROVIDER || 'gtts';
 const {
   generateInviteVideo,
   attachAudioToBaseInviteVideo,
+  overlayTextOnVideo,
   writeTempFile,
   cleanupFiles,
   safeUnlink,
@@ -71,6 +72,10 @@ function buildInviteStorageKey({
 
   if (mediaGroup === 'template-music') {
     return `${baseSegments.join('/')}/template/music/${ts}-music.${ext}`;
+  }
+
+  if (mediaGroup === 'template-video') {
+    return `${baseSegments.join('/')}/template/video/${ts}-template.${ext}`;
   }
 
   return `${baseSegments.join('/')}/${ts}-${mediaKind}.${ext}`;
@@ -231,7 +236,12 @@ async function processInviteJob(jobId, io) {
   // Strip {name} from voice text — the static body is generated ONCE and cached.
   // This means 1 ElevenLabs API call total per unique template, not 1 per guest.
   const baseTextTemplate = (voiceRawTemplate || 'You are cordially invited').replace(/\{name\}/gi, '').trim();
-  const videoOverlayText = jobOverlayText || 'You are Invited';
+  const videoOverlayText = jobOverlayText || '';
+  const isUploadedBaseVideoTemplate =
+    sceneEntries.length === 1 &&
+    typeof sceneEntries[0] === 'object' &&
+    String(sceneEntries[0]?.mode || '') === 'base-video-template';
+  const isPersonalizedOverlay = /\{name\}/i.test(videoOverlayText);
   let baseVoiceBuffer = null;
 
   // Pre-generate the static voice body once before the guest loop
@@ -267,38 +277,56 @@ async function processInviteJob(jobId, io) {
   }
   let baseVideoPath = null;
   try {
-    const baseRender = await generateInviteVideo({
-      scenes: sceneRenderData.map((scene, index) => {
-        const descriptor = sceneEntries[index] || {};
+    if (isUploadedBaseVideoTemplate) {
+      const uploadedBase = sceneRenderData[0]?.backgroundPath;
+      if (!uploadedBase) {
+        throw new Error('Uploaded base video template could not be prepared');
+      }
 
-        const texts = Array.isArray(descriptor.texts)
-          ? descriptor.texts.map((text) => ({
-              value: String(text?.value || ''),
-              start: typeof text?.start === 'number' ? text.start : 0,
-              duration: typeof text?.duration === 'number' ? text.duration : 3,
-              x: typeof text?.x === 'number' ? text.x : 0.5,
-              y: typeof text?.y === 'number' ? text.y : 0.5,
-              maxWidth: typeof text?.maxWidth === 'number' ? text.maxWidth : 0.82,
-              maxHeight: typeof text?.maxHeight === 'number' ? text.maxHeight : 0.08,
-              align: text?.align || 'center',
-              style: text?.style || {},
-            }))
-          : [];
+      if (videoOverlayText && !isPersonalizedOverlay) {
+        const staticOverlay = await overlayTextOnVideo({
+          baseVideoPath: uploadedBase,
+          text: videoOverlayText,
+          renderProfile: process.env.FFMPEG_RENDER_PROFILE || 'memory_saver',
+        });
+        baseVideoPath = staticOverlay.videoPath;
+      } else {
+        baseVideoPath = uploadedBase;
+      }
+    } else {
+      const baseRender = await generateInviteVideo({
+        scenes: sceneRenderData.map((scene, index) => {
+          const descriptor = sceneEntries[index] || {};
 
-        if (!texts.length && index === 0 && videoOverlayText) {
-          texts.push({ value: videoOverlayText, start: 0.6, duration: 2.6, x: 0.5, y: 0.2, maxWidth: 0.8, maxHeight: 0.08, align: 'center', style: { fontSize: 54, color: '#ffffff' } });
-        }
+          const texts = Array.isArray(descriptor.texts)
+            ? descriptor.texts.map((text) => ({
+                value: String(text?.value || ''),
+                start: typeof text?.start === 'number' ? text.start : 0,
+                duration: typeof text?.duration === 'number' ? text.duration : 3,
+                x: typeof text?.x === 'number' ? text.x : 0.5,
+                y: typeof text?.y === 'number' ? text.y : 0.5,
+                maxWidth: typeof text?.maxWidth === 'number' ? text.maxWidth : 0.82,
+                maxHeight: typeof text?.maxHeight === 'number' ? text.maxHeight : 0.08,
+                align: text?.align || 'center',
+                style: text?.style || {},
+              }))
+            : [];
 
-        return {
-          background: scene.backgroundPath,
-          duration: Number(scene.durationMs || descriptor.durationMs || descriptor.duration || 3200) / 1000,
-          texts,
-        };
-      }),
-      musicBuffer: null,
-      renderProfile: process.env.FFMPEG_RENDER_PROFILE || 'memory_saver',
-    });
-    baseVideoPath = baseRender.videoPath;
+          if (!texts.length && index === 0 && videoOverlayText) {
+            texts.push({ value: videoOverlayText, start: 0.6, duration: 2.6, x: 0.5, y: 0.2, maxWidth: 0.8, maxHeight: 0.08, align: 'center', style: { fontSize: 54, color: '#ffffff' } });
+          }
+
+          return {
+            background: scene.backgroundPath,
+            duration: Number(scene.durationMs || descriptor.durationMs || descriptor.duration || 3200) / 1000,
+            texts,
+          };
+        }),
+        musicBuffer: null,
+        renderProfile: process.env.FFMPEG_RENDER_PROFILE || 'memory_saver',
+      });
+      baseVideoPath = baseRender.videoPath;
+    }
   } catch (err) {
     cleanupFiles(sceneRenderData.flatMap((scene) => [scene.rawPath, scene.backgroundPath].filter(Boolean)));
     await failJob(jobId, `Failed to render base invite video: ${err.message}`);
@@ -334,8 +362,22 @@ async function processInviteJob(jobId, io) {
       }
 
       // 2. Reuse base visual and only compose personalized audio
+      let guestBaseVideoPath = baseVideoPath;
+      if (isUploadedBaseVideoTemplate && isPersonalizedOverlay) {
+        const personalizedOverlayText = videoOverlayText.replace(/\{name\}/gi, guest.guestName);
+        const overlaid = await overlayTextOnVideo({
+          baseVideoPath,
+          text: personalizedOverlayText,
+          renderProfile: process.env.FFMPEG_RENDER_PROFILE || 'memory_saver',
+        });
+        guestBaseVideoPath = overlaid.videoPath;
+        if (guestBaseVideoPath !== baseVideoPath) {
+          tempFiles.push(guestBaseVideoPath);
+        }
+      }
+
       const { videoPath } = await attachAudioToBaseInviteVideo({
-        baseVideoPath,
+        baseVideoPath: guestBaseVideoPath,
         voiceBuffer,
         musicBuffer,
         renderProfile: process.env.FFMPEG_RENDER_PROFILE || 'memory_saver',

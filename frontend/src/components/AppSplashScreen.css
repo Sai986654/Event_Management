@@ -1,0 +1,110 @@
+.app-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(800px 460px at 8% 5%, rgba(15, 118, 110, 0.2), transparent 56%),
+    radial-gradient(680px 420px at 92% 8%, rgba(249, 115, 22, 0.16), transparent 56%),
+    linear-gradient(180deg, #f4faff 0%, #eaf6ff 42%, #f4fbff 100%);
+}
+
+.app-splash-orb {
+  position: absolute;
+  width: min(62vw, 420px);
+  aspect-ratio: 1;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(15, 118, 110, 0.22) 0%, rgba(15, 118, 110, 0.02) 66%, rgba(15, 118, 110, 0) 100%);
+  filter: blur(3px);
+  animation: splashPulse 1.3s ease-in-out infinite;
+}
+
+.app-splash-card {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  padding: 26px 24px;
+  min-width: min(84vw, 340px);
+  border-radius: 22px;
+  border: 1px solid rgba(12, 80, 106, 0.16);
+  background: rgba(255, 255, 255, 0.82);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 18px 40px rgba(20, 57, 80, 0.16);
+}
+
+.app-splash-logo {
+  width: 74px;
+  height: 74px;
+  border-radius: 18px;
+  object-fit: cover;
+  margin-bottom: 12px;
+  box-shadow: 0 8px 20px rgba(22, 58, 84, 0.25);
+}
+
+.app-splash-card h1 {
+  margin: 0;
+  font-size: clamp(26px, 6.2vw, 34px);
+  line-height: 1.15;
+}
+
+.app-splash-card p {
+  margin: 6px 0 0;
+  color: #3c5972;
+  font-weight: 600;
+}
+
+.app-splash-loader {
+  margin: 18px auto 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.app-splash-loader span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #0f766e, #0b7285);
+  animation: splashDot 900ms ease-in-out infinite;
+}
+
+.app-splash-loader span:nth-child(2) {
+  animation-delay: 130ms;
+}
+
+.app-splash-loader span:nth-child(3) {
+  animation-delay: 260ms;
+}
+
+@keyframes splashPulse {
+  0%,
+  100% {
+    transform: scale(0.95);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 1;
+  }
+}
+
+@keyframes splashDot {
+  0%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.45;
+  }
+  50% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-splash-orb,
+  .app-splash-loader span {
+    animation: none;
+  }
+}

@@ -148,6 +148,7 @@ exports.createInviteJob = asyncHandler(async (req, res) => {
   const manifestPayload = parseMaybeJson(req.body.manifest);
   const templateId = req.body.templateId !== undefined ? Number(req.body.templateId) : null;
   const templateKey = req.body.templateKey ? String(req.body.templateKey).trim() : '';
+  const templateVideoFile = req.files?.templateVideo?.[0] || null;
 
   // ── Validate eventId ──────────────────────────────────────
   if (!eventId) {
@@ -178,10 +179,10 @@ exports.createInviteJob = asyncHandler(async (req, res) => {
   const manifest = manifestPayload || normalizeManifestTemplate(adobeTemplate);
   const manifestScenes = buildScenePayloadsFromManifest(manifest, event);
 
-  // ── Validate images ───────────────────────────────────────
+  // ── Validate scene source ──────────────────────────────────
   const images = req.files?.images;
-  if (!manifestScenes.length && (!images || images.length < 3 || images.length > 5)) {
-    return res.status(400).json({ message: '3 to 5 images are required or provide a manifest with timeline scenes' });
+  if (!templateVideoFile && !manifestScenes.length && (!images || images.length < 3 || images.length > 5)) {
+    return res.status(400).json({ message: 'Provide a template video, manifest timeline scenes, or 3 to 5 images' });
   }
 
   // ── Validate guests ───────────────────────────────────────
@@ -202,12 +203,28 @@ exports.createInviteJob = asyncHandler(async (req, res) => {
     }
   }
 
-  // ── Upload template images to R2 or use manifest scene assets ─
+  // ── Upload template assets to R2 or use manifest scene assets ─
   const requestId = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
   const templatePrefix = `invites/events/event-${Number(eventId)}/req-${requestId}/template`;
   const imageKeys = [];
 
-  if (manifestScenes.length > 0) {
+  if (templateVideoFile) {
+    const videoKey = buildInviteStorageKey({
+      eventId: Number(eventId),
+      requestId,
+      mediaGroup: 'template-video',
+      mediaKind: 'video',
+      extension: fileExtension(templateVideoFile, 'mp4'),
+    });
+    await uploadToR2(templateVideoFile.buffer, videoKey, templateVideoFile.mimetype || 'video/mp4');
+    imageKeys.push({
+      mode: 'base-video-template',
+      sceneId: 'uploaded-template-video',
+      key: videoKey,
+      durationMs: 0,
+      texts: [],
+    });
+  } else if (manifestScenes.length > 0) {
     for (const scene of manifestScenes) {
       imageKeys.push(scene);
     }

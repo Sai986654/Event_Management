@@ -174,6 +174,22 @@ function getVideoDuration(videoPath) {
   });
 }
 
+function hasAudioStream(videoPath) {
+  return new Promise((resolve) => {
+    const proc = spawn('ffprobe', [
+      '-v', 'error',
+      '-select_streams', 'a:0',
+      '-show_entries', 'stream=index',
+      '-of', 'csv=p=0',
+      videoPath,
+    ]);
+    let out = '';
+    proc.stdout.on('data', (d) => { out += d.toString(); });
+    proc.on('close', (code) => resolve(code === 0 && String(out || '').trim().length > 0));
+    proc.on('error', () => resolve(false));
+  });
+}
+
 function collectOverlayAssets(overlayDir) {
   const result = { light: [], grain: [], dust: [] };
   if (!overlayDir || !fs.existsSync(overlayDir)) return result;
@@ -720,6 +736,7 @@ async function attachAudioToBaseInviteVideo({
 
     // Determine full video duration so we can pad audio to match all photos.
     const videoDuration = await getVideoDuration(baseVideoPath);
+    const baseHasAudio = await hasAudioStream(baseVideoPath);
     const padTarget = videoDuration ? videoDuration.toFixed(3) : '30';
 
     const args = ['-y', '-i', baseVideoPath, '-i', voicePath];
@@ -728,13 +745,29 @@ async function attachAudioToBaseInviteVideo({
       `[1:a]aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=mono,` +
       `volume=1.0,apad=whole_dur=${padTarget}[voice]`;
 
+    const mixInputs = ['voice'];
+    const mixWeights = ['1'];
+
+    if (baseHasAudio) {
+      filterComplex +=
+        `;[0:a]aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo,` +
+        `atrim=0:${padTarget},asetpts=PTS-STARTPTS,volume=0.75[baseaud]`;
+      mixInputs.push('baseaud');
+      mixWeights.push('0.75');
+    }
+
     if (musicPath) {
       args.push('-stream_loop', '-1', '-i', musicPath);
       filterComplex +=
         `;[2:a]aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo,` +
         `volume=0.55,atrim=0:${padTarget},asetpts=PTS-STARTPTS,` +
-        `afade=t=out:st=${Math.max(0, Number(padTarget) - 1).toFixed(3)}:d=1.0[music]` +
-        `;[voice][music]amix=inputs=2:duration=longest:weights='1 0.5':dropout_transition=0.8[aout]`;
+        `afade=t=out:st=${Math.max(0, Number(padTarget) - 1).toFixed(3)}:d=1.0[music]`;
+      mixInputs.push('music');
+      mixWeights.push('0.45');
+    }
+
+    if (mixInputs.length > 1) {
+      filterComplex += `;[${mixInputs.join('][')}]amix=inputs=${mixInputs.length}:duration=longest:weights='${mixWeights.join(' ')}':dropout_transition=0.8[aout]`;
     } else {
       filterComplex += ';[voice]anull[aout]';
     }
@@ -758,6 +791,53 @@ async function attachAudioToBaseInviteVideo({
   }
 }
 
+async function overlayTextOnVideo({
+  baseVideoPath,
+  text,
+  outputPath,
+  renderProfile,
+}) {
+  const content = String(text || '').trim();
+  if (!content) {
+    return { videoPath: baseVideoPath, reusedBase: true };
+  }
+  if (!baseVideoPath || !fs.existsSync(baseVideoPath)) {
+    throw new Error('Base video not found for text overlay');
+  }
+
+  const tempFilesToCleanup = [];
+  const rpf = resolveRenderProfile(renderProfile);
+
+  try {
+    const textPath = writeTempFile(Buffer.from(content, 'utf8'), '.txt');
+    tempFilesToCleanup.push(textPath);
+
+    const finalOutputPath = outputPath || tempPath('.mp4');
+    ensureDir(path.dirname(finalOutputPath));
+
+    const drawFilter =
+      `drawtext=textfile='${escapePathForFilter(textPath)}':fontsize=52:fontcolor=white:` +
+      `x=(w-text_w)/2:y=h-(text_h*2.6):box=1:boxcolor=black@0.35:boxborderw=18:` +
+      `shadowx=2:shadowy=2:shadowcolor=black@0.4`;
+
+    await runFFmpeg([
+      '-y',
+      '-i', baseVideoPath,
+      '-vf', drawFilter,
+      '-c:v', 'libx264',
+      '-preset', rpf.videoPreset,
+      '-crf', rpf.crf,
+      '-c:a', 'copy',
+      '-movflags', '+faststart',
+      finalOutputPath,
+    ]);
+
+    return { videoPath: finalOutputPath, reusedBase: false };
+  } finally {
+    cleanupFiles(tempFilesToCleanup);
+  }
+}
+
 /** Safely delete a file. */
 function safeUnlink(filePath) {
   try { if (filePath && fs.existsSync(filePath)) fs.unlinkSync(filePath); } catch { /* ignore */ }
@@ -771,6 +851,7 @@ function cleanupFiles(paths) {
 module.exports = {
   generateInviteVideo,
   attachAudioToBaseInviteVideo,
+  overlayTextOnVideo,
   preResizeImage,
   writeTempFile,
   cleanupFiles,

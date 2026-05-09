@@ -18,6 +18,7 @@
   --ease-standard: cubic-bezier(0.22, 1, 0.36, 1);
   --dur-fast: 180ms;
   --dur-normal: 320ms;
+  --mobile-dock-height: 86px;
 }
 
 html {
@@ -28,12 +29,44 @@ body {
   font-family: 'Manrope', 'Segoe UI', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  overscroll-behavior-y: none;
   background:
     radial-gradient(1100px 620px at 10% -10%, rgba(15, 118, 110, 0.14), transparent 58%),
     radial-gradient(900px 460px at 100% 8%, rgba(249, 115, 22, 0.12), transparent 58%),
     linear-gradient(180deg, #f5faff 0%, #eef7ff 48%, #f6fbff 100%);
   color: var(--ink-1);
   animation: appFadeIn 380ms var(--ease-standard);
+}
+
+body.is-standalone {
+  background-attachment: fixed;
+}
+
+#root {
+  min-height: 100%;
+}
+
+.app-shell-layout {
+  min-height: 100dvh;
+}
+
+.app-main-content {
+  min-height: calc(100dvh - 64px);
+  -webkit-overflow-scrolling: touch;
+}
+
+body.is-standalone .header {
+  padding-top: env(safe-area-inset-top);
+}
+
+body.is-standalone .footer {
+  display: none;
+}
+
+body.is-standalone .app-main-content {
+  padding-top: 6px;
 }
 
 code {
@@ -173,5 +206,14 @@ h1, h2, h3, h4 {
 @media (max-width: 768px) {
   body {
     font-size: 14px;
+  }
+
+  .app-main-content {
+    min-height: calc(100dvh - 64px);
+    padding-bottom: calc(var(--mobile-dock-height) + env(safe-area-inset-bottom) + 8px);
+  }
+
+  .footer {
+    padding-bottom: calc(24px + env(safe-area-inset-bottom));
   }
 }

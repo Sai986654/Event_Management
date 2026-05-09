@@ -1,11 +1,16 @@
-import React, { useContext } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import React, { useContext, useEffect, useMemo, useState } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Layout } from 'antd';
 import { AuthContext, AuthProvider } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Header from './components/Header';
 import Footer from './components/Footer';
+import PWAInstallPrompt from './components/PWAInstallPrompt';
+import MobileAppDock from './components/MobileAppDock';
+import RouteTransition from './components/RouteTransition';
+import AppSplashScreen from './components/AppSplashScreen';
+import usePullToRefreshGuard from './hooks/usePullToRefreshGuard';
 
 // Pages
 import Home from './pages/Home';
@@ -37,21 +42,91 @@ import SurpriseViewer from './pages/SurpriseViewer';
 import './App.css';
 
 const AppLayout = ({ children }) => (
-  <Layout style={{ minHeight: '100vh' }}>
+  <Layout className="app-shell-layout" style={{ minHeight: '100vh' }}>
     <Header />
-    <Layout.Content style={{ flex: 1 }}>
-      {children}
+    <Layout.Content className="app-main-content" style={{ flex: 1 }}>
+      <PWAInstallPrompt />
+      <RouteTransition>{children}</RouteTransition>
     </Layout.Content>
     <Footer />
+    <MobileAppDock />
   </Layout>
 );
 
+const PULL_GUARD_ROUTES = [
+  '/',
+  '/dashboard',
+  '/vendors',
+  '/bookings',
+  '/profile',
+  '/planner',
+  '/surprises',
+];
+
+const AppExperienceController = () => {
+  const location = useLocation();
+
+  const shouldGuardPullToRefresh = useMemo(
+    () => PULL_GUARD_ROUTES.some((path) => location.pathname === path || location.pathname.startsWith(`${path}/`)),
+    [location.pathname]
+  );
+
+  usePullToRefreshGuard(shouldGuardPullToRefresh);
+  return null;
+};
+
 const AppInner = () => {
   const { isAuthenticated } = useContext(AuthContext);
+  const [isSplashVisible, setIsSplashVisible] = useState(true);
+
+  useEffect(() => {
+    const firstLaunchKey = 'vedika360-first-launch-seen';
+    const hasSeenLaunch = localStorage.getItem(firstLaunchKey) === '1';
+    const splashDuration = hasSeenLaunch ? 700 : 1700;
+
+    if (!hasSeenLaunch) {
+      localStorage.setItem(firstLaunchKey, '1');
+    }
+
+    const timer = window.setTimeout(() => {
+      setIsSplashVisible(false);
+    }, splashDuration);
+
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(display-mode: standalone)');
+
+    const updateBodyClasses = () => {
+      const isStandalone = mediaQuery.matches || window.navigator.standalone === true;
+      document.body.classList.toggle('is-standalone', isStandalone);
+    };
+
+    updateBodyClasses();
+
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener('change', updateBodyClasses);
+    } else if (mediaQuery.addListener) {
+      mediaQuery.addListener(updateBodyClasses);
+    }
+
+    return () => {
+      if (mediaQuery.removeEventListener) {
+        mediaQuery.removeEventListener('change', updateBodyClasses);
+      } else if (mediaQuery.removeListener) {
+        mediaQuery.removeListener(updateBodyClasses);
+      }
+      document.body.classList.remove('is-standalone');
+    };
+  }, []);
 
   return (
-    <Router>
-      <Routes>
+    <>
+      <AppSplashScreen visible={isSplashVisible} />
+      <Router>
+        <AppExperienceController />
+        <Routes>
         {/* Public Routes */}
         <Route
           path="/"
@@ -284,8 +359,9 @@ const AppInner = () => {
 
         {/* Catch-all */}
         <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </Router>
+        </Routes>
+      </Router>
+    </>
   );
 };
 

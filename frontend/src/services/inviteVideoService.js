@@ -2,13 +2,17 @@ import api from './api';
 
 export const inviteVideoService = {
   /** Create a new invite video job (multipart). */
-  createJob: async (eventId, images, guests, music = null, voiceTemplate = '', voiceLang = 'en') => {
+  createJob: async (eventId, images, guests, music = null, voiceTemplate = '', voiceLang = 'en', overlayText = '', templateVideo = null) => {
     const formData = new FormData();
     formData.append('eventId', eventId);
     formData.append('guests', JSON.stringify(guests));
-    if (voiceTemplate) formData.append('voiceTemplate', voiceTemplate);
+    const encodedTemplate = overlayText
+      ? `${voiceTemplate}|||OVERLAY|||${overlayText}`
+      : voiceTemplate;
+    if (encodedTemplate) formData.append('voiceTemplate', encodedTemplate);
     formData.append('voiceLang', voiceLang);
     images.forEach((file) => formData.append('images', file));
+    if (templateVideo) formData.append('templateVideo', templateVideo);
     if (music) formData.append('music', music);
 
     const response = await api.post('invite-videos', formData, {
@@ -19,13 +23,16 @@ export const inviteVideoService = {
   },
 
   /** Create a new invite video job from an Adobe manifest payload. */
-  createJobFromManifest: async (eventId, manifest, guests, music = null, voiceTemplate = '', voiceLang = 'en', templateKey = '') => {
+  createJobFromManifest: async (eventId, manifest, guests, music = null, voiceTemplate = '', voiceLang = 'en', templateKey = '', overlayText = '') => {
     const formData = new FormData();
     formData.append('eventId', eventId);
     formData.append('guests', JSON.stringify(guests));
     formData.append('manifest', JSON.stringify(manifest));
     if (templateKey) formData.append('templateKey', templateKey);
-    if (voiceTemplate) formData.append('voiceTemplate', voiceTemplate);
+    const encodedTemplate = overlayText
+      ? `${voiceTemplate}|||OVERLAY|||${overlayText}`
+      : voiceTemplate;
+    if (encodedTemplate) formData.append('voiceTemplate', encodedTemplate);
     formData.append('voiceLang', voiceLang);
     if (music) formData.append('music', music);
 
@@ -37,12 +44,15 @@ export const inviteVideoService = {
   },
 
   /** Create a new invite video job from an existing invite template. */
-  createJobFromTemplate: async (eventId, templateKey, guests, music = null, voiceTemplate = '', voiceLang = 'en') => {
+  createJobFromTemplate: async (eventId, templateKey, guests, music = null, voiceTemplate = '', voiceLang = 'en', overlayText = '') => {
     const formData = new FormData();
     formData.append('eventId', eventId);
     formData.append('guests', JSON.stringify(guests));
     formData.append('templateKey', templateKey);
-    if (voiceTemplate) formData.append('voiceTemplate', voiceTemplate);
+    const encodedTemplate = overlayText
+      ? `${voiceTemplate}|||OVERLAY|||${overlayText}`
+      : voiceTemplate;
+    if (encodedTemplate) formData.append('voiceTemplate', encodedTemplate);
     formData.append('voiceLang', voiceLang);
     if (music) formData.append('music', music);
 

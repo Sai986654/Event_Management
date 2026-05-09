@@ -69,6 +69,12 @@ const getTemplatePreviewInfo = (template) => {
   };
 };
 
+const isVideoTemplate = (template) => {
+  const adobe = template?.palette?.__adobeExpress;
+  const profiles = Array.isArray(adobe?.outputProfiles) ? adobe.outputProfiles : [];
+  return profiles.some((profile) => String(profile?.format || '').toLowerCase() === 'mp4');
+};
+
 const InviteVideoManager = ({ eventId, guests: eventGuests = [] }) => {
   const [jobs, setJobs] = useState([]);
   const [activeJob, setActiveJob] = useState(null);
@@ -78,6 +84,7 @@ const InviteVideoManager = ({ eventId, guests: eventGuests = [] }) => {
 
   // Form state
   const [imageFiles, setImageFiles] = useState([]);
+  const [templateVideoFile, setTemplateVideoFile] = useState(null);
   const [musicFile, setMusicFile] = useState(null);
   const [manifestJson, setManifestJson] = useState('');
   const [inviteTemplates, setInviteTemplates] = useState([]);
@@ -86,6 +93,7 @@ const InviteVideoManager = ({ eventId, guests: eventGuests = [] }) => {
   const [guestInput, setGuestInput] = useState('');
   const [useExistingGuests, setUseExistingGuests] = useState(true);
   const [voiceTemplate, setVoiceTemplate] = useState('Dear {name}, you are cordially invited to our event');
+  const [overlayText, setOverlayText] = useState('');
   const [voiceLang, setVoiceLang] = useState('en');
 
   // Real-time progress ref
@@ -121,7 +129,9 @@ const InviteVideoManager = ({ eventId, guests: eventGuests = [] }) => {
     setLoadingTemplates(true);
     try {
       const data = await adminService.getInviteTemplates();
-      setInviteTemplates(Array.isArray(data.templates) ? data.templates : []);
+      const templates = Array.isArray(data.templates) ? data.templates : [];
+      const videoTemplates = templates.filter(isVideoTemplate);
+      setInviteTemplates(videoTemplates);
     } catch (err) {
       message.error(getErrorMessage(err));
     } finally {
@@ -178,6 +188,7 @@ const InviteVideoManager = ({ eventId, guests: eventGuests = [] }) => {
   // ── Submit new job ────────────────────────────────────────
   const handleSubmit = async () => {
     const manifestText = manifestJson.trim();
+    const hasTemplateVideo = Boolean(templateVideoFile);
     let parsedManifest = null;
 
     if (manifestText) {
@@ -187,8 +198,8 @@ const InviteVideoManager = ({ eventId, guests: eventGuests = [] }) => {
         message.error('Manifest JSON is invalid. Paste a valid Adobe manifest before submitting.');
         return;
       }
-    } else if (imageFiles.length < 3 || imageFiles.length > 5) {
-      message.warning('Please upload 3 to 5 images for the slideshow, or paste an Adobe manifest.');
+    } else if (!hasTemplateVideo && !selectedTemplateKey && (imageFiles.length < 3 || imageFiles.length > 5)) {
+      message.warning('Upload a template MP4, choose a video template, paste a manifest, or upload 3 to 5 images.');
       return;
     }
 
@@ -214,19 +225,31 @@ const InviteVideoManager = ({ eventId, guests: eventGuests = [] }) => {
     setSubmitting(true);
     try {
       const music = musicFile?.originFileObj || musicFile || null;
+      const templateVideo = templateVideoFile?.originFileObj || templateVideoFile || null;
       const data = manifestText
-        ? await inviteVideoService.createJobFromManifest(eventId, parsedManifest, guests, music, voiceTemplate, voiceLang, parsedManifest?.templateKey || '')
+        ? await inviteVideoService.createJobFromManifest(eventId, parsedManifest, guests, music, voiceTemplate, voiceLang, parsedManifest?.templateKey || '', overlayText)
         : selectedTemplateKey
-        ? await inviteVideoService.createJobFromTemplate(eventId, selectedTemplateKey, guests, music, voiceTemplate, voiceLang)
-        : await inviteVideoService.createJob(eventId, imageFiles.map((f) => f.originFileObj || f), guests, music, voiceTemplate, voiceLang);
+        ? await inviteVideoService.createJobFromTemplate(eventId, selectedTemplateKey, guests, music, voiceTemplate, voiceLang, overlayText)
+        : await inviteVideoService.createJob(
+            eventId,
+            imageFiles.map((f) => f.originFileObj || f),
+            guests,
+            music,
+            voiceTemplate,
+            voiceLang,
+            overlayText,
+            templateVideo
+          );
       message.success(`Job started! Generating videos for ${data.totalGuests} guest(s).`);
       await loadJobs();
       loadJobDetail(data.jobId);
       // Reset form
       setImageFiles([]);
+      setTemplateVideoFile(null);
       setMusicFile(null);
       setManifestJson('');
       setSelectedTemplateKey('');
+      setOverlayText('');
     } catch (err) {
       message.error(getErrorMessage(err));
     } finally {
@@ -409,6 +432,34 @@ const InviteVideoManager = ({ eventId, guests: eventGuests = [] }) => {
           <Text type="warning">Upload at least 3 images ({imageFiles.length}/3 minimum)</Text>
         )}
 
+        <Divider orientation="left">1a. Base Video Template (MP4)</Divider>
+        <Space direction="vertical" size={8} style={{ width: '100%' }}>
+          {templateVideoFile ? (
+            <Space>
+              <VideoCameraOutlined />
+              <Text>{templateVideoFile.name || templateVideoFile.originFileObj?.name || 'template-video.mp4'}</Text>
+              <Button size="small" icon={<DeleteOutlined />} danger onClick={() => setTemplateVideoFile(null)}>
+                Remove
+              </Button>
+            </Space>
+          ) : (
+            <Upload
+              accept="video/mp4,video/*"
+              maxCount={1}
+              beforeUpload={(file) => {
+                setTemplateVideoFile(file);
+                return false;
+              }}
+              showUploadList={false}
+            >
+              <Button icon={<UploadOutlined />}>Upload Template Video (MP4)</Button>
+            </Upload>
+          )}
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            Upload a fully designed MP4 (with background music and visuals). Generation will add guest-name voice and optional text.
+          </Text>
+        </Space>
+
         <Divider orientation="left">1b. Adobe Manifest (optional)</Divider>
         <Space direction="vertical" size={8} style={{ width: '100%' }}>
           <Select
@@ -426,7 +477,7 @@ const InviteVideoManager = ({ eventId, guests: eventGuests = [] }) => {
             optionLabelProp="title"
           />
           <Text type="secondary" style={{ fontSize: 12 }}>
-            Pick an imported Adobe template here if you want the video job to use the saved timeline directly.
+            Pick a video-capable template here to keep PDF invite templates separate.
           </Text>
           {selectedTemplate ? (
             <Card size="small" style={{ borderColor: selectedTemplatePreview ? '#f59e0b' : undefined }}>
@@ -510,9 +561,26 @@ const InviteVideoManager = ({ eventId, guests: eventGuests = [] }) => {
             maxLength={200}
             showCount
           />
+          <div>
+            <Text strong>Optional On-Screen Text</Text>
+            <Text type="secondary" style={{ marginLeft: 8 }}>
+              Use <Text code>{'{name}'}</Text> for per-guest text on video template jobs
+            </Text>
+          </div>
+          <Input
+            value={overlayText}
+            onChange={(e) => setOverlayText(e.target.value)}
+            placeholder="Welcome {name}"
+            maxLength={80}
+          />
           <Text type="secondary" style={{ fontSize: 12 }}>
-            <AudioOutlined /> Preview: "{voiceTemplate.replace(/\{name\}/gi, 'Prakash')}"
+            <AudioOutlined /> Voice preview: "{voiceTemplate.replace(/\{name\}/gi, 'Prakash')}"
           </Text>
+          {overlayText ? (
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              Overlay preview: "{overlayText.replace(/\{name\}/gi, 'Prakash')}"
+            </Text>
+          ) : null}
         </Space>
 
         <Divider orientation="left">4. Guest List</Divider>
@@ -555,7 +623,7 @@ const InviteVideoManager = ({ eventId, guests: eventGuests = [] }) => {
           icon={<VideoCameraOutlined />}
           loading={submitting}
           onClick={handleSubmit}
-          disabled={!manifestJson.trim() && !selectedTemplateKey && imageFiles.length < 3}
+          disabled={!manifestJson.trim() && !selectedTemplateKey && !templateVideoFile && imageFiles.length < 3}
         >
           Generate & Send Invite Videos
         </Button>

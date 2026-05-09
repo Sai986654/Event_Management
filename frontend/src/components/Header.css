@@ -118,15 +118,47 @@
 }
 
 @media (max-width: 768px) {
+  .header {
+    padding: 0 12px;
+    box-shadow: 0 10px 22px rgba(10, 54, 77, 0.24);
+  }
+
+  .header-container {
+    height: 56px;
+  }
+
   .nav-menu {
     display: none;
   }
 
   .header-right {
-    gap: 12px;
+    gap: 8px;
   }
 
   .logo {
-    font-size: 20px;
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+  }
+
+  .logo-icon {
+    width: 30px;
+    height: 30px;
+    border-radius: 10px;
+  }
+
+  .header .ant-btn {
+    min-height: 34px;
+    border-radius: 10px;
+  }
+
+  .header .ant-avatar {
+    width: 30px;
+    height: 30px;
+    line-height: 30px;
+  }
+
+  body.is-standalone .header {
+    padding-top: max(env(safe-area-inset-top), 6px);
   }
 }

@@ -67,6 +67,20 @@ npm run build
 
 This creates an optimized production build in the `build` folder.
 
+## PWA Support (iOS Alternative to App Store)
+
+The web app now supports Progressive Web App (PWA) installation.
+
+- iPhone/iPad users can open the app in Safari and use:
+	- Share -> Add to Home Screen
+- Android users can open the app in Chrome and use:
+	- Browser menu -> Install app (or Add to Home screen)
+- Other supported browsers/devices can use the in-app Install button when available.
+
+Notes:
+- Service worker registration is enabled in production builds.
+- The app can launch in standalone mode when installed from home screen.
+
 ## Project Structure
 
 ```
