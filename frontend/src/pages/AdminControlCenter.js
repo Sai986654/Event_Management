@@ -209,9 +209,16 @@ const AdminControlCenter = () => {
       eventDate: { label: 'Event Date', type: 'date', required: true },
       eventTime: { label: 'Event Time', type: 'text', required: false, maxLength: 32 },
       venueName: { label: 'Venue Name', type: 'text', required: true, maxLength: 120 },
+      eventAddress: { label: 'Event Address', type: 'text', required: false, maxLength: 200 },
       customMessage: { label: 'Custom Message', type: 'text', required: false, maxLength: 240 },
       rsvpLink: { label: 'RSVP Link', type: 'qrcode', required: true },
       guestName: { label: 'Guest Name', type: 'text', required: false, maxLength: 60 },
+      hostLine: { label: 'Host Line', type: 'text', required: false, maxLength: 100 },
+      dressCode: { label: 'Dress Code', type: 'text', required: false, maxLength: 80 },
+      hashtag: { label: 'Hashtag', type: 'text', required: false, maxLength: 80 },
+      mapLink: { label: 'Venue Map Link', type: 'qrcode', required: false },
+      programHighlight: { label: 'Program Highlight', type: 'text', required: false, maxLength: 180 },
+      seatingInfo: { label: 'Seating Info', type: 'text', required: false, maxLength: 120 },
     };
 
     const selectedAssetFiles = Array.isArray(values.selectedAssetFiles) ? values.selectedAssetFiles : [];
@@ -926,7 +933,7 @@ const AdminControlCenter = () => {
                   variantKeys: 'floral-traditional,modern-minimal',
                   selectedAssetFiles: [],
                   assetFilesManual: '',
-                  selectedFields: ['eventTitle', 'brideName', 'groomName', 'eventDate', 'venueName', 'rsvpLink'],
+                  selectedFields: ['eventTitle', 'eventDate', 'eventTime', 'venueName', 'guestName', 'customMessage', 'rsvpLink'],
                 }}
               >
                 <Row gutter={12}>
@@ -1071,9 +1078,16 @@ const AdminControlCenter = () => {
                       { value: 'eventDate', label: 'eventDate' },
                       { value: 'eventTime', label: 'eventTime' },
                       { value: 'venueName', label: 'venueName' },
+                      { value: 'eventAddress', label: 'eventAddress' },
                       { value: 'customMessage', label: 'customMessage' },
                       { value: 'rsvpLink', label: 'rsvpLink' },
                       { value: 'guestName', label: 'guestName' },
+                      { value: 'hostLine', label: 'hostLine' },
+                      { value: 'dressCode', label: 'dressCode' },
+                      { value: 'hashtag', label: 'hashtag' },
+                      { value: 'mapLink', label: 'mapLink' },
+                      { value: 'programHighlight', label: 'programHighlight' },
+                      { value: 'seatingInfo', label: 'seatingInfo' },
                     ]}
                   />
                 </Form.Item>

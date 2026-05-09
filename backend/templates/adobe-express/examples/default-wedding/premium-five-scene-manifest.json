@@ -1,0 +1,290 @@
+{
+  "manifestVersion": "1.0",
+  "templateKey": "telugu-wedding-premium-five-scene",
+  "templateName": "Telugu Wedding Premium Five Scene",
+  "engine": "adobe-express",
+  "version": 1,
+  "category": "wedding",
+  "source": {
+    "tool": "adobe-express-premium",
+    "projectLink": "https://new.express.adobe.com/",
+    "exportedAt": "2026-05-09T00:00:00.000Z"
+  },
+  "editableFields": [
+    {
+      "id": "eventTitle",
+      "label": "Event Title",
+      "type": "text",
+      "required": true,
+      "maxLength": 80,
+      "bindings": [
+        { "sceneId": "scene-cover", "target": "textLayer.eventTitle" },
+        { "sceneId": "scene-thankyou", "target": "textLayer.eventTitle" }
+      ]
+    },
+    {
+      "id": "guestName",
+      "label": "Guest Name",
+      "type": "text",
+      "required": false,
+      "maxLength": 60,
+      "bindings": [
+        { "sceneId": "scene-message", "target": "textLayer.guestName" },
+        { "sceneId": "scene-seating", "target": "textLayer.guestName" }
+      ]
+    },
+    {
+      "id": "eventDate",
+      "label": "Event Date",
+      "type": "date",
+      "required": true,
+      "bindings": [
+        { "sceneId": "scene-cover", "target": "textLayer.eventDate" },
+        { "sceneId": "scene-details", "target": "textLayer.eventDate" }
+      ]
+    },
+    {
+      "id": "eventTime",
+      "label": "Event Time",
+      "type": "text",
+      "required": false,
+      "maxLength": 32,
+      "bindings": [
+        { "sceneId": "scene-cover", "target": "textLayer.eventTime" },
+        { "sceneId": "scene-details", "target": "textLayer.eventTime" }
+      ]
+    },
+    {
+      "id": "venueName",
+      "label": "Venue Name",
+      "type": "text",
+      "required": true,
+      "maxLength": 120,
+      "bindings": [
+        { "sceneId": "scene-cover", "target": "textLayer.venueName" },
+        { "sceneId": "scene-details", "target": "textLayer.venueName" }
+      ]
+    },
+    {
+      "id": "eventAddress",
+      "label": "Event Address",
+      "type": "text",
+      "required": false,
+      "maxLength": 200,
+      "bindings": [
+        { "sceneId": "scene-details", "target": "textLayer.eventAddress" }
+      ]
+    },
+    {
+      "id": "customMessage",
+      "label": "Custom Message",
+      "type": "text",
+      "required": false,
+      "maxLength": 240,
+      "bindings": [
+        { "sceneId": "scene-message", "target": "textLayer.customMessage" }
+      ]
+    },
+    {
+      "id": "hostLine",
+      "label": "Host Line",
+      "type": "text",
+      "required": false,
+      "maxLength": 100,
+      "bindings": [
+        { "sceneId": "scene-cover", "target": "textLayer.hostLine" },
+        { "sceneId": "scene-thankyou", "target": "textLayer.hostLine" }
+      ]
+    },
+    {
+      "id": "dressCode",
+      "label": "Dress Code",
+      "type": "text",
+      "required": false,
+      "maxLength": 80,
+      "bindings": [
+        { "sceneId": "scene-details", "target": "textLayer.dressCode" }
+      ]
+    },
+    {
+      "id": "programHighlight",
+      "label": "Program Highlight",
+      "type": "text",
+      "required": false,
+      "maxLength": 180,
+      "bindings": [
+        { "sceneId": "scene-message", "target": "textLayer.programHighlight" }
+      ]
+    },
+    {
+      "id": "hashtag",
+      "label": "Hashtag",
+      "type": "text",
+      "required": false,
+      "maxLength": 80,
+      "bindings": [
+        { "sceneId": "scene-thankyou", "target": "textLayer.hashtag" }
+      ]
+    },
+    {
+      "id": "seatingInfo",
+      "label": "Seating Info",
+      "type": "text",
+      "required": false,
+      "maxLength": 120,
+      "bindings": [
+        { "sceneId": "scene-seating", "target": "textLayer.seatingInfo" }
+      ]
+    },
+    {
+      "id": "rsvpLink",
+      "label": "RSVP Link",
+      "type": "qrcode",
+      "required": true,
+      "bindings": [
+        { "sceneId": "scene-details", "target": "imageLayer.rsvp" }
+      ]
+    },
+    {
+      "id": "mapLink",
+      "label": "Venue Map Link",
+      "type": "qrcode",
+      "required": false,
+      "bindings": [
+        { "sceneId": "scene-seating", "target": "imageLayer.map" }
+      ]
+    }
+  ],
+  "variantProfiles": [
+    {
+      "key": "regal-maroon",
+      "label": "Regal Maroon",
+      "palette": {
+        "primary": "#7C2D12",
+        "secondary": "#FFF7ED",
+        "accent": "#B45309",
+        "text": "#1F2937"
+      },
+      "fontPairing": {
+        "heading": "Noto Serif Telugu",
+        "body": "Noto Sans Telugu"
+      }
+    },
+    {
+      "key": "sage-modern",
+      "label": "Sage Modern",
+      "palette": {
+        "primary": "#14532D",
+        "secondary": "#F0FDF4",
+        "accent": "#15803D",
+        "text": "#1F2937"
+      },
+      "fontPairing": {
+        "heading": "Noto Serif Telugu",
+        "body": "Noto Sans Telugu"
+      }
+    },
+    {
+      "key": "midnight-luxe",
+      "label": "Midnight Luxe",
+      "palette": {
+        "primary": "#1E3A8A",
+        "secondary": "#EFF6FF",
+        "accent": "#1D4ED8",
+        "text": "#111827"
+      },
+      "fontPairing": {
+        "heading": "Noto Serif Telugu",
+        "body": "Noto Sans Telugu"
+      }
+    }
+  ],
+  "outputProfiles": [
+    {
+      "key": "invite-pdf-pages",
+      "format": "pdf",
+      "width": 1080,
+      "height": 1920,
+      "fps": 1
+    },
+    {
+      "key": "story-video",
+      "format": "mp4",
+      "width": 1080,
+      "height": 1920,
+      "fps": 30,
+      "videoBitrateKbps": 7000,
+      "audioBitrateKbps": 256
+    }
+  ],
+  "timeline": [
+    {
+      "sceneId": "scene-cover",
+      "startMs": 0,
+      "durationMs": 3500,
+      "baseVideo": "scenes/floral-traditional-telugu.png",
+      "textLayers": [
+        { "id": "cover-title", "fieldId": "eventTitle", "x": 0.5, "y": 0.14, "maxWidth": 0.82, "maxHeight": 0.08, "align": "center", "style": { "fontSize": 66, "fontFamily": "serif", "weight": "700", "color": "#7C2D12", "lineHeight": 1.1, "shadowColor": "#ffffff", "shadowOffsetX": 1, "shadowOffsetY": 1, "shadowOpacity": 0.45, "textGradient": { "from": "#7C2D12", "to": "#B45309", "angle": 90 } } },
+        { "id": "cover-host", "fieldId": "hostLine", "x": 0.5, "y": 0.23, "maxWidth": 0.76, "maxHeight": 0.06, "align": "center", "style": { "fontSize": 34, "fontFamily": "serif", "italic": true, "color": "#92400E" } },
+        { "id": "cover-date", "fieldId": "eventDate", "x": 0.5, "y": 0.33, "maxWidth": 0.7, "maxHeight": 0.05, "align": "center", "style": { "fontSize": 30, "weight": "600", "color": "#7C2D12" } },
+        { "id": "cover-time", "fieldId": "eventTime", "x": 0.5, "y": 0.38, "maxWidth": 0.64, "maxHeight": 0.05, "align": "center" },
+        { "id": "cover-venue", "fieldId": "venueName", "x": 0.5, "y": 0.43, "maxWidth": 0.8, "maxHeight": 0.07, "align": "center", "style": { "fontSize": 30, "color": "#5B392A" } }
+      ]
+    },
+    {
+      "sceneId": "scene-message",
+      "startMs": 3500,
+      "durationMs": 3500,
+      "baseVideo": "scenes/modern-minimal-telugu.png",
+      "textLayers": [
+        { "id": "msg-guest", "fieldId": "guestName", "x": 0.28, "y": 0.18, "maxWidth": 0.42, "maxHeight": 0.05, "align": "left", "style": { "fontSize": 30, "weight": "700", "color": "#0F172A" } },
+        { "id": "msg-body", "fieldId": "customMessage", "x": 0.28, "y": 0.3, "maxWidth": 0.46, "maxHeight": 0.2, "align": "left", "style": { "fontSize": 26, "lineHeight": 1.25, "color": "#1F2937", "backgroundOpacity": 0.74, "padding": 12, "radius": 10, "borderColor": "#D1D5DB", "borderWidth": 1, "backgroundGradient": { "from": "#ffffff", "to": "#F8FAFC", "angle": 90 } } },
+        { "id": "msg-highlight", "fieldId": "programHighlight", "x": 0.28, "y": 0.54, "maxWidth": 0.48, "maxHeight": 0.08, "align": "left", "style": { "fontSize": 24, "weight": "600", "color": "#14532D", "rotation": -2 } }
+      ]
+    },
+    {
+      "sceneId": "scene-details",
+      "startMs": 7000,
+      "durationMs": 3500,
+      "baseVideo": "scenes/floral-traditional-telugu.png",
+      "textLayers": [
+        { "id": "details-date", "fieldId": "eventDate", "x": 0.24, "y": 0.63, "maxWidth": 0.3, "maxHeight": 0.05, "align": "left", "style": { "fontSize": 24, "weight": "700", "color": "#7C2D12", "strokeColor": "#FFFFFF", "strokeWidth": 1 } },
+        { "id": "details-time", "fieldId": "eventTime", "x": 0.62, "y": 0.63, "maxWidth": 0.2, "maxHeight": 0.05, "align": "left" },
+        { "id": "details-venue", "fieldId": "venueName", "x": 0.32, "y": 0.7, "maxWidth": 0.54, "maxHeight": 0.06, "align": "left", "style": { "fontSize": 26, "weight": "600", "color": "#1F2937" } },
+        { "id": "details-address", "fieldId": "eventAddress", "x": 0.32, "y": 0.77, "maxWidth": 0.54, "maxHeight": 0.08, "align": "left" },
+        { "id": "details-dress", "fieldId": "dressCode", "x": 0.32, "y": 0.86, "maxWidth": 0.4, "maxHeight": 0.05, "align": "left" },
+        { "id": "details-rsvp", "fieldId": "rsvpLink", "x": 0.82, "y": 0.79, "maxWidth": 0.14, "maxHeight": 0.14, "align": "center" }
+      ]
+    },
+    {
+      "sceneId": "scene-seating",
+      "startMs": 10500,
+      "durationMs": 3500,
+      "baseVideo": "scenes/modern-minimal-telugu.png",
+      "textLayers": [
+        { "id": "seating-guest", "fieldId": "guestName", "x": 0.28, "y": 0.2, "maxWidth": 0.42, "maxHeight": 0.05, "align": "left" },
+        { "id": "seating-info", "fieldId": "seatingInfo", "x": 0.28, "y": 0.28, "maxWidth": 0.5, "maxHeight": 0.06, "align": "left", "style": { "fontSize": 24, "color": "#0F172A", "opacity": 0.82 } },
+        { "id": "seating-map", "fieldId": "mapLink", "x": 0.8, "y": 0.3, "maxWidth": 0.16, "maxHeight": 0.16, "align": "center" }
+      ]
+    },
+    {
+      "sceneId": "scene-thankyou",
+      "startMs": 14000,
+      "durationMs": 3000,
+      "baseVideo": "scenes/floral-traditional-telugu.png",
+      "textLayers": [
+        { "id": "thanks-title", "fieldId": "eventTitle", "x": 0.5, "y": 0.42, "maxWidth": 0.72, "maxHeight": 0.08, "align": "center", "style": { "fontSize": 58, "fontFamily": "serif", "weight": "700", "color": "#7C2D12" } },
+        { "id": "thanks-host", "fieldId": "hostLine", "x": 0.5, "y": 0.52, "maxWidth": 0.68, "maxHeight": 0.06, "align": "center", "style": { "fontSize": 30, "italic": true, "color": "#7C2D12", "opacity": 0.88 } },
+        { "id": "thanks-hashtag", "fieldId": "hashtag", "x": 0.5, "y": 0.86, "maxWidth": 0.5, "maxHeight": 0.05, "align": "center", "style": { "fontSize": 26, "weight": "600", "uppercase": true, "letterSpacing": 0.5, "color": "#14532D", "backgroundOpacity": 0.92, "paddingX": 10, "paddingY": 6, "radius": 12, "backgroundGradient": { "from": "#ECFDF5", "to": "#D1FAE5", "angle": 0 }, "textGradient": { "from": "#14532D", "to": "#15803D", "angle": 0 } } }
+      ]
+    }
+  ],
+  "assets": {
+    "videos": [],
+    "images": [
+      "scenes/floral-traditional-telugu.png",
+      "scenes/modern-minimal-telugu.png"
+    ],
+    "audio": []
+  }
+}

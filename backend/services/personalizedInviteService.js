@@ -853,8 +853,19 @@ function resolveAdobeFieldValue({ fieldId, guest, event, inviteMessage, inviteUr
   const dateText = eventDate ? eventDate.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) : '';
   const timeText = eventDate ? eventDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }) : '';
   const inviteLines = String(inviteMessage || '').split('\n').map((line) => line.trim()).filter(Boolean);
+  const salutationLine = inviteLines[0] || '';
+  const closingLine = inviteLines[inviteLines.length - 1] || '';
   const firstBodyLine = inviteLines.find((line, idx) => idx > 0 && line !== 'With love' && line !== 'Prema to') || '';
   const addressParts = [event?.address, event?.city, event?.state].filter(Boolean);
+  const mapUrl = Number.isFinite(Number(event?.lat)) && Number.isFinite(Number(event?.lng))
+    ? `https://maps.google.com/?q=${event.lat},${event.lng}`
+    : (event?.venue || addressParts.join(', '))
+      ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${event?.venue || ''} ${addressParts.join(' ')}`.trim())}`
+      : '';
+  const hashtag = event?.slug ? `#${String(event.slug).replace(/[^a-z0-9]/gi, '')}` : '#CelebrateWithVedika360';
+  const hostLine = event?.organizerName || event?.organizer?.name || 'Hosted by Vedika 360';
+  const dressCode = 'Traditional Elegance';
+  const seatingInfo = relationship ? `Reserved for ${relationship}` : 'Reserved for our honored guest';
 
   if (['eventtitle', 'covertitle', 'title'].includes(key)) return event?.title || '';
   if (['bridename', 'hostname', 'rsvpname'].includes(key)) return event?.organizerName || event?.organizer?.name || 'Vedika 360';
@@ -862,8 +873,16 @@ function resolveAdobeFieldValue({ fieldId, guest, event, inviteMessage, inviteUr
   if (['eventdate'].includes(key)) return dateText;
   if (['eventtime'].includes(key)) return timeText;
   if (['venuename', 'eventvenue'].includes(key)) return event?.venue || '';
-  if (['eventaddress'].includes(key)) return addressParts.join(', ') || event?.venue || '';
+  if (['eventaddress', 'venueaddress', 'locationaddress'].includes(key)) return addressParts.join(', ') || event?.venue || '';
   if (['guestname'].includes(key)) return guest?.name || 'Guest';
+  if (['welcomeline', 'salutation'].includes(key)) return salutationLine;
+  if (['closingline', 'closingtext'].includes(key)) return closingLine;
+  if (['hostline', 'hostmessage', 'hosttitle'].includes(key)) return hostLine;
+  if (['dresscode'].includes(key)) return dressCode;
+  if (['hashtag'].includes(key)) return hashtag;
+  if (['maplink', 'venuemap'].includes(key)) return mapUrl;
+  if (['programhighlight', 'eventhighlight'].includes(key)) return firstBodyLine || customMessage || '';
+  if (['seatinginfo'].includes(key)) return seatingInfo;
   if (['specialnote', 'custommessage', 'coversubtitle', 'subtitle'].includes(key)) {
     return customMessage || firstBodyLine || relationship || '';
   }
@@ -871,6 +890,137 @@ function resolveAdobeFieldValue({ fieldId, guest, event, inviteMessage, inviteUr
   if (['rsvplink'].includes(key)) return inviteUrl || '';
 
   return '';
+}
+
+function resolvePdfFontName(style = {}) {
+  const familyRaw = String(style.fontFamily || '').toLowerCase();
+  const weightRaw = String(style.weight || style.fontWeight || '').toLowerCase();
+  const isBold = ['bold', '700', '800', '900', 'semibold', '600'].includes(weightRaw);
+  const isItalic = Boolean(style.italic) || String(style.fontStyle || '').toLowerCase() === 'italic';
+
+  let family = 'helvetica';
+  if (familyRaw.includes('serif') || familyRaw.includes('times')) family = 'times';
+  else if (familyRaw.includes('mono') || familyRaw.includes('courier')) family = 'courier';
+
+  if (family === 'times') {
+    if (isBold && isItalic) return 'Times-BoldItalic';
+    if (isBold) return 'Times-Bold';
+    if (isItalic) return 'Times-Italic';
+    return 'Times-Roman';
+  }
+
+  if (family === 'courier') {
+    if (isBold && isItalic) return 'Courier-BoldOblique';
+    if (isBold) return 'Courier-Bold';
+    if (isItalic) return 'Courier-Oblique';
+    return 'Courier';
+  }
+
+  if (isBold && isItalic) return 'Helvetica-BoldOblique';
+  if (isBold) return 'Helvetica-Bold';
+  if (isItalic) return 'Helvetica-Oblique';
+  return 'Helvetica';
+}
+
+function normalizeLayerStyle({ layer, meta, template, boxHeight }) {
+  const style = {
+    ...((meta && typeof meta.style === 'object') ? meta.style : {}),
+    ...((layer && typeof layer.style === 'object') ? layer.style : {}),
+  };
+
+  const parsedFont = Number(style.fontSize);
+  const fontSize = Number.isFinite(parsedFont)
+    ? Math.max(8, Math.min(120, parsedFont))
+    : Math.max(10, Math.min(70, Math.round(boxHeight * 0.6)));
+
+  const parsedLineHeight = Number(style.lineHeight);
+  const lineGap = Number.isFinite(parsedLineHeight)
+    ? Math.max(0, parsedLineHeight > 3 ? parsedLineHeight - fontSize : fontSize * Math.max(0, parsedLineHeight - 1))
+    : 2;
+
+  const parsedLetter = Number(style.letterSpacing);
+  const letterSpacing = Number.isFinite(parsedLetter) ? Math.max(0, Math.min(8, parsedLetter)) : 0;
+
+  const parsedPadX = Number(style.paddingX);
+  const parsedPadY = Number(style.paddingY);
+  const parsedPad = Number(style.padding);
+  const paddingX = Number.isFinite(parsedPadX)
+    ? Math.max(0, Math.min(80, parsedPadX))
+    : Number.isFinite(parsedPad)
+      ? Math.max(0, Math.min(80, parsedPad))
+      : 0;
+  const paddingY = Number.isFinite(parsedPadY)
+    ? Math.max(0, Math.min(80, parsedPadY))
+    : Number.isFinite(parsedPad)
+      ? Math.max(0, Math.min(80, parsedPad))
+      : 0;
+
+  const parsedRadius = Number(style.radius);
+  const parsedBorderWidth = Number(style.borderWidth);
+  const parsedBgOpacity = Number(style.backgroundOpacity);
+  const parsedStrokeWidth = Number(style.strokeWidth);
+  const parsedShadowDx = Number(style.shadowOffsetX);
+  const parsedShadowDy = Number(style.shadowOffsetY);
+  const parsedShadowOpacity = Number(style.shadowOpacity);
+  const parsedRotation = Number(style.rotation);
+  const parsedOpacity = Number(style.opacity);
+
+  return {
+    fontName: resolvePdfFontName(style),
+    fontSize,
+    color: String(style.color || template?.palette?.body || '#111827'),
+    align: String(style.align || layer?.align || 'center'),
+    uppercase: Boolean(style.uppercase),
+    lineGap,
+    letterSpacing,
+    backgroundColor: style.backgroundColor ? String(style.backgroundColor) : null,
+    backgroundOpacity: Number.isFinite(parsedBgOpacity) ? Math.max(0, Math.min(1, parsedBgOpacity)) : 0.82,
+    borderColor: style.borderColor ? String(style.borderColor) : null,
+    borderWidth: Number.isFinite(parsedBorderWidth) ? Math.max(0, Math.min(12, parsedBorderWidth)) : 0,
+    radius: Number.isFinite(parsedRadius) ? Math.max(0, Math.min(80, parsedRadius)) : 0,
+    paddingX,
+    paddingY,
+    shadowColor: style.shadowColor ? String(style.shadowColor) : null,
+    shadowOffsetX: Number.isFinite(parsedShadowDx) ? Math.max(-40, Math.min(40, parsedShadowDx)) : 0,
+    shadowOffsetY: Number.isFinite(parsedShadowDy) ? Math.max(-40, Math.min(40, parsedShadowDy)) : 0,
+    shadowOpacity: Number.isFinite(parsedShadowOpacity) ? Math.max(0, Math.min(1, parsedShadowOpacity)) : 0.35,
+    strokeColor: style.strokeColor ? String(style.strokeColor) : null,
+    strokeWidth: Number.isFinite(parsedStrokeWidth) ? Math.max(0, Math.min(8, parsedStrokeWidth)) : 0,
+    rotation: Number.isFinite(parsedRotation) ? Math.max(-180, Math.min(180, parsedRotation)) : 0,
+    opacity: Number.isFinite(parsedOpacity) ? Math.max(0, Math.min(1, parsedOpacity)) : 1,
+    textGradient: style.textGradient && typeof style.textGradient === 'object' ? style.textGradient : null,
+    backgroundGradient: style.backgroundGradient && typeof style.backgroundGradient === 'object' ? style.backgroundGradient : null,
+  };
+}
+
+function buildLinearGradient(doc, x, y, width, height, gradientStyle) {
+  if (!gradientStyle || typeof gradientStyle !== 'object') return null;
+
+  const angleDeg = Number.isFinite(Number(gradientStyle.angle)) ? Number(gradientStyle.angle) : 90;
+  const angle = (angleDeg * Math.PI) / 180;
+  const cx = x + width / 2;
+  const cy = y + height / 2;
+  const len = Math.sqrt(width * width + height * height) / 2;
+
+  const fromX = Number.isFinite(Number(gradientStyle.fromX)) ? x + width * Number(gradientStyle.fromX) : cx - Math.cos(angle) * len;
+  const fromY = Number.isFinite(Number(gradientStyle.fromY)) ? y + height * Number(gradientStyle.fromY) : cy - Math.sin(angle) * len;
+  const toX = Number.isFinite(Number(gradientStyle.toX)) ? x + width * Number(gradientStyle.toX) : cx + Math.cos(angle) * len;
+  const toY = Number.isFinite(Number(gradientStyle.toY)) ? y + height * Number(gradientStyle.toY) : cy + Math.sin(angle) * len;
+
+  const gradient = doc.linearGradient(fromX, fromY, toX, toY);
+  const stops = Array.isArray(gradientStyle.stops) ? gradientStyle.stops : null;
+  if (stops && stops.length >= 2) {
+    stops.forEach((stop) => {
+      const offset = Number.isFinite(Number(stop?.offset)) ? Math.max(0, Math.min(1, Number(stop.offset))) : 0;
+      const color = String(stop?.color || '#000000');
+      gradient.stop(offset, color);
+    });
+    return gradient;
+  }
+
+  gradient.stop(0, String(gradientStyle.from || '#111827'));
+  gradient.stop(1, String(gradientStyle.to || '#ffffff'));
+  return gradient;
 }
 
 function buildAdobeExpressPdfBuffer({ guest, event, template, inviteMessage, inviteUrl, qrBuffer, relationship, customMessage }) {
@@ -944,17 +1094,78 @@ function buildAdobeExpressPdfBuffer({ guest, event, template, inviteMessage, inv
           });
           if (!value) return;
 
-          const fontSize = Math.max(10, Math.min(70, Math.round(boxHeight * 0.6)));
-          const align = layer?.align || 'center';
-          const color = template?.palette?.body || '#111827';
-          doc.font('Helvetica-Bold').fontSize(fontSize).fillColor(color)
-            .text(String(value), boxX, boxY + Math.max(0, (boxHeight - fontSize) / 2), {
-              width: boxWidth,
-              height: boxHeight,
-              align,
+          const style = normalizeLayerStyle({ layer, meta, template, boxHeight });
+          const renderedValue = style.uppercase ? String(value).toUpperCase() : String(value);
+          const textX = boxX + style.paddingX;
+          const textY = boxY + style.paddingY + Math.max(0, (boxHeight - style.paddingY * 2 - style.fontSize) / 2);
+          const textWidth = Math.max(4, boxWidth - style.paddingX * 2);
+          const textHeight = Math.max(4, boxHeight - style.paddingY * 2);
+          const originX = boxX + boxWidth / 2;
+          const originY = boxY + boxHeight / 2;
+
+          doc.save();
+          if (style.rotation !== 0) {
+            doc.rotate(style.rotation, { origin: [originX, originY] });
+          }
+          if (style.opacity < 1) {
+            doc.fillOpacity(style.opacity);
+            doc.strokeOpacity(style.opacity);
+          }
+
+          if (style.backgroundColor || style.backgroundGradient) {
+            const bgGradient = buildLinearGradient(doc, boxX, boxY, boxWidth, boxHeight, style.backgroundGradient);
+            doc.fillOpacity(style.backgroundOpacity);
+            if (bgGradient) doc.fillColor(bgGradient);
+            else doc.fillColor(style.backgroundColor);
+            doc.roundedRect(boxX, boxY, boxWidth, boxHeight, style.radius).fill();
+            if (style.opacity < 1) doc.fillOpacity(style.opacity);
+          }
+
+          if (style.borderColor && style.borderWidth > 0) {
+            doc.lineWidth(style.borderWidth).strokeColor(style.borderColor);
+            doc.roundedRect(boxX, boxY, boxWidth, boxHeight, style.radius).stroke();
+          }
+
+          doc.font(style.fontName).fontSize(style.fontSize).fillColor(style.color);
+          if (style.letterSpacing > 0) doc.characterSpacing(style.letterSpacing);
+
+          const textOptions = {
+            width: textWidth,
+            height: textHeight,
+            align: style.align,
               lineBreak: true,
+            lineGap: style.lineGap,
               ellipsis: true,
+          };
+
+          if (style.shadowColor && (style.shadowOffsetX !== 0 || style.shadowOffsetY !== 0)) {
+            const effectiveShadowOpacity = style.opacity < 1
+              ? Math.max(0, Math.min(1, style.shadowOpacity * style.opacity))
+              : style.shadowOpacity;
+            doc.fillOpacity(effectiveShadowOpacity).fillColor(style.shadowColor);
+            doc.text(renderedValue, textX + style.shadowOffsetX, textY + style.shadowOffsetY, textOptions);
+            doc.fillOpacity(style.opacity < 1 ? style.opacity : 1);
+          }
+
+          if (style.strokeColor && style.strokeWidth > 0) {
+            const offsets = [
+              [-style.strokeWidth, 0],
+              [style.strokeWidth, 0],
+              [0, -style.strokeWidth],
+              [0, style.strokeWidth],
+            ];
+            doc.fillColor(style.strokeColor);
+            offsets.forEach(([dx, dy]) => {
+              doc.text(renderedValue, textX + dx, textY + dy, textOptions);
             });
+          }
+
+          const textGradient = buildLinearGradient(doc, textX, textY, textWidth, textHeight, style.textGradient);
+          if (textGradient) doc.fillColor(textGradient);
+          else doc.fillColor(style.color);
+          doc.text(renderedValue, textX, textY, textOptions);
+          if (style.letterSpacing > 0) doc.characterSpacing(0);
+          doc.restore();
         });
       }
 
