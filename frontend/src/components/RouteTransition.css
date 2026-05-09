@@ -3,6 +3,157 @@
   transform-origin: center top;
 }
 
+.route-transition-shell.route-hidden {
+  visibility: hidden;
+}
+
+.route-loading-skeleton {
+  margin: 16px;
+  padding: 18px;
+  border-radius: 18px;
+  border: 1px solid rgba(37, 92, 125, 0.12);
+  background: rgba(255, 255, 255, 0.76);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+.route-loading-line,
+.route-loading-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  background: #e6f0f8;
+}
+
+.route-loading-line::after,
+.route-loading-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0));
+  animation: skeletonShimmer 980ms ease-in-out infinite;
+}
+
+.route-loading-line {
+  height: 14px;
+  margin-bottom: 10px;
+}
+
+.route-loading-line-1 {
+  width: min(72%, 380px);
+}
+
+.route-loading-line-2 {
+  width: min(46%, 260px);
+}
+
+.route-loading-card-grid {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.route-loading-card {
+  min-height: 120px;
+}
+
+.route-loading-list {
+  margin-top: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.route-loading-list-item {
+  height: 14px;
+  border-radius: 10px;
+  background: #e8f3fb;
+  position: relative;
+  overflow: hidden;
+}
+
+.route-loading-list-item::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.68), rgba(255, 255, 255, 0));
+  animation: skeletonShimmer 980ms ease-in-out infinite;
+}
+
+.route-loading-skeleton-auth {
+  max-width: 520px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.route-loading-skeleton-auth .route-loading-card-grid {
+  grid-template-columns: 1fr;
+}
+
+.route-loading-skeleton-auth .route-loading-card {
+  min-height: 220px;
+}
+
+.route-loading-skeleton-auth .route-loading-list {
+  display: none;
+}
+
+.route-loading-skeleton-dashboard-admin .route-loading-card-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.route-loading-skeleton-dashboard-admin .route-loading-card {
+  min-height: 104px;
+}
+
+.route-loading-skeleton-dashboard-organizer .route-loading-card-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.route-loading-skeleton-dashboard-organizer .route-loading-card {
+  min-height: 108px;
+}
+
+.route-loading-skeleton-dashboard-vendor .route-loading-card-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.route-loading-skeleton-dashboard-vendor .route-loading-card {
+  min-height: 128px;
+}
+
+.route-loading-skeleton-dashboard-vendor .route-loading-list {
+  margin-top: 10px;
+}
+
+.route-loading-skeleton-vendors .route-loading-card-grid,
+.route-loading-skeleton-bookings .route-loading-card-grid {
+  grid-template-columns: 1fr;
+}
+
+.route-loading-skeleton-vendors .route-loading-card,
+.route-loading-skeleton-bookings .route-loading-card {
+  min-height: 92px;
+}
+
+.route-loading-skeleton-profile .route-loading-card-grid {
+  grid-template-columns: 1fr;
+}
+
+.route-loading-skeleton-profile .route-loading-card {
+  min-height: 180px;
+}
+
+.route-loading-skeleton-event .route-loading-card-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.route-loading-skeleton-event .route-loading-card {
+  min-height: 160px;
+}
+
 @keyframes routeSlideFade {
   from {
     opacity: 0;
@@ -16,8 +167,45 @@
   }
 }
 
+@keyframes skeletonShimmer {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@media (max-width: 768px) {
+  .route-loading-skeleton {
+    margin: 12px;
+    padding: 14px;
+  }
+
+  .route-loading-card-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .route-loading-card {
+    min-height: 96px;
+  }
+
+  .route-loading-skeleton-dashboard-admin .route-loading-card-grid,
+  .route-loading-skeleton-dashboard-organizer .route-loading-card-grid,
+  .route-loading-skeleton-dashboard-vendor .route-loading-card-grid,
+  .route-loading-skeleton-event .route-loading-card-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .route-loading-skeleton-auth .route-loading-card {
+    min-height: 180px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .route-transition-shell {
+    animation: none;
+  }
+
+  .route-loading-line::after,
+  .route-loading-card::after {
     animation: none;
   }
 }
