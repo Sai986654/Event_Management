@@ -19,7 +19,7 @@ const PWAInstallPrompt = () => {
     return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
   }, []);
 
-  const { isIOS, isSafari, isStandalone } = useMemo(() => {
+  const { isIOS, isAndroid, isSafari, isChrome, isStandalone } = useMemo(() => {
     const userAgent = window.navigator.userAgent || '';
     const ios = /iphone|ipad|ipod/i.test(userAgent);
     const android = /android/i.test(userAgent);
