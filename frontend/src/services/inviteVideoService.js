@@ -18,6 +18,41 @@ export const inviteVideoService = {
     return response.data;
   },
 
+  /** Create a new invite video job from an Adobe manifest payload. */
+  createJobFromManifest: async (eventId, manifest, guests, music = null, voiceTemplate = '', voiceLang = 'en', templateKey = '') => {
+    const formData = new FormData();
+    formData.append('eventId', eventId);
+    formData.append('guests', JSON.stringify(guests));
+    formData.append('manifest', JSON.stringify(manifest));
+    if (templateKey) formData.append('templateKey', templateKey);
+    if (voiceTemplate) formData.append('voiceTemplate', voiceTemplate);
+    formData.append('voiceLang', voiceLang);
+    if (music) formData.append('music', music);
+
+    const response = await api.post('invite-videos', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 120000,
+    });
+    return response.data;
+  },
+
+  /** Create a new invite video job from an existing invite template. */
+  createJobFromTemplate: async (eventId, templateKey, guests, music = null, voiceTemplate = '', voiceLang = 'en') => {
+    const formData = new FormData();
+    formData.append('eventId', eventId);
+    formData.append('guests', JSON.stringify(guests));
+    formData.append('templateKey', templateKey);
+    if (voiceTemplate) formData.append('voiceTemplate', voiceTemplate);
+    formData.append('voiceLang', voiceLang);
+    if (music) formData.append('music', music);
+
+    const response = await api.post('invite-videos', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 120000,
+    });
+    return response.data;
+  },
+
   /** Get job status + per-guest progress. */
   getJob: async (jobId) => {
     const response = await api.get(`invite-videos/${jobId}`);

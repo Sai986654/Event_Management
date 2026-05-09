@@ -52,7 +52,7 @@ function isImageFile(filePath) {
 function clampSceneDuration(duration) {
   const num = Number(duration);
   if (!Number.isFinite(num)) return 3;
-  return Math.max(2, Math.min(4, num));
+  return Math.max(1.5, Math.min(12, num));
 }
 
 function pickRandom(list) {
@@ -63,6 +63,40 @@ function pickRandom(list) {
 function sanitizeSceneTextValue(value) {
   if (typeof value !== 'string') return '';
   return value.trim().replace(/\s+/g, ' ').slice(0, 280);
+}
+
+function wrapSceneTextValue(value, maxWidthPx, fontSize) {
+  const text = sanitizeSceneTextValue(value);
+  if (!text || !Number.isFinite(maxWidthPx) || !Number.isFinite(fontSize) || maxWidthPx <= 0 || fontSize <= 0) {
+    return text;
+  }
+
+  const approxCharsPerLine = Math.max(10, Math.floor(maxWidthPx / (fontSize * 0.56)));
+  if (text.length <= approxCharsPerLine) return text;
+
+  const words = text.split(' ');
+  const lines = [];
+  let current = '';
+
+  for (const word of words) {
+    const candidate = current ? `${current} ${word}` : word;
+    if (candidate.length > approxCharsPerLine && current) {
+      lines.push(current);
+      current = word;
+    } else {
+      current = candidate;
+    }
+  }
+
+  if (current) lines.push(current);
+  return lines.join('\n');
+}
+
+function colorWithOpacity(color, opacity) {
+  const value = String(color || '').trim() || '#000000';
+  if (!Number.isFinite(opacity)) return value;
+  const alpha = Math.max(0, Math.min(1, opacity));
+  return `${value}@${alpha.toFixed(2)}`;
 }
 
 /**
@@ -472,22 +506,70 @@ async function generateInviteVideo({ imagePaths, voiceBuffer, musicBuffer, overl
       for (let textIdx = 0; textIdx < textEntries.length; textIdx++) {
         const text = textEntries[textIdx];
         const txtPath = tempPath('.txt');
-        fs.writeFileSync(txtPath, text.value, 'utf8');
+        const fontSize = Math.round((text.fontSize || (textIdx === 0 ? 70 : 52)) * themeCfg.fontSizeScale);
+        const wrappedText = wrapSceneTextValue(text.value, Number(text.maxWidth) * W, fontSize);
+        fs.writeFileSync(txtPath, wrappedText, 'utf8');
         textFilePaths.push(txtPath);
         tempFilesToCleanup.push(txtPath);
 
         const textLabel = `s${sceneIdx}t${textIdx}`;
-        const baseY = H * (0.34 + textIdx * 0.11);
-        const fontSize = Math.round((text.fontSize || (textIdx === 0 ? 70 : 52)) * themeCfg.fontSizeScale);
+        const anchorX = Number.isFinite(Number(text.x))
+          ? (Number(text.x) <= 1 ? Number(text.x) * W : Number(text.x))
+          : W / 2;
+        const anchorY = Number.isFinite(Number(text.y))
+          ? (Number(text.y) <= 1 ? Number(text.y) * H : Number(text.y))
+          : H * (0.34 + textIdx * 0.11);
+        const align = String(text.align || 'center').toLowerCase();
+        const xExpr = align === 'left'
+          ? anchorX.toFixed(2)
+          : align === 'right'
+            ? `${anchorX.toFixed(2)}-text_w`
+            : `${anchorX.toFixed(2)}-text_w/2`;
+        const yExpr = align === 'center'
+          ? `${anchorY.toFixed(2)}-text_h/2`
+          : anchorY.toFixed(2);
         const fontOpt = fontFile ? `:fontfile='${escapePathForFilter(fontFile)}'` : '';
+        const style = text.style || {};
         const alpha = alphaExpr(text.start, text.duration, 0.4, 0.45);
-        const yExprText = yMoveExpr(baseY, text.start);
+        const opacity = Number.isFinite(Number(style.opacity)) ? Math.max(0, Math.min(1, Number(style.opacity))) : 1;
+        const finalAlpha = opacity < 1 ? `(${alpha})*${opacity.toFixed(3)}` : alpha;
+        const boxColor = style.backgroundColor
+          ? colorWithOpacity(style.backgroundColor, Number.isFinite(Number(style.backgroundOpacity)) ? Number(style.backgroundOpacity) : 0.35)
+          : null;
+        const borderWidth = Number.isFinite(Number(style.borderWidth)) ? Math.max(0, Math.round(Number(style.borderWidth))) : 0;
+        const borderColor = style.strokeColor || style.borderColor || 'black';
+        const shadowX = Number.isFinite(Number(style.shadowOffsetX)) ? Math.round(Number(style.shadowOffsetX)) : 2;
+        const shadowY = Number.isFinite(Number(style.shadowOffsetY)) ? Math.round(Number(style.shadowOffsetY)) : 2;
+        const shadowOpacity = Number.isFinite(Number(style.shadowOpacity)) ? Math.max(0, Math.min(1, Number(style.shadowOpacity))) : 0.35;
+        const shadowColor = colorWithOpacity(style.shadowColor || 'black', shadowOpacity);
+        const lineSpacing = Number.isFinite(Number(style.lineHeight)) ? Math.max(0, Math.round((Number(style.lineHeight) - 1) * fontSize)) : 10;
+        const strokeWidth = Number.isFinite(Number(style.strokeWidth)) ? Math.max(0, Math.round(Number(style.strokeWidth))) : 0;
+        const strokeColor = style.strokeColor || borderColor;
 
-        filters.push(
-          `[${currentLabel}]drawtext=textfile='${escapePathForFilter(txtPath)}'${fontOpt}` +
-            `:fontsize=${fontSize}:fontcolor=${text.color}:line_spacing=10:x=(w-text_w)/2:y='${yExprText}'` +
-            `:alpha='${alpha}':shadowx=2:shadowy=2:shadowcolor=black@0.35[${textLabel}]`
-        );
+        let drawtext = `[${currentLabel}]drawtext=textfile='${escapePathForFilter(txtPath)}'${fontOpt}` +
+          `:fontsize=${fontSize}:fontcolor=${text.color || '#ffffff'}:line_spacing=${lineSpacing}` +
+          `:x='${xExpr}':y='${yExpr}'` +
+          `:alpha='${finalAlpha}'`;
+
+        if (boxColor) {
+          drawtext += `:box=1:boxcolor=${boxColor}`;
+          if (Number.isFinite(Number(style.padding))) {
+            drawtext += `:boxborderw=${Math.max(0, Math.round(Number(style.padding)))}`;
+          }
+        }
+
+        if (strokeWidth > 0) {
+          drawtext += `:borderw=${strokeWidth}:bordercolor=${strokeColor}`;
+        }
+
+        if (borderWidth > 0) {
+          drawtext += `:box=1:boxborderw=${borderWidth}:boxcolor=${boxColor || 'black@0.25'}`;
+        }
+
+        drawtext += `:shadowx=${shadowX}:shadowy=${shadowY}:shadowcolor=${shadowColor}`;
+        drawtext += `[${textLabel}]`;
+
+        filters.push(drawtext);
 
         currentLabel = textLabel;
       }

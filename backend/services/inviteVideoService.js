@@ -1,4 +1,5 @@
 const fs = require('fs');
+const path = require('path');
 const { prisma } = require('../config/db');
 const { r2Client, R2_BUCKET, R2_PUBLIC_URL } = require('../config/r2');
 const { PutObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
@@ -104,6 +105,33 @@ async function downloadFromR2(key) {
   return Buffer.concat(chunks);
 }
 
+async function downloadAssetBuffer(assetRef) {
+  const ref = String(assetRef || '').trim();
+  if (!ref) {
+    throw new Error('Missing asset reference');
+  }
+
+  if (/^https?:\/\//i.test(ref)) {
+    const response = await fetch(ref);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch asset: ${response.status}`);
+    }
+    const arrayBuffer = await response.arrayBuffer();
+    return {
+      buffer: Buffer.from(arrayBuffer),
+      ext: path.extname(new URL(ref).pathname) || '.bin',
+      contentType: response.headers.get('content-type') || 'application/octet-stream',
+    };
+  }
+
+  const buffer = await downloadFromR2(ref);
+  return {
+    buffer,
+    ext: path.extname(ref) || '.bin',
+    contentType: 'application/octet-stream',
+  };
+}
+
 /**
  * Start processing an invite job.
  * Called from the controller — returns immediately, processing happens in the background.
@@ -137,26 +165,36 @@ async function processInviteJob(jobId, io) {
 
   emitProgress(io, job.eventId, jobId, { status: 'processing', processed: 0, total: job.totalGuests });
 
-  // Download template images from R2 to local temp files, then pre-resize to 480p
-  const imageKeys = Array.isArray(job.imageKeys) ? job.imageKeys : [];
-  const localImages = [];    // resized images (used for video gen)
-  const rawImages = [];      // originals (cleaned up after resize)
+  // Download template assets from R2/URL to local temp files.
+  // Manifest-driven jobs can carry scene descriptors, while legacy jobs still carry string keys.
+  const sceneEntries = Array.isArray(job.imageKeys) ? job.imageKeys : [];
+  const sceneRenderData = [];
 
   try {
-    for (const key of imageKeys) {
-      const buf = await downloadFromR2(key);
-      const ext = key.match(/\.\w+$/)?.[0] || '.jpg';
-      const rawPath = writeTempFile(buf, ext);
-      rawImages.push(rawPath);
-      // Pre-resize to 854x480 to keep FFmpeg memory low
-      const resized = await preResizeImage(rawPath);
-      localImages.push(resized);
+    for (const [index, entry] of sceneEntries.entries()) {
+      const descriptor = typeof entry === 'string' ? { key: entry } : (entry || {});
+      const assetRef = String(descriptor.key || descriptor.assetKey || descriptor.path || '').trim();
+
+      if (!assetRef) {
+        throw new Error(`Scene ${index + 1} is missing an asset reference`);
+      }
+
+      const downloaded = await downloadAssetBuffer(assetRef);
+      const rawPath = writeTempFile(downloaded.buffer, downloaded.ext || path.extname(assetRef) || '.bin');
+      const isVideo = /\.(mp4|mov|mkv|webm|avi|m4v)$/i.test(rawPath) || /^video\//i.test(downloaded.contentType || '');
+      const backgroundPath = isVideo ? rawPath : await preResizeImage(rawPath);
+
+      sceneRenderData.push({
+        sceneId: descriptor.sceneId || `scene-${index + 1}`,
+        rawPath,
+        backgroundPath,
+        isVideo,
+        durationMs: Number(descriptor.durationMs || descriptor.duration || 0) || 3200,
+        texts: Array.isArray(descriptor.texts) ? descriptor.texts : [],
+      });
     }
-    // Clean up raw originals immediately
-    cleanupFiles(rawImages);
   } catch (err) {
-    cleanupFiles(rawImages);
-    cleanupFiles(localImages);
+    cleanupFiles(sceneRenderData.flatMap((scene) => [scene.rawPath, scene.backgroundPath].filter(Boolean)));
     await failJob(jobId, `Failed to prepare template images: ${err.message}`);
     emitProgress(io, job.eventId, jobId, { status: 'failed', error: err.message });
     return;
@@ -217,7 +255,7 @@ async function processInviteJob(jobId, io) {
           });
         }
 
-        cleanupFiles(localImages);
+          cleanupFiles(sceneRenderData.flatMap((scene) => [scene.rawPath, scene.backgroundPath].filter(Boolean)));
         await failJob(jobId, `Non-retryable TTS error: ${err.message}`);
         emitProgress(io, job.eventId, jobId, { status: 'failed', error: err.message });
         console.error(`[InviteJob] Job ${jobId} failed early due to non-retryable TTS error: ${err.message}`);
@@ -230,14 +268,39 @@ async function processInviteJob(jobId, io) {
   let baseVideoPath = null;
   try {
     const baseRender = await generateInviteVideo({
-      imagePaths: localImages,
+      scenes: sceneRenderData.map((scene, index) => {
+        const descriptor = sceneEntries[index] || {};
+
+        const texts = Array.isArray(descriptor.texts)
+          ? descriptor.texts.map((text) => ({
+              value: String(text?.value || ''),
+              start: typeof text?.start === 'number' ? text.start : 0,
+              duration: typeof text?.duration === 'number' ? text.duration : 3,
+              x: typeof text?.x === 'number' ? text.x : 0.5,
+              y: typeof text?.y === 'number' ? text.y : 0.5,
+              maxWidth: typeof text?.maxWidth === 'number' ? text.maxWidth : 0.82,
+              maxHeight: typeof text?.maxHeight === 'number' ? text.maxHeight : 0.08,
+              align: text?.align || 'center',
+              style: text?.style || {},
+            }))
+          : [];
+
+        if (!texts.length && index === 0 && videoOverlayText) {
+          texts.push({ value: videoOverlayText, start: 0.6, duration: 2.6, x: 0.5, y: 0.2, maxWidth: 0.8, maxHeight: 0.08, align: 'center', style: { fontSize: 54, color: '#ffffff' } });
+        }
+
+        return {
+          background: scene.backgroundPath,
+          duration: Number(scene.durationMs || descriptor.durationMs || descriptor.duration || 3200) / 1000,
+          texts,
+        };
+      }),
       musicBuffer: null,
-      overlayText: videoOverlayText,
       renderProfile: process.env.FFMPEG_RENDER_PROFILE || 'memory_saver',
     });
     baseVideoPath = baseRender.videoPath;
   } catch (err) {
-    cleanupFiles(localImages);
+    cleanupFiles(sceneRenderData.flatMap((scene) => [scene.rawPath, scene.backgroundPath].filter(Boolean)));
     await failJob(jobId, `Failed to render base invite video: ${err.message}`);
     emitProgress(io, job.eventId, jobId, { status: 'failed', error: err.message });
     return;
@@ -355,7 +418,7 @@ async function processInviteJob(jobId, io) {
   }
 
   // Clean up shared temp files (template images)
-  cleanupFiles(localImages);
+  cleanupFiles(sceneRenderData.flatMap((scene) => [scene.rawPath, scene.backgroundPath].filter(Boolean)));
   safeUnlink(baseVideoPath);
 
   // Retry pending guests (those that failed but have retries left)

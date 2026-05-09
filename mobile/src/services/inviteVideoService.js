@@ -36,6 +36,32 @@ export const inviteVideoService = {
     return response.data;
   },
 
+  createInviteJobFromTemplate: async ({ eventId, guests, templateKey, music = null, voiceTemplate = '', overlayText = '', voiceLang = 'en' }) => {
+    const formData = new FormData();
+    formData.append('eventId', String(eventId));
+    formData.append('guests', JSON.stringify(guests || []));
+    formData.append('templateKey', templateKey);
+    const encodedTemplate = overlayText
+      ? `${voiceTemplate}|||OVERLAY|||${overlayText}`
+      : voiceTemplate;
+    if (encodedTemplate) formData.append('voiceTemplate', encodedTemplate);
+    if (voiceLang) formData.append('voiceLang', voiceLang);
+
+    if (music?.uri) {
+      formData.append('music', {
+        uri: music.uri,
+        name: music.fileName || 'music.mp3',
+        type: music.mimeType || 'audio/mpeg',
+      });
+    }
+
+    const response = await api.post('/invite-videos', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 120000,
+    });
+    return response.data;
+  },
+
   getJobsByEvent: async (eventId) => {
     const response = await api.get(`/invite-videos/event/${eventId}`);
     return response.data;

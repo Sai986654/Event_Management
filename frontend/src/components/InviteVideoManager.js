@@ -22,6 +22,7 @@ import {
   SoundOutlined,
   AudioOutlined,
 } from '@ant-design/icons';
+import { adminService } from '../services/adminService';
 import { inviteVideoService } from '../services/inviteVideoService';
 import { socketService } from '../services/socketService';
 import { getErrorMessage } from '../utils/helpers';
@@ -48,6 +49,26 @@ const VOICE_LANGUAGES = [
   { value: 'ar', label: 'Arabic' },
 ];
 
+const isAdobeTemplate = (template) => Boolean(template?.palette?.__adobeExpress);
+
+const getAdobeTemplateTimeline = (template) => {
+  const adobe = template?.palette?.__adobeExpress || {};
+  return Array.isArray(adobe.timeline) ? adobe.timeline : [];
+};
+
+const getTemplatePreviewInfo = (template) => {
+  const timeline = getAdobeTemplateTimeline(template);
+  const firstScene = timeline[0] || null;
+  const previewAsset = String(firstScene?.baseVideo || firstScene?.baseImage || firstScene?.background || '').trim();
+  const previewUrl = /^https?:\/\//i.test(previewAsset) ? previewAsset : '';
+
+  return {
+    sceneCount: timeline.length,
+    previewUrl,
+    previewLabel: firstScene?.sceneId || template?.key || 'template',
+  };
+};
+
 const InviteVideoManager = ({ eventId, guests: eventGuests = [] }) => {
   const [jobs, setJobs] = useState([]);
   const [activeJob, setActiveJob] = useState(null);
@@ -58,6 +79,10 @@ const InviteVideoManager = ({ eventId, guests: eventGuests = [] }) => {
   // Form state
   const [imageFiles, setImageFiles] = useState([]);
   const [musicFile, setMusicFile] = useState(null);
+  const [manifestJson, setManifestJson] = useState('');
+  const [inviteTemplates, setInviteTemplates] = useState([]);
+  const [loadingTemplates, setLoadingTemplates] = useState(false);
+  const [selectedTemplateKey, setSelectedTemplateKey] = useState('');
   const [guestInput, setGuestInput] = useState('');
   const [useExistingGuests, setUseExistingGuests] = useState(true);
   const [voiceTemplate, setVoiceTemplate] = useState('Dear {name}, you are cordially invited to our event');
@@ -92,6 +117,37 @@ const InviteVideoManager = ({ eventId, guests: eventGuests = [] }) => {
     loadJobs();
   }, [loadJobs]);
 
+  const loadInviteTemplates = useCallback(async () => {
+    setLoadingTemplates(true);
+    try {
+      const data = await adminService.getInviteTemplates();
+      setInviteTemplates(Array.isArray(data.templates) ? data.templates : []);
+    } catch (err) {
+      message.error(getErrorMessage(err));
+    } finally {
+      setLoadingTemplates(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadInviteTemplates();
+  }, [loadInviteTemplates]);
+
+  useEffect(() => {
+    if (selectedTemplateKey) {
+      const selectedExists = inviteTemplates.some((template) => template.key === selectedTemplateKey);
+      if (selectedExists) return;
+    }
+
+    const newestAdobeTemplate = [...inviteTemplates]
+      .filter(isAdobeTemplate)
+      .sort((left, right) => new Date(right.updatedAt || right.createdAt || 0) - new Date(left.updatedAt || left.createdAt || 0))[0];
+
+    if (newestAdobeTemplate?.key) {
+      setSelectedTemplateKey(newestAdobeTemplate.key);
+    }
+  }, [inviteTemplates, selectedTemplateKey]);
+
   // ── Socket.IO real-time progress ──────────────────────────
   useEffect(() => {
     const socket = socketService.getSocket();
@@ -121,8 +177,18 @@ const InviteVideoManager = ({ eventId, guests: eventGuests = [] }) => {
 
   // ── Submit new job ────────────────────────────────────────
   const handleSubmit = async () => {
-    if (imageFiles.length < 3 || imageFiles.length > 5) {
-      message.warning('Please upload 3 to 5 images for the slideshow.');
+    const manifestText = manifestJson.trim();
+    let parsedManifest = null;
+
+    if (manifestText) {
+      try {
+        parsedManifest = JSON.parse(manifestText);
+      } catch {
+        message.error('Manifest JSON is invalid. Paste a valid Adobe manifest before submitting.');
+        return;
+      }
+    } else if (imageFiles.length < 3 || imageFiles.length > 5) {
+      message.warning('Please upload 3 to 5 images for the slideshow, or paste an Adobe manifest.');
       return;
     }
 
@@ -147,15 +213,20 @@ const InviteVideoManager = ({ eventId, guests: eventGuests = [] }) => {
 
     setSubmitting(true);
     try {
-      const files = imageFiles.map((f) => f.originFileObj || f);
       const music = musicFile?.originFileObj || musicFile || null;
-      const data = await inviteVideoService.createJob(eventId, files, guests, music, voiceTemplate, voiceLang);
+      const data = manifestText
+        ? await inviteVideoService.createJobFromManifest(eventId, parsedManifest, guests, music, voiceTemplate, voiceLang, parsedManifest?.templateKey || '')
+        : selectedTemplateKey
+        ? await inviteVideoService.createJobFromTemplate(eventId, selectedTemplateKey, guests, music, voiceTemplate, voiceLang)
+        : await inviteVideoService.createJob(eventId, imageFiles.map((f) => f.originFileObj || f), guests, music, voiceTemplate, voiceLang);
       message.success(`Job started! Generating videos for ${data.totalGuests} guest(s).`);
       await loadJobs();
       loadJobDetail(data.jobId);
       // Reset form
       setImageFiles([]);
       setMusicFile(null);
+      setManifestJson('');
+      setSelectedTemplateKey('');
     } catch (err) {
       message.error(getErrorMessage(err));
     } finally {
@@ -252,6 +323,54 @@ const InviteVideoManager = ({ eventId, guests: eventGuests = [] }) => {
   ];
 
   const guestsWithPhone = eventGuests.filter((g) => g.phone).length;
+  const selectedTemplate = inviteTemplates.find((template) => template.key === selectedTemplateKey) || null;
+  const selectedTemplatePreview = selectedTemplate ? getTemplatePreviewInfo(selectedTemplate) : null;
+  const newestAdobeTemplate = [...inviteTemplates]
+    .filter(isAdobeTemplate)
+    .sort((left, right) => new Date(right.updatedAt || right.createdAt || 0) - new Date(left.updatedAt || left.createdAt || 0))[0] || null;
+
+  const renderTemplateOption = (template) => {
+    const preview = getTemplatePreviewInfo(template);
+    const isAdobe = isAdobeTemplate(template);
+
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div
+          style={{
+            width: 56,
+            height: 56,
+            borderRadius: 14,
+            background: preview.previewUrl
+              ? `url(${preview.previewUrl}) center / cover no-repeat`
+              : 'linear-gradient(135deg, #7c2d12 0%, #9a3412 100%)',
+            border: '1px solid rgba(124, 45, 18, 0.35)',
+            flex: '0 0 auto',
+          }}
+        />
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+            <span style={{ fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {template.name || template.key}
+            </span>
+            {isAdobe ? (
+              <Tag color="gold" style={{ marginInlineEnd: 0 }}>
+                Adobe
+              </Tag>
+            ) : null}
+          </div>
+          <div style={{ fontSize: 12, color: '#6b7280', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {template.description || template.key}
+          </div>
+          {isAdobe ? (
+            <div style={{ fontSize: 11, color: '#9a3412', marginTop: 2 }}>
+              {preview.sceneCount} scene{preview.sceneCount === 1 ? '' : 's'}
+              {preview.previewLabel ? ` • ${preview.previewLabel}` : ''}
+            </div>
+          ) : null}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div>
@@ -289,6 +408,54 @@ const InviteVideoManager = ({ eventId, guests: eventGuests = [] }) => {
         {imageFiles.length > 0 && imageFiles.length < 3 && (
           <Text type="warning">Upload at least 3 images ({imageFiles.length}/3 minimum)</Text>
         )}
+
+        <Divider orientation="left">1b. Adobe Manifest (optional)</Divider>
+        <Space direction="vertical" size={8} style={{ width: '100%' }}>
+          <Select
+            value={selectedTemplateKey || undefined}
+            onChange={(value) => setSelectedTemplateKey(value)}
+            placeholder="Select an imported Adobe template"
+            loading={loadingTemplates}
+            allowClear
+            style={{ width: '100%' }}
+            options={inviteTemplates.map((template) => ({
+              value: template.key,
+              label: renderTemplateOption(template),
+              title: template.key,
+            }))}
+            optionLabelProp="title"
+          />
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            Pick an imported Adobe template here if you want the video job to use the saved timeline directly.
+          </Text>
+          {selectedTemplate ? (
+            <Card size="small" style={{ borderColor: selectedTemplatePreview ? '#f59e0b' : undefined }}>
+              <Space align="start" style={{ width: '100%', justifyContent: 'space-between' }}>
+                <div>
+                  <Text strong>{selectedTemplate.name || selectedTemplate.key}</Text>
+                  <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
+                    {isAdobeTemplate(selectedTemplate)
+                      ? `${selectedTemplatePreview?.sceneCount || 0} scene Adobe timeline ready for video rendering.`
+                      : 'Classic template selected.'}
+                  </div>
+                </div>
+                {newestAdobeTemplate?.key === selectedTemplate.key ? <Tag color="gold">Newest Adobe template</Tag> : null}
+              </Space>
+            </Card>
+          ) : null}
+          <TextArea
+            rows={7}
+            value={manifestJson}
+            onChange={(e) => setManifestJson(e.target.value)}
+            placeholder={`{
+  "templateKey": "telugu-wedding-premium-five-scene",
+  "timeline": [ ... ]
+}`}
+          />
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            Paste an Adobe manifest here to generate a scene-based video from the template timeline. If this is filled, manual image uploads are optional.
+          </Text>
+        </Space>
 
         <Divider orientation="left">2. Background Music (Optional)</Divider>
         <Space>
@@ -388,7 +555,7 @@ const InviteVideoManager = ({ eventId, guests: eventGuests = [] }) => {
           icon={<VideoCameraOutlined />}
           loading={submitting}
           onClick={handleSubmit}
-          disabled={imageFiles.length < 3}
+          disabled={!manifestJson.trim() && !selectedTemplateKey && imageFiles.length < 3}
         >
           Generate & Send Invite Videos
         </Button>

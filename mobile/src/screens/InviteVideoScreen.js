@@ -36,6 +36,15 @@ const parseGuests = (raw) => String(raw || '')
   })
   .filter((g) => g.name && g.phone);
 
+const isAdobeTemplate = (template) => Boolean(template?.palette?.__adobeExpress);
+
+const getTemplateTimeline = (template) => {
+  const adobe = template?.palette?.__adobeExpress || {};
+  return Array.isArray(adobe.timeline) ? adobe.timeline : [];
+};
+
+const getTemplatePreviewImageUrl = (template) => template?.previewImageUrl || '';
+
 const terminalStatuses = new Set(['completed', 'failed']);
 
 const statusColor = (status) => {
@@ -149,6 +158,9 @@ const InviteVideoScreen = ({ route }) => {
   const [voiceLang, setVoiceLang] = useState('en');
   const [images, setImages] = useState([]);
   const [music, setMusic] = useState(null);
+  const [inviteTemplates, setInviteTemplates] = useState([]);
+  const [loadingTemplates, setLoadingTemplates] = useState(false);
+  const [selectedTemplateKey, setSelectedTemplateKey] = useState('');
   const [promptEventType, setPromptEventType] = useState(initialEventType);
 
   const [jobs, setJobs] = useState([]);
@@ -170,6 +182,16 @@ const InviteVideoScreen = ({ route }) => {
   const activePromptPack = useMemo(
     () => PROMPT_PACKS[promptEventType] || PROMPT_PACKS.default,
     [promptEventType]
+  );
+
+  const selectedTemplate = useMemo(
+    () => inviteTemplates.find((template) => template.key === selectedTemplateKey) || null,
+    [inviteTemplates, selectedTemplateKey]
+  );
+
+  const selectedTemplateSceneCount = useMemo(
+    () => (selectedTemplate ? getTemplateTimeline(selectedTemplate).length : 0),
+    [selectedTemplate]
   );
 
   const copyText = async (text, successLabel = 'Copied') => {
@@ -210,6 +232,26 @@ const InviteVideoScreen = ({ route }) => {
       setLoadingJobs(false);
     }
   }, [eventId, selectedJobId]);
+
+  const loadInviteTemplates = useCallback(async () => {
+    setLoadingTemplates(true);
+    try {
+      const res = await guestService.getInviteTemplates();
+      const templates = Array.isArray(res.templates) ? res.templates : [];
+      setInviteTemplates(templates);
+      setSelectedTemplateKey((current) => {
+        if (current && templates.some((template) => template.key === current)) return current;
+        const newestAdobe = [...templates]
+          .filter(isAdobeTemplate)
+          .sort((left, right) => new Date(right.updatedAt || right.createdAt || 0) - new Date(left.updatedAt || left.createdAt || 0))[0];
+        return newestAdobe?.key || current;
+      });
+    } catch (err) {
+      showSnack(getErrorMessage(err), 'error');
+    } finally {
+      setLoadingTemplates(false);
+    }
+  }, []);
 
   const loadJobDetail = useCallback(async (jobId) => {
     if (!jobId) return;
@@ -261,12 +303,13 @@ const InviteVideoScreen = ({ route }) => {
     };
 
     bootstrap();
+    loadInviteTemplates();
 
     return () => {
       mounted = false;
       stopPolling();
     };
-  }, [eventId, stopPolling]);
+  }, [eventId, stopPolling, loadInviteTemplates]);
 
   useEffect(() => {
     if (!selectedJobId) {
@@ -359,17 +402,32 @@ const InviteVideoScreen = ({ route }) => {
       return;
     }
 
+    if (!selectedTemplateKey && (images.length < 3 || images.length > 5)) {
+      showSnack('Select a template or pick 3 to 5 images.', 'error');
+      return;
+    }
+
     setCreating(true);
     try {
-      const res = await inviteVideoService.createInviteJob({
-        eventId,
-        guests: parsedGuests,
-        images,
-        music,
-        voiceTemplate,
-        overlayText,
-        voiceLang,
-      });
+      const res = selectedTemplateKey
+        ? await inviteVideoService.createInviteJobFromTemplate({
+            eventId,
+            guests: parsedGuests,
+            templateKey: selectedTemplateKey,
+            music,
+            voiceTemplate,
+            overlayText,
+            voiceLang,
+          })
+        : await inviteVideoService.createInviteJob({
+            eventId,
+            guests: parsedGuests,
+            images,
+            music,
+            voiceTemplate,
+            overlayText,
+            voiceLang,
+          });
 
       showSnack(res.message || 'Invite video job started.');
       setSelectedJobId(res.jobId);
@@ -453,9 +511,67 @@ const InviteVideoScreen = ({ route }) => {
 
         <Card style={styles.card}>
           <Card.Content>
+            <View style={styles.rowBetween}>
+              <Text variant="titleMedium" style={styles.sectionTitle}>Adobe Template</Text>
+              {loadingTemplates ? <ActivityIndicator color={Colors.primary} size="small" /> : null}
+            </View>
+            <Text style={styles.hint}>Pick an imported Adobe template. Clear it to use manual images.</Text>
+
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipRow}>
+              {inviteTemplates.map((template) => {
+                const selected = selectedTemplateKey === template.key;
+                const sceneCount = getTemplateTimeline(template).length;
+                return (
+                  <Chip
+                    key={template.key}
+                    selected={selected}
+                    onPress={() => setSelectedTemplateKey(template.key)}
+                    style={[styles.templateChip, selected && styles.templateChipSelected]}
+                    textStyle={selected ? styles.templateChipTextSelected : undefined}
+                  >
+                    {template.name || template.key}{sceneCount ? ` • ${sceneCount} scenes` : ''}
+                  </Chip>
+                );
+              })}
+            </ScrollView>
+
+            {selectedTemplate ? (
+              <View style={styles.templatePreviewCard}>
+                {getTemplatePreviewImageUrl(selectedTemplate) ? (
+                  <Image source={{ uri: getTemplatePreviewImageUrl(selectedTemplate) }} style={styles.templatePreviewImage} />
+                ) : (
+                  <View style={styles.templatePreviewFallback} />
+                )}
+                <View style={styles.rowBetween}>
+                  <Text style={styles.templatePreviewTitle}>{selectedTemplate.name || selectedTemplate.key}</Text>
+                  {isAdobeTemplate(selectedTemplate) ? <Chip compact style={styles.adobeBadge}>Adobe</Chip> : null}
+                </View>
+                <Text style={styles.templatePreviewText}>
+                  {isAdobeTemplate(selectedTemplate)
+                    ? `${selectedTemplateSceneCount} timeline scene${selectedTemplateSceneCount === 1 ? '' : 's'} ready for video rendering.`
+                    : 'Classic template selected.'}
+                </Text>
+                <Button mode="text" compact onPress={() => setSelectedTemplateKey('')}>
+                  Use manual images instead
+                </Button>
+              </View>
+            ) : null}
+          </Card.Content>
+        </Card>
+
+        <Card style={styles.card}>
+          <Card.Content>
             <Text variant="titleMedium" style={styles.sectionTitle}>1) Upload Template Images</Text>
-            <Text style={styles.hint}>Select 3 to 5 images (required)</Text>
-            <Button mode="contained-tonal" icon="image-multiple" onPress={pickImages} style={styles.btn}>Pick Images</Button>
+            <Text style={styles.hint}>Select 3 to 5 images when not using a template</Text>
+            <Button
+              mode="contained-tonal"
+              icon="image-multiple"
+              onPress={pickImages}
+              style={styles.btn}
+              disabled={Boolean(selectedTemplateKey)}
+            >
+              Pick Images
+            </Button>
 
             {images.length > 0 ? (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.imageStrip}>
@@ -467,6 +583,7 @@ const InviteVideoScreen = ({ route }) => {
               </ScrollView>
             ) : null}
             <Text style={styles.muted}>Selected: {images.length}/5</Text>
+            {selectedTemplateKey ? <Text style={styles.muted}>Template mode enabled. Manual image upload is optional.</Text> : null}
 
             <Divider style={styles.divider} />
             <Text variant="titleSmall" style={styles.sectionTitle}>Optional Music</Text>
@@ -601,7 +718,7 @@ const InviteVideoScreen = ({ route }) => {
               disabled={creating}
               style={styles.primaryBtn}
             >
-              Start Invite Video Job
+              {selectedTemplateKey ? 'Start Template Video Job' : 'Start Invite Video Job'}
             </Button>
           </Card.Content>
         </Card>
@@ -745,6 +862,34 @@ const styles = StyleSheet.create({
   quickTplRow: { flexDirection: 'row', gap: Spacing.xs, marginBottom: Spacing.sm, flexWrap: 'wrap' },
   tplChip: { marginBottom: 4 },
   hintBold: { fontWeight: '700', color: Colors.primary },
+  templateChip: { marginRight: Spacing.sm, backgroundColor: Colors.surfaceVariant },
+  templateChipSelected: { backgroundColor: Colors.primary },
+  templateChipTextSelected: { color: '#fff' },
+  templatePreviewCard: {
+    backgroundColor: Colors.surfaceVariant,
+    borderRadius: Radius.sm,
+    padding: Spacing.sm,
+    marginBottom: Spacing.sm,
+  },
+  templatePreviewImage: {
+    width: '100%',
+    height: 180,
+    borderRadius: Radius.sm,
+    marginBottom: Spacing.sm,
+    backgroundColor: Colors.surfaceVariant,
+  },
+  templatePreviewFallback: {
+    width: '100%',
+    height: 180,
+    borderRadius: Radius.sm,
+    marginBottom: Spacing.sm,
+    backgroundColor: 'rgba(124, 45, 18, 0.16)',
+    borderWidth: 1,
+    borderColor: 'rgba(124, 45, 18, 0.35)',
+  },
+  templatePreviewTitle: { fontWeight: '700', color: Colors.textPrimary },
+  templatePreviewText: { color: Colors.textPrimary, fontSize: 12, marginTop: 2 },
+  adobeBadge: { backgroundColor: '#fef3c7' },
   promptTypeChip: { marginRight: Spacing.sm, backgroundColor: Colors.surfaceVariant },
   promptCard: {
     backgroundColor: Colors.surfaceVariant,
