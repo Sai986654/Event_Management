@@ -34,12 +34,15 @@ const GuestManagement = () => {
 
   const renderTemplateOption = (template) => {
     const preview = template?.preview || {};
+    const hasImagePreview = Boolean(template?.previewImageUrl);
     return (
       <div className="invite-template-option">
         <span
           className="invite-template-thumb"
           style={{
-            background: preview.gradient || 'linear-gradient(135deg, #7c2d12 0%, #9a3412 100%)',
+            background: hasImagePreview
+              ? `url(${template.previewImageUrl}) center / cover no-repeat`
+              : preview.gradient || 'linear-gradient(135deg, #7c2d12 0%, #9a3412 100%)',
             borderColor: preview.frame || '#7c2d12',
           }}
         />
@@ -533,6 +536,10 @@ const GuestManagement = () => {
                     :
                     selectedTemplate?.preview?.gradient ||
                     'linear-gradient(135deg, #7c2d12 0%, #9a3412 100%)',
+                  backgroundImage: !selectedDesign && selectedTemplate?.previewImageUrl ? `url(${selectedTemplate.previewImageUrl})` : undefined,
+                  backgroundSize: !selectedDesign && selectedTemplate?.previewImageUrl ? 'cover' : undefined,
+                  backgroundPosition: !selectedDesign && selectedTemplate?.previewImageUrl ? 'center' : undefined,
+                  backgroundRepeat: !selectedDesign && selectedTemplate?.previewImageUrl ? 'no-repeat' : undefined,
                   borderColor: selectedDesign ? '#0f766e' : selectedTemplate?.preview?.frame || '#7c2d12',
                 }}
               >

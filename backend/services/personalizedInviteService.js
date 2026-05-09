@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 const PDFDocument = require('pdfkit');
 const QRCode = require('qrcode');
-const { PutObjectCommand } = require('@aws-sdk/client-s3');
+const { PutObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
 const { prisma } = require('../config/db');
 const { r2Client, R2_BUCKET, R2_PUBLIC_URL } = require('../config/r2');
 
@@ -236,12 +236,16 @@ function normalizeTemplateConfig(raw, fallback) {
 
   const r = raw?.palette || {};
   const f = fallback.palette || {};
+  const templateEngine = raw?.__templateEngine || r.__templateEngine || null;
+  const adobeExpress = raw?.__adobeExpress || r.__adobeExpress || null;
 
   return {
     key,
     name: String(raw?.name || fallback.name || key).trim(),
     description: String(raw?.description || fallback.description || '').trim(),
     ornamentStyle: String(raw?.ornamentStyle || fallback.ornamentStyle || 'traditional').trim(),
+    templateEngine: templateEngine ? String(templateEngine).trim().toLowerCase() : null,
+    adobeExpress: adobeExpress && typeof adobeExpress === 'object' ? adobeExpress : null,
     palette: {
       background:  String(r.background  || f.background  || '#ffffff'),
       frame:       String(r.frame       || f.frame       || '#333333'),
@@ -321,21 +325,34 @@ async function getInviteTemplateKeys() {
 
 async function listInviteTemplates() {
   const templates = await getTemplateCatalog();
-  return templates.map((t) => ({
-    key: t.key,
-    name: t.name,
-    description: t.description,
-    ornamentStyle: t.ornamentStyle || 'traditional',
-    preview: {
-      background: t.palette.background,
-      frame: t.palette.frame,
-      accent: t.palette.accent,
-      header: t.palette.header || t.palette.frame,
-      headerText: t.palette.headerText || '#ffffff',
-      badge: t.palette.badge || '#f9fafb',
-      gradient: `linear-gradient(135deg, ${t.palette.header || t.palette.frame} 0%, ${t.palette.accent} 100%)`,
-    },
-  }));
+  return templates.map((t) => {
+    const firstScene = Array.isArray(t?.adobeExpress?.timeline) ? t.adobeExpress.timeline[0] : null;
+    const previewAsset = firstScene?.baseVideo || firstScene?.asset || null;
+    const previewAssetKey = resolveR2ObjectKey(previewAsset);
+    const previewImageUrl = /^https?:\/\//i.test(String(previewAsset || ''))
+      ? String(previewAsset)
+      : previewAssetKey
+        ? `${R2_PUBLIC_URL}/${previewAssetKey}`
+        : null;
+
+    return {
+      key: t.key,
+      name: t.name,
+      description: t.description,
+      ornamentStyle: t.ornamentStyle || 'traditional',
+      templateEngine: t.templateEngine || 'classic',
+      previewImageUrl,
+      preview: {
+        background: t.palette.background,
+        frame: t.palette.frame,
+        accent: t.palette.accent,
+        header: t.palette.header || t.palette.frame,
+        headerText: t.palette.headerText || '#ffffff',
+        badge: t.palette.badge || '#f9fafb',
+        gradient: `linear-gradient(135deg, ${t.palette.header || t.palette.frame} 0%, ${t.palette.accent} 100%)`,
+      },
+    };
+  });
 }
 
 function normalizeTemplateKey(templateKey, templates = ENV_INVITE_TEMPLATES) {
@@ -779,6 +796,175 @@ function buildPdfBuffer({ guest, event, inviteMessage, inviteUrl, qrBuffer, lang
   });
 }
 
+function resolveR2ObjectKey(assetPath) {
+  if (!assetPath) return null;
+  const raw = String(assetPath).trim();
+  if (!raw) return null;
+
+  if (/^https?:\/\//i.test(raw)) {
+    if (R2_PUBLIC_URL && raw.startsWith(R2_PUBLIC_URL)) {
+      return raw.slice(R2_PUBLIC_URL.length).replace(/^\/+/, '');
+    }
+    try {
+      const parsed = new URL(raw);
+      return decodeURIComponent(parsed.pathname.replace(/^\/+/, ''));
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  return raw.replace(/^\/+/, '');
+}
+
+async function streamToBuffer(stream) {
+  const chunks = [];
+  for await (const chunk of stream) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks);
+}
+
+async function loadR2AssetBuffer(assetPath) {
+  const key = resolveR2ObjectKey(assetPath);
+  if (!key) return null;
+
+  try {
+    const response = await r2Client.send(
+      new GetObjectCommand({
+        Bucket: R2_BUCKET,
+        Key: key,
+      })
+    );
+
+    if (!response?.Body) return null;
+    if (typeof response.Body.transformToByteArray === 'function') {
+      const byteArray = await response.Body.transformToByteArray();
+      return Buffer.from(byteArray);
+    }
+    return await streamToBuffer(response.Body);
+  } catch (_error) {
+    return null;
+  }
+}
+
+function resolveAdobeFieldValue({ fieldId, guest, event, inviteMessage, inviteUrl, relationship, customMessage }) {
+  const key = String(fieldId || '').trim().toLowerCase();
+  const eventDate = event?.date ? new Date(event.date) : null;
+  const dateText = eventDate ? eventDate.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) : '';
+  const timeText = eventDate ? eventDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }) : '';
+  const inviteLines = String(inviteMessage || '').split('\n').map((line) => line.trim()).filter(Boolean);
+  const firstBodyLine = inviteLines.find((line, idx) => idx > 0 && line !== 'With love' && line !== 'Prema to') || '';
+  const addressParts = [event?.address, event?.city, event?.state].filter(Boolean);
+
+  if (['eventtitle', 'covertitle', 'title'].includes(key)) return event?.title || '';
+  if (['bridename', 'hostname', 'rsvpname'].includes(key)) return event?.organizerName || event?.organizer?.name || 'Vedika 360';
+  if (['groomname', 'partnername'].includes(key)) return event?.partnerName || '';
+  if (['eventdate'].includes(key)) return dateText;
+  if (['eventtime'].includes(key)) return timeText;
+  if (['venuename', 'eventvenue'].includes(key)) return event?.venue || '';
+  if (['eventaddress'].includes(key)) return addressParts.join(', ') || event?.venue || '';
+  if (['guestname'].includes(key)) return guest?.name || 'Guest';
+  if (['specialnote', 'custommessage', 'coversubtitle', 'subtitle'].includes(key)) {
+    return customMessage || firstBodyLine || relationship || '';
+  }
+  if (['rsvpphone'].includes(key)) return guest?.phone || '';
+  if (['rsvplink'].includes(key)) return inviteUrl || '';
+
+  return '';
+}
+
+function buildAdobeExpressPdfBuffer({ guest, event, template, inviteMessage, inviteUrl, qrBuffer, relationship, customMessage }) {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const adobe = template?.adobeExpress || {};
+      const timeline = Array.isArray(adobe.timeline) ? adobe.timeline : [];
+      const outputProfile = Array.isArray(adobe.outputProfiles) ? adobe.outputProfiles[0] : null;
+      const pageWidth = Math.max(320, Math.min(2000, Number(outputProfile?.width) || 1080));
+      const pageHeight = Math.max(480, Math.min(4000, Number(outputProfile?.height) || 1920));
+      const doc = new PDFDocument({ size: [pageWidth, pageHeight], margin: 0 });
+      const chunks = [];
+
+      doc.on('data', (chunk) => chunks.push(chunk));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+
+      const editableFields = Array.isArray(adobe.editableFields) ? adobe.editableFields : [];
+      const fieldMetaById = new Map(editableFields.map((field) => [String(field?.id || ''), field || {}]));
+      const scenes = timeline.length ? timeline : [null];
+
+      for (let sceneIndex = 0; sceneIndex < scenes.length; sceneIndex += 1) {
+        const scene = scenes[sceneIndex];
+        if (sceneIndex > 0) {
+          doc.addPage({ size: [pageWidth, pageHeight], margin: 0 });
+        }
+
+        const sceneAsset = scene?.baseVideo || scene?.asset;
+        const sceneBuffer = await loadR2AssetBuffer(sceneAsset);
+        if (sceneBuffer) {
+          const image = doc.openImage(sceneBuffer);
+          const scale = Math.max(pageWidth / image.width, pageHeight / image.height);
+          const drawWidth = image.width * scale;
+          const drawHeight = image.height * scale;
+          const drawX = (pageWidth - drawWidth) / 2;
+          const drawY = (pageHeight - drawHeight) / 2;
+          doc.image(sceneBuffer, drawX, drawY, { width: drawWidth, height: drawHeight });
+        } else {
+          doc.rect(0, 0, pageWidth, pageHeight).fill(template?.palette?.background || '#ffffff');
+        }
+
+        const textLayers = Array.isArray(scene?.textLayers) ? scene.textLayers : [];
+        textLayers.forEach((layer) => {
+          const fieldId = String(layer?.fieldId || '').trim();
+          if (!fieldId) return;
+
+          const meta = fieldMetaById.get(fieldId) || {};
+          const type = String(meta.type || 'text').toLowerCase();
+          const maxWidth = Math.max(0.04, Math.min(1, Number(layer?.maxWidth) || 0.82));
+          const maxHeight = Math.max(0.03, Math.min(1, Number(layer?.maxHeight) || 0.08));
+          const centerX = Math.max(0, Math.min(1, Number(layer?.x) || 0.5));
+          const centerY = Math.max(0, Math.min(1, Number(layer?.y) || 0.5));
+          const boxWidth = pageWidth * maxWidth;
+          const boxHeight = pageHeight * maxHeight;
+          const boxX = Math.max(0, Math.min(pageWidth - boxWidth, centerX * pageWidth - boxWidth / 2));
+          const boxY = Math.max(0, Math.min(pageHeight - boxHeight, centerY * pageHeight - boxHeight / 2));
+
+          if (type === 'qrcode') {
+            if (qrBuffer) doc.image(qrBuffer, boxX, boxY, { fit: [boxWidth, boxHeight], align: 'center', valign: 'center' });
+            return;
+          }
+
+          const value = resolveAdobeFieldValue({
+            fieldId,
+            guest,
+            event,
+            inviteMessage,
+            inviteUrl,
+            relationship,
+            customMessage,
+          });
+          if (!value) return;
+
+          const fontSize = Math.max(10, Math.min(70, Math.round(boxHeight * 0.6)));
+          const align = layer?.align || 'center';
+          const color = template?.palette?.body || '#111827';
+          doc.font('Helvetica-Bold').fontSize(fontSize).fillColor(color)
+            .text(String(value), boxX, boxY + Math.max(0, (boxHeight - fontSize) / 2), {
+              width: boxWidth,
+              height: boxHeight,
+              align,
+              lineBreak: true,
+              ellipsis: true,
+            });
+        });
+      }
+
+      doc.end();
+    } catch (error) {
+      reject(error);
+    }
+  });
+}
+
 async function uploadPdfToR2(pdfBuffer, key) {
   await r2Client.send(
     new PutObjectCommand({
@@ -817,17 +1003,29 @@ async function generatePersonalizedInvite({ guest, event, clientBaseUrl, payload
     memoryNote,
   });
 
-  const pdfBuffer = await buildPdfBuffer({
-    guest,
-    event,
-    inviteMessage,
-    inviteUrl,
-    qrBuffer,
-    language,
-    tone,
-    relationship,
-    template,
-  });
+  const hasAdobeTemplate = template?.templateEngine === 'adobe-express' && Array.isArray(template?.adobeExpress?.timeline) && template.adobeExpress.timeline.length > 0;
+  const pdfBuffer = hasAdobeTemplate
+    ? await buildAdobeExpressPdfBuffer({
+        guest,
+        event,
+        template,
+        inviteMessage,
+        inviteUrl,
+        qrBuffer,
+        relationship,
+        customMessage,
+      })
+    : await buildPdfBuffer({
+        guest,
+        event,
+        inviteMessage,
+        inviteUrl,
+        qrBuffer,
+        language,
+        tone,
+        relationship,
+        template,
+      });
 
   const key = `invites/personalized/${event.id}/${inviteTemplateKey}/guest-${guest.id}-${Date.now()}.pdf`;
   const pdfUrl = await uploadPdfToR2(pdfBuffer, key);
