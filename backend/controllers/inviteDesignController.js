@@ -8,12 +8,10 @@ const { listInviteTemplates, generatePersonalizedInvite } = require('../services
 const { sendInviteLink } = require('../services/notificationService');
 const paymentService = require('../services/paymentService');
 const { r2Client, R2_BUCKET, R2_PUBLIC_URL } = require('../config/r2');
+const { resolveClientBaseUrl } = require('../utils/urlResolver');
 
 const canManageEvent = (event, user) =>
   !!event && (event.organizerId === user.id || user.role === 'admin' || user.role === 'organizer');
-
-const resolveClientBaseUrl = (req) =>
-  process.env.CLIENT_URL || req.get('origin') || 'http://localhost:3000';
 
 const normalizeFormat = (value) => {
   const candidate = String(value || '').toLowerCase();

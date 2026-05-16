@@ -4,12 +4,10 @@ const asyncHandler = require('../utils/asyncHandler');
 const { paginate } = require('../utils/pagination');
 const { sendEmail, sendInviteLink } = require('../services/notificationService');
 const { generatePersonalizedInvite, listInviteTemplates } = require('../services/personalizedInviteService');
+const { resolveClientBaseUrl } = require('../utils/urlResolver');
 
 const canManageEventGuests = (event, user) =>
   !!event && (event.organizerId === user.id || user.role === 'admin' || user.role === 'organizer');
-
-const resolveClientBaseUrl = (req) =>
-  process.env.CLIENT_URL || req.get('origin') || 'http://localhost:3000';
 
 // POST /api/guests
 exports.addGuest = asyncHandler(async (req, res) => {

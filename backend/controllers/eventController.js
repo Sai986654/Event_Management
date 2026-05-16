@@ -7,6 +7,7 @@ const { gifting, inviteCopy } = require('../config/inviteConfig');
 const { dispatchEventCreated } = require('../services/inAppNotificationService');
 const { triggerInviteDripForEventId } = require('../services/inviteDripService');
 const { deployEventToNetlify } = require('../services/netlifySiteService');
+const { resolveClientBaseUrl } = require('../utils/urlResolver');
 
 const generateSlug = (title) =>
   slugify(title, { lower: true, strict: true }) + '-' + Date.now().toString(36);
@@ -143,7 +144,7 @@ exports.getEvent = asyncHandler(async (req, res) => {
   });
   if (!event) return res.status(404).json({ message: 'Event not found' });
 
-  const origin = process.env.CLIENT_URL || req.get('origin') || 'http://localhost:3000';
+  const origin = resolveClientBaseUrl(req);
   const sharePayload = await buildSharePayload(event, origin);
 
   res.json({ event, inviteCopy, ...sharePayload });
@@ -289,7 +290,7 @@ exports.updateShareSettings = asyncHandler(async (req, res) => {
     data: { qrDestinationType },
   });
 
-  const origin = process.env.CLIENT_URL || req.get('origin') || 'http://localhost:3000';
+  const origin = resolveClientBaseUrl(req);
   const sharePayload = await buildSharePayload(updated, origin);
 
   res.json({ event: updated, ...sharePayload });
@@ -379,7 +380,7 @@ exports.publishEventNetlify = asyncHandler(async (req, res) => {
       },
     });
 
-    const origin = process.env.CLIENT_URL || req.get('origin') || 'http://localhost:3000';
+    const origin = resolveClientBaseUrl(req);
     const sharePayload = await buildSharePayload(updated, origin);
 
     res.status(isUpdate ? 200 : 201).json({

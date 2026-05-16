@@ -1,11 +1,11 @@
 const { prisma } = require('../config/db');
 const { sendWhatsApp } = require('./notificationService');
+const { resolveClientBaseUrl } = require('../utils/urlResolver');
 
 const LOG = '[InviteDrip]';
 
 function clientBaseUrl() {
-  const u = String(process.env.CLIENT_URL || 'http://localhost:3000').replace(/\/+$/, '');
-  return u;
+  return resolveClientBaseUrl();
 }
 
 function getLlmEndpoint() {
