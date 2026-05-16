@@ -330,7 +330,11 @@ const VendorDetail = () => {
                 <Rate disabled value={Number(vendor.averageRating)} allowHalf />
                 <p style={{ color: '#888', margin: '4px 0 16px' }}>{vendor.totalReviews} reviews</p>
                 <div style={{ fontSize: 18, fontWeight: 600 }}>
-                  Starting at {formatCurrency(vendor.basePrice)}
+                  Starting at {formatCurrency(
+                    packages.length > 0
+                      ? Math.min(...packages.map((p) => Number(p.basePrice ?? p.price ?? 0)), Number(vendor.basePrice ?? 0))
+                      : Number(vendor.basePrice ?? 0)
+                  )}
                 </div>
                 <p style={{ color: '#888', margin: 0 }}>{vendor.priceType} pricing</p>
               </div>

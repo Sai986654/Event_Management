@@ -118,7 +118,7 @@ const VendorMarketplace = () => {
   const getPackageRange = (vendor) => {
     const packages = Array.isArray(vendor.packages) ? vendor.packages : [];
     if (packages.length === 0) return null;
-    const prices = packages.map((p) => p.price).sort((a, b) => a - b);
+    const prices = packages.map((p) => Number(p.basePrice ?? p.price ?? 0)).sort((a, b) => a - b);
     return { min: prices[0], max: prices[prices.length - 1], count: packages.length };
   };
 

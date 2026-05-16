@@ -402,7 +402,7 @@ const VendorPackagesScreen = ({ route, navigation }) => {
                       </View>
                       <View style={styles.priceBlock}>
                         <Text variant="headlineSmall" style={styles.pkgPrice}>{formatCurrency(pkg.basePrice)}</Text>
-                        {pkg.unitLabel ? <Text variant="labelSmall" style={styles.unitLabel}>per {pkg.unitLabel}</Text> : null}
+                        {pkg.unitLabel ? <Text variant="labelSmall" style={styles.unitLabel}>per {String(pkg.unitLabel).replace(/^per\s+/i, '')}</Text> : null}
                       </View>
                     </View>
 

@@ -348,9 +348,10 @@ async function syncVendorsFromGooglePlaces(options = {}) {
 
     if (isExisting) {
       results.skipped += 1;
+      continue;
     }
 
-    if (!isCreated && !isExisting) {
+    if (!isCreated) {
       results.failed += 1;
       results.errors.push({
         placeId: place.placeId,

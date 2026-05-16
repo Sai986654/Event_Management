@@ -131,7 +131,11 @@ const VendorDetailScreen = ({ route, navigation }) => {
           {(vendor.city || vendor.state) && (
             <Text variant="bodySmall" style={styles.locationLine}>📍 {[vendor.city, vendor.state].filter(Boolean).join(', ')}</Text>
           )}
-          <Text variant="titleMedium" style={styles.basePrice}>Starting at {formatCurrency(vendor.basePrice)}</Text>
+          <Text variant="titleMedium" style={styles.basePrice}>Starting at {formatCurrency(
+            packageCatalog.length > 0
+              ? Math.min(...packageCatalog.map((p) => Number(p.basePrice ?? 0)), Number(vendor.basePrice ?? 0))
+              : Number(vendor.basePrice ?? 0)
+          )}</Text>
         </View>
 
         {/* ── About ── */}

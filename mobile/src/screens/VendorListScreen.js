@@ -188,8 +188,8 @@ const VendorListScreen = ({ navigation }) => {
 
   const renderVendor = ({ item }) => {
     const packages = item.packages || [];
-    const minPrice = packages.length > 0 ? Math.min(...packages.map((p) => Number(p.price))) : Number(item.basePrice);
-    const maxPrice = packages.length > 0 ? Math.max(...packages.map((p) => Number(p.price))) : Number(item.basePrice);
+    const minPrice = packages.length > 0 ? Math.min(...packages.map((p) => Number(p.basePrice ?? p.price ?? 0))) : Number(item.basePrice);
+    const maxPrice = packages.length > 0 ? Math.max(...packages.map((p) => Number(p.basePrice ?? p.price ?? 0))) : Number(item.basePrice);
     const ratingVal = item.averageRating ? Number(item.averageRating).toFixed(1) : null;
 
     return (
