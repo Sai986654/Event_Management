@@ -9,6 +9,7 @@ import { AuthContext } from '../context/AuthContext';
 import { authService } from '../services/authService';
 import { vendorService } from '../services/vendorService';
 import { adminService } from '../services/adminService';
+import LocationPicker from '../components/LocationPicker';
 import { getRoleColor, getErrorMessage } from '../utils/helpers';
 import { Colors, Spacing, Radius } from '../theme';
 
@@ -50,6 +51,8 @@ const ProfileScreen = () => {
   const [instagram, setInstagram] = useState('');
   const [twitter, setTwitter] = useState('');
   const [youtube, setYoutube] = useState('');
+  const [businessLookup, setBusinessLookup] = useState('');
+  const [selectedCoords, setSelectedCoords] = useState({ lat: null, lng: null });
 
   const loadData = useCallback(async () => {
     try {
@@ -81,13 +84,17 @@ const ProfileScreen = () => {
           setContactPhone(mine.contactPhone || '');
           setContactEmail(mine.contactEmail || '');
           setWebsite(mine.website || '');
+          setSelectedCoords({ lat: mine.latitude ?? null, lng: mine.longitude ?? null });
           const links = mine.socialLinks || {};
           setFacebook(links.facebook || '');
           setInstagram(links.instagram || '');
           setTwitter(links.twitter || '');
           setYoutube(links.youtube || '');
+        } else {
+          setSelectedCoords({ lat: null, lng: null });
         }
       }
+      setBusinessLookup('');
     } catch (err) {
       Alert.alert('Error', getErrorMessage(err));
     } finally {
@@ -132,6 +139,10 @@ const ProfileScreen = () => {
           ...(youtube ? { youtube } : {}),
         },
       };
+      if (Number.isFinite(selectedCoords.lat) && Number.isFinite(selectedCoords.lng)) {
+        payload.latitude = selectedCoords.lat;
+        payload.longitude = selectedCoords.lng;
+      }
       if (vendor) {
         await vendorService.updateVendorProfile(vendor.id, payload);
         Alert.alert('Success', 'Business profile updated');
@@ -235,6 +246,36 @@ const ProfileScreen = () => {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Logout', style: 'destructive', onPress: () => logout() },
     ]);
+  };
+
+  const handleBusinessPlacePick = (place) => {
+    if (!place) return;
+
+    const ratingNum = Number(place.rating);
+    const totalRatingsNum = Number(place.totalRatings);
+    const summary = [
+      place.formattedAddress ? `Address: ${place.formattedAddress}` : '',
+      Number.isFinite(ratingNum) && ratingNum > 0
+        ? `Google rating: ${ratingNum.toFixed(1)}/5${Number.isFinite(totalRatingsNum) ? ` (${totalRatingsNum} reviews)` : ''}`
+        : '',
+    ].filter(Boolean).join(' | ');
+
+    setBusinessName(place.name || businessName);
+    setCity(place.city || city);
+    setState(place.state || state);
+    setWebsite(place.website || website);
+    setContactPhone(place.phone || contactPhone);
+    if (!String(description || '').trim()) {
+      setDescription(summary ? `Listed on Google Places. ${summary}` : 'Listed on Google Places.');
+    }
+
+    const lat = Number(place.lat);
+    const lng = Number(place.lng);
+    if (Number.isFinite(lat) && Number.isFinite(lng) && (lat !== 0 || lng !== 0)) {
+      setSelectedCoords({ lat, lng });
+    }
+
+    Alert.alert('Autofill Complete', 'Business details were filled from Google Places.');
   };
 
   if (loading) {
@@ -440,6 +481,17 @@ const ProfileScreen = () => {
                 <Text style={styles.adminNoteText}>{vendor.verificationNotes}</Text>
               </View>
             ) : null}
+
+            <LocationPicker
+              label="Find On Google Places"
+              value={businessLookup}
+              onChange={setBusinessLookup}
+              onLocationPick={handleBusinessPlacePick}
+              mode="business"
+              country="in"
+              placeholder="Search your business and select the best match"
+              style={styles.input}
+            />
 
             <TextInput
               label="Business Name *"

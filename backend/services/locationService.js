@@ -35,22 +35,25 @@ const parseAddressParts = (components = []) => {
   };
 };
 
-const autocomplete = async ({ input, sessionToken }) => {
+const autocomplete = async ({ input, sessionToken, mode = 'geocode', country = 'in' }) => {
   const query = String(input || '').trim();
   if (query.length < 3) return { suggestions: [], source: 'short-query' };
 
   const apiKey = mapsKey();
   if (!apiKey) return { suggestions: [], source: 'no-key' };
 
-  const cacheKey = `auto:${query.toLowerCase()}`;
+  const normalizedMode = String(mode || 'geocode').toLowerCase() === 'business' ? 'business' : 'geocode';
+  const countryCode = String(country || 'in').trim().toLowerCase() || 'in';
+
+  const cacheKey = `auto:${normalizedMode}:${countryCode}:${query.toLowerCase()}`;
   const cached = getCache(autocompleteCache, cacheKey);
   if (cached) return { suggestions: cached, source: 'cache' };
 
   const params = new URLSearchParams({
     input: query,
     key: apiKey,
-    types: 'geocode',
-    components: 'country:in',
+    types: normalizedMode === 'business' ? 'establishment' : 'geocode',
+    components: `country:${countryCode}`,
   });
 
   if (sessionToken) params.set('sessiontoken', sessionToken);
@@ -84,7 +87,7 @@ const placeDetails = async ({ placeId, sessionToken }) => {
   const params = new URLSearchParams({
     place_id: id,
     key: apiKey,
-    fields: 'place_id,name,formatted_address,geometry,address_components',
+    fields: 'place_id,name,formatted_address,geometry,address_components,formatted_phone_number,international_phone_number,website,rating,user_ratings_total,types',
   });
 
   if (sessionToken) params.set('sessiontoken', sessionToken);
@@ -105,6 +108,11 @@ const placeDetails = async ({ placeId, sessionToken }) => {
     postalCode: parts.postalCode,
     lat: Number(result.geometry?.location?.lat || 0),
     lng: Number(result.geometry?.location?.lng || 0),
+    phone: String(result.formatted_phone_number || result.international_phone_number || '').trim(),
+    website: String(result.website || '').trim(),
+    rating: Number(result.rating || 0),
+    totalRatings: Number(result.user_ratings_total || 0),
+    types: Array.isArray(result.types) ? result.types : [],
   };
 
   setCache(placeCache, cacheKey, normalized);

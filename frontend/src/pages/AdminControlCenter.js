@@ -1492,7 +1492,7 @@ const AdminControlCenter = () => {
           </Col>
           <Col xs={24} xl={12}>
             <Card className="phase-card" title="Import From Google Places">
-              <Form form={placesSyncForm} layout="vertical" onFinish={syncFromPlaces} initialValues={{ limit: 50, radiusMeters: 15000 }}>
+              <Form form={placesSyncForm} layout="vertical" onFinish={syncFromPlaces} initialValues={{ limit: 50, radiusMeters: 15000, reviewPage: 1, reviewLimit: 20 }}>
                 <Form.Item name="query" label="Search Query" rules={[{ required: true, message: 'Enter a Places search query' }]}>
                   <Input placeholder="wedding caterers in Hyderabad" prefix={<EnvironmentOutlined />} />
                 </Form.Item>
@@ -1558,6 +1558,21 @@ const AdminControlCenter = () => {
                     </Form.Item>
                   </Col>
                 </Row>
+                <Row gutter={12}>
+                  <Col xs={24} md={12}>
+                    <Form.Item name="reviewPage" label="Review Page (Google)">
+                      <InputNumber min={1} max={1000} style={{ width: '100%' }} />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={24} md={12}>
+                    <Form.Item name="reviewLimit" label="Reviews Per Vendor (Page Size)">
+                      <InputNumber min={1} max={100} style={{ width: '100%' }} />
+                    </Form.Item>
+                  </Col>
+                </Row>
+                <div style={{ marginTop: -6, marginBottom: 12, color: '#6b7280', fontSize: 12 }}>
+                  Google may return only a limited review subset for some places. Pagination here controls how many reviews our sync processes from the returned subset.
+                </div>
                 <Form.Item name="defaultPassword" label="Default Vendor Password">
                   <Input.Password placeholder="Vendor@123" />
                 </Form.Item>

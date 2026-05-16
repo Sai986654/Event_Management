@@ -83,7 +83,11 @@ const mergePortfolio = (existing, incoming) => {
   return merged;
 };
 
-async function fetchPlaceDetailsForSync(placeId, apiKey) {
+async function fetchPlaceDetailsForSync(placeId, apiKey, options = {}) {
+  const reviewPage = Math.max(1, Number(options.reviewPage) || 1);
+  const reviewLimit = Math.max(1, Math.min(100, Number(options.reviewLimit) || 20));
+  const reviewSkip = (reviewPage - 1) * reviewLimit;
+
   const id = String(placeId || '').trim();
   if (!id || !apiKey) return null;
 
@@ -101,7 +105,7 @@ async function fetchPlaceDetailsForSync(placeId, apiKey) {
     if (!result) return null;
 
     const addr = parseAddressParts(result.address_components);
-    const reviews = Array.isArray(result.reviews)
+    const allReviews = Array.isArray(result.reviews)
       ? result.reviews
           .map((review) => ({
             clientName: String(review?.author_name || 'Google User').trim() || 'Google User',
@@ -109,8 +113,9 @@ async function fetchPlaceDetailsForSync(placeId, apiKey) {
             rating: parseRating(review?.rating),
           }))
           .filter((review) => review.content)
-          .slice(0, 5)
       : [];
+
+    const reviews = allReviews.slice(reviewSkip, reviewSkip + reviewLimit);
 
     const photoReferences = Array.isArray(result.photos)
       ? result.photos.map((p) => String(p?.photo_reference || '').trim()).filter(Boolean)
@@ -127,6 +132,9 @@ async function fetchPlaceDetailsForSync(placeId, apiKey) {
       rating: toNumber(result.rating),
       totalRatings: toNumber(result.user_ratings_total),
       reviews,
+      reviewsAvailable: allReviews.length,
+      reviewPage,
+      reviewLimit,
       photoReferences,
     };
   } catch {
@@ -248,6 +256,8 @@ async function syncVendorsFromGooglePlaces(options = {}) {
     defaultPassword = process.env.VENDOR_DEFAULT_PASSWORD,
     includeCredentials = false,
     forceCategory,
+    reviewPage = 1,
+    reviewLimit = 20,
   } = options;
 
   const apiKey = process.env.GOOGLE_MAPS_API_KEY;
@@ -274,6 +284,10 @@ async function syncVendorsFromGooglePlaces(options = {}) {
     updated: 0,
     testimonialsAdded: 0,
     imagesAdded: 0,
+    reviewsImported: 0,
+    reviewsAvailable: 0,
+    reviewPage: Math.max(1, Number(reviewPage) || 1),
+    reviewLimit: Math.max(1, Math.min(100, Number(reviewLimit) || 20)),
     skipped: 0,
     failed: 0,
     errors: [],
@@ -286,7 +300,10 @@ async function syncVendorsFromGooglePlaces(options = {}) {
       continue;
     }
 
-    const details = await fetchPlaceDetailsForSync(basePlace.placeId, apiKey);
+    const details = await fetchPlaceDetailsForSync(basePlace.placeId, apiKey, {
+      reviewPage,
+      reviewLimit,
+    });
     const place = {
       ...basePlace,
       ...(details || {}),
@@ -303,9 +320,12 @@ async function syncVendorsFromGooglePlaces(options = {}) {
         ].filter(Boolean))
       ),
       reviews: Array.isArray(details?.reviews) ? details.reviews : [],
+      reviewsAvailable: Number(details?.reviewsAvailable || 0),
       phone: details?.phone || '',
       website: details?.website || '',
     };
+
+    results.reviewsAvailable += Math.max(0, Number(place.reviewsAvailable) || 0);
 
     const payload = toFormLikePayload(place, { city, state, forceCategory });
 
@@ -379,6 +399,7 @@ async function syncVendorsFromGooglePlaces(options = {}) {
     if (place.reviews.length > 0) {
       const added = await upsertGoogleTestimonials(vendorId, place.reviews);
       results.testimonialsAdded += added;
+      results.reviewsImported += place.reviews.length;
     }
   }
 

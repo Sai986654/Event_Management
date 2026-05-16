@@ -1,11 +1,12 @@
 import React, { useContext, useEffect, useRef, useState } from 'react';
 import { Avatar, Button, Card, Col, Divider, Form, Input, Popconfirm, Row, Select, Tag, Upload, message } from 'antd';
-import { CameraOutlined, DeleteOutlined, FacebookOutlined, InstagramOutlined, LockOutlined, MailOutlined, PhoneOutlined, TwitterOutlined, UploadOutlined, UserOutlined, YoutubeOutlined } from '@ant-design/icons';
+import { CameraOutlined, DeleteOutlined, EnvironmentOutlined, FacebookOutlined, InstagramOutlined, LockOutlined, MailOutlined, PhoneOutlined, TwitterOutlined, UploadOutlined, UserOutlined, YoutubeOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { authService } from '../services/authService';
 import { vendorService } from '../services/vendorService';
 import { adminService } from '../services/adminService';
+import LocationAutocomplete from '../components/LocationAutocomplete';
 import { getErrorMessage, getInitials } from '../utils/helpers';
 import './PhaseFlows.css';
 
@@ -31,6 +32,8 @@ const Profile = () => {
   const [categories, setCategories] = useState(FALLBACK_CATEGORIES);
   const [userDirty, setUserDirty] = useState(false);
   const [vendorDirty, setVendorDirty] = useState(false);
+  const [businessLookup, setBusinessLookup] = useState('');
+  const [selectedCoords, setSelectedCoords] = useState({ lat: null, lng: null });
   const savedUserRef = useRef({});
   const savedVendorRef = useRef({});
 
@@ -75,6 +78,7 @@ const Profile = () => {
       const defaults = { category: 'other' };
       vendorForm.setFieldsValue(defaults);
       savedVendorRef.current = defaults;
+      setSelectedCoords({ lat: null, lng: null });
     } else {
       const saved = {};
       const coreFields = ['businessName', 'category', 'description', 'city', 'state', 'contactPhone', 'contactEmail', 'website'];
@@ -86,9 +90,46 @@ const Profile = () => {
       saved.youtube = links.youtube || '';
       vendorForm.setFieldsValue(saved);
       savedVendorRef.current = saved;
+      setSelectedCoords({ lat: vendor.latitude ?? null, lng: vendor.longitude ?? null });
     }
+    setBusinessLookup('');
     setVendorDirty(false);
   }, [vendor, vendorForm]);
+
+  const applyBusinessFromGooglePlaces = (place) => {
+    if (!place) return;
+
+    const existingDescription = String(vendorForm.getFieldValue('description') || '').trim();
+    const summaryParts = [
+      place.formattedAddress ? `Address: ${place.formattedAddress}` : '',
+      Number.isFinite(Number(place.rating)) && Number(place.rating) > 0
+        ? `Google rating: ${Number(place.rating).toFixed(1)}/5${Number.isFinite(Number(place.totalRatings)) ? ` (${Number(place.totalRatings)} reviews)` : ''}`
+        : '',
+    ].filter(Boolean);
+    const googleSnippet = summaryParts.length ? `Listed on Google Places. ${summaryParts.join(' | ')}` : 'Listed on Google Places.';
+
+    const nextDescription = existingDescription
+      ? existingDescription
+      : googleSnippet;
+
+    vendorForm.setFieldsValue({
+      businessName: place.name || vendorForm.getFieldValue('businessName') || '',
+      city: place.city || vendorForm.getFieldValue('city') || '',
+      state: place.state || vendorForm.getFieldValue('state') || '',
+      website: place.website || vendorForm.getFieldValue('website') || '',
+      contactPhone: place.phone || vendorForm.getFieldValue('contactPhone') || '',
+      description: nextDescription,
+    });
+
+    const lat = Number(place.lat);
+    const lng = Number(place.lng);
+    if (Number.isFinite(lat) && Number.isFinite(lng) && (lat !== 0 || lng !== 0)) {
+      setSelectedCoords({ lat, lng });
+    }
+
+    setVendorDirty(true);
+    message.success('Business details auto-filled from Google Places');
+  };
 
   const onUserValuesChange = () => {
     const current = userForm.getFieldsValue(USER_FIELDS);
@@ -130,6 +171,12 @@ const Profile = () => {
           ...(youtube ? { youtube } : {}),
         },
       };
+
+      if (Number.isFinite(selectedCoords.lat) && Number.isFinite(selectedCoords.lng)) {
+        payload.latitude = selectedCoords.lat;
+        payload.longitude = selectedCoords.lng;
+      }
+
       if (vendor) {
         await vendorService.updateVendorProfile(vendor.id, payload);
         message.success('Vendor profile updated');
@@ -304,10 +351,20 @@ const Profile = () => {
                 </div>
               )}
               <Form form={vendorForm} layout="vertical" onFinish={saveVendorProfile} onValuesChange={onVendorValuesChange}>
+                <Form.Item label="Find Your Business On Google Places (Optional)">
+                  <LocationAutocomplete
+                    value={businessLookup}
+                    onChange={(value) => setBusinessLookup(value)}
+                    onLocationPick={applyBusinessFromGooglePlaces}
+                    mode="business"
+                    country="in"
+                    placeholder="Search your business name and select the best match"
+                  />
+                </Form.Item>
                 <Row gutter={16}>
                   <Col xs={24} md={12}>
                     <Form.Item name="businessName" label="Business Name" rules={[{ required: true }]}>
-                      <Input />
+                      <Input prefix={<EnvironmentOutlined />} />
                     </Form.Item>
                   </Col>
                   <Col xs={24} md={12}>

@@ -67,7 +67,7 @@ const AdminControlScreen = () => {
   const [syncingForms, setSyncingForms] = useState(false);
   const [syncingPlaces, setSyncingPlaces] = useState(false);
   const [formsSyncForm, setFormsSyncForm] = useState({ limit: '100', spreadsheetId: '', range: '', defaultPassword: '' });
-  const [placesSyncForm, setPlacesSyncForm] = useState({ query: '', city: '', state: '', lat: '', lng: '', limit: '50', radiusMeters: '15000', type: '', forceCategory: '', defaultPassword: '' });
+  const [placesSyncForm, setPlacesSyncForm] = useState({ query: '', city: '', state: '', lat: '', lng: '', limit: '50', radiusMeters: '15000', type: '', forceCategory: '', reviewPage: '1', reviewLimit: '20', defaultPassword: '' });
   const [lastSyncResult, setLastSyncResult] = useState(null);
 
   // ── Create User ─────────────────────────────────────────────────
@@ -386,6 +386,8 @@ const AdminControlScreen = () => {
         query: placesSyncForm.query.trim(),
         limit: Number(placesSyncForm.limit) || 50,
         radiusMeters: Number(placesSyncForm.radiusMeters) || 15000,
+        reviewPage: Number(placesSyncForm.reviewPage) || 1,
+        reviewLimit: Number(placesSyncForm.reviewLimit) || 20,
         includeCredentialsInResponse: true,
         ...(placesSyncForm.city.trim() ? { city: placesSyncForm.city.trim() } : {}),
         ...(placesSyncForm.state.trim() ? { state: placesSyncForm.state.trim() } : {}),
@@ -1016,6 +1018,11 @@ const AdminControlScreen = () => {
           <TextInput label="Radius (meters)" mode="outlined" value={placesSyncForm.radiusMeters} onChangeText={(v) => setPlacesSyncForm((p) => ({ ...p, radiusMeters: v.replace(/[^0-9]/g, '') }))} keyboardType="number-pad" style={styles.input} outlineStyle={styles.outline} />
           <TextInput label="Google Place Type" mode="outlined" value={placesSyncForm.type} onChangeText={(v) => setPlacesSyncForm((p) => ({ ...p, type: v }))} placeholder="caterer, florist, lodging" style={styles.input} outlineStyle={styles.outline} />
           <TextInput label="Force Marketplace Category" mode="outlined" value={placesSyncForm.forceCategory} onChangeText={(v) => setPlacesSyncForm((p) => ({ ...p, forceCategory: v }))} placeholder="catering, venue, florist..." style={styles.input} outlineStyle={styles.outline} />
+          <TextInput label="Review Page (Google)" mode="outlined" value={placesSyncForm.reviewPage} onChangeText={(v) => setPlacesSyncForm((p) => ({ ...p, reviewPage: v.replace(/[^0-9]/g, '') }))} keyboardType="number-pad" style={styles.input} outlineStyle={styles.outline} />
+          <TextInput label="Reviews Per Vendor (Page Size)" mode="outlined" value={placesSyncForm.reviewLimit} onChangeText={(v) => setPlacesSyncForm((p) => ({ ...p, reviewLimit: v.replace(/[^0-9]/g, '') }))} keyboardType="number-pad" style={styles.input} outlineStyle={styles.outline} />
+          <Text style={{ color: Colors.textSecondary, marginTop: -4, marginBottom: Spacing.sm }}>
+            Google may return only a limited review subset for some places. Pagination here controls how many reviews our sync processes from that subset.
+          </Text>
           <TextInput label="Default Vendor Password" mode="outlined" value={placesSyncForm.defaultPassword} onChangeText={(v) => setPlacesSyncForm((p) => ({ ...p, defaultPassword: v }))} secureTextEntry style={styles.input} outlineStyle={styles.outline} />
           <Button mode="contained" loading={syncingPlaces} disabled={syncingPlaces} onPress={syncFromPlaces} style={styles.btn}>Start Places Onboarding</Button>
         </Card.Content>

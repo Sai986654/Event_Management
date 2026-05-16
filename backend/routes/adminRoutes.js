@@ -138,6 +138,8 @@ router.post(
     body('radiusMeters').optional({ nullable: true, checkFalsy: true }).isInt({ min: 1000, max: 50000 }).withMessage('radiusMeters must be between 1000 and 50000'),
     body('type').optional().trim(),
     body('limit').optional().isInt({ min: 1, max: 200 }).withMessage('Limit must be between 1-200'),
+    body('reviewPage').optional().isInt({ min: 1, max: 1000 }).withMessage('reviewPage must be between 1-1000'),
+    body('reviewLimit').optional().isInt({ min: 1, max: 100 }).withMessage('reviewLimit must be between 1-100'),
     body('defaultPassword').optional().isLength({ min: 6 }).withMessage('defaultPassword must be at least 6 characters'),
     body('includeCredentialsInResponse').optional().isBoolean().withMessage('includeCredentialsInResponse must be boolean'),
     body('forceCategory').optional().isIn(['catering', 'decor', 'photography', 'videography', 'music', 'venue', 'florist', 'transportation', 'other']).withMessage('Invalid forceCategory'),

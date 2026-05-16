@@ -30,4 +30,9 @@ export const packageService = {
     const response = await api.post('/packages/testimonials', payload);
     return response.data;
   },
+
+  getVendorTestimonials: async (vendorId, params = {}) => {
+    const response = await api.get(`/packages/vendor/${vendorId}/testimonials`, { params });
+    return response.data;
+  },
 };

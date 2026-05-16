@@ -1,9 +1,10 @@
 import api from './api';
 
 export const locationService = {
-  autocomplete: async (input, sessionToken) => {
+  autocomplete: async (input, sessionToken, options = {}) => {
+    const { mode = 'geocode', country = 'in' } = options;
     const response = await api.get('/location/autocomplete', {
-      params: { input, sessionToken },
+      params: { input, sessionToken, mode, country },
     });
     return response.data;
   },

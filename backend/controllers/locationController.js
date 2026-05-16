@@ -5,8 +5,10 @@ const locationService = require('../services/locationService');
 exports.autocomplete = asyncHandler(async (req, res) => {
   const input = String(req.query.input || '');
   const sessionToken = String(req.query.sessionToken || '');
+  const mode = String(req.query.mode || 'geocode');
+  const country = String(req.query.country || 'in');
 
-  const data = await locationService.autocomplete({ input, sessionToken });
+  const data = await locationService.autocomplete({ input, sessionToken, mode, country });
   res.json(data);
 });
 

@@ -3,7 +3,14 @@ import { AutoComplete } from 'antd';
 import { v4 as uuidv4 } from 'uuid';
 import { locationService } from '../services/locationService';
 
-const LocationAutocomplete = ({ value, onChange, onLocationPick, placeholder = 'Search location' }) => {
+const LocationAutocomplete = ({
+  value,
+  onChange,
+  onLocationPick,
+  placeholder = 'Search location',
+  mode = 'geocode',
+  country = 'in',
+}) => {
   const [options, setOptions] = useState([]);
   const [loading, setLoading] = useState(false);
   const sessionTokenRef = useRef('');
@@ -30,7 +37,7 @@ const LocationAutocomplete = ({ value, onChange, onLocationPick, placeholder = '
     const token = ensureSession();
     setLoading(true);
     try {
-      const res = await locationService.autocomplete(input, token);
+      const res = await locationService.autocomplete(input, token, { mode, country });
       const next = (res.suggestions || []).map((item) => ({
         value: item.description,
         label: `${item.mainText}${item.secondaryText ? `, ${item.secondaryText}` : ''}`,
@@ -42,7 +49,7 @@ const LocationAutocomplete = ({ value, onChange, onLocationPick, placeholder = '
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [country, mode]);
 
   const onSearch = (query) => {
     if (debounceRef.current) clearTimeout(debounceRef.current);

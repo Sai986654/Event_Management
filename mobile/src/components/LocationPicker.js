@@ -14,7 +14,17 @@ const genToken = () => Math.random().toString(36).slice(2) + Date.now().toString
  *   onLocationPick – called with { name, formattedAddress, city, state, lat, lng } on selection
  *   label, placeholder, style – passed to the underlying TextInput
  */
-const LocationPicker = ({ value, onChange, onLocationPick, label = 'Venue', placeholder, style, ...rest }) => {
+const LocationPicker = ({
+  value,
+  onChange,
+  onLocationPick,
+  label = 'Venue',
+  placeholder,
+  style,
+  mode = 'geocode',
+  country = 'in',
+  ...rest
+}) => {
   const [suggestions, setSuggestions] = useState([]);
   const [loading, setLoading] = useState(false);
   const sessionRef = useRef(genToken());
@@ -27,12 +37,12 @@ const LocationPicker = ({ value, onChange, onLocationPick, label = 'Venue', plac
     debounceRef.current = setTimeout(async () => {
       setLoading(true);
       try {
-        const res = await locationService.autocomplete(text.trim(), sessionRef.current);
+        const res = await locationService.autocomplete(text.trim(), sessionRef.current, { mode, country });
         setSuggestions(res.suggestions || []);
       } catch { setSuggestions([]); }
       finally { setLoading(false); }
     }, 350);
-  }, [onChange]);
+  }, [country, mode, onChange]);
 
   const pick = useCallback(async (item) => {
     onChange?.(item.description);

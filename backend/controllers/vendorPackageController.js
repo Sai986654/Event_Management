@@ -1,5 +1,6 @@
 const { prisma } = require('../config/db');
 const asyncHandler = require('../utils/asyncHandler');
+const { paginate } = require('../utils/pagination');
 
 const getVendorIdForUser = async (userId) => {
   return prisma.vendor.findUnique({ where: { userId } });
@@ -103,9 +104,18 @@ exports.addTestimonial = asyncHandler(async (req, res) => {
 });
 
 exports.getVendorTestimonials = asyncHandler(async (req, res) => {
-  const testimonials = await prisma.vendorTestimonial.findMany({
-    where: { vendorId: Number(req.params.vendorId) },
-    orderBy: { createdAt: 'desc' },
-  });
-  res.json({ testimonials });
+  const { page, limit, skip } = paginate(req.query.page, req.query.limit || 20);
+  const where = { vendorId: Number(req.params.vendorId) };
+
+  const [testimonials, total] = await Promise.all([
+    prisma.vendorTestimonial.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      skip,
+      take: limit,
+    }),
+    prisma.vendorTestimonial.count({ where }),
+  ]);
+
+  res.json({ testimonials, page, totalPages: Math.ceil(total / limit), total });
 });
