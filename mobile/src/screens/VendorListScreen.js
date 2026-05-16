@@ -98,7 +98,8 @@ const VendorListScreen = ({ navigation }) => {
     if (page === 1) setLoading(true);
     else setLoadingMore(true);
     try {
-      const params = { page, limit: VENDORS_PER_PAGE };
+      const isTextSearchMode = !nearMe && Boolean(debouncedSearch);
+      const params = { page, limit: isTextSearchMode ? 100 : VENDORS_PER_PAGE };
       if (category !== 'all') params.category = category;
 
       const loc = locOverride || userLocation;
@@ -111,7 +112,22 @@ const VendorListScreen = ({ navigation }) => {
       }
 
       const data = await vendorService.searchVendors(params);
-      const newVendors = data.vendors || [];
+      const rawVendors = data.vendors || [];
+      const keyword = String(debouncedSearch || '').toLowerCase();
+      const newVendors = !nearMe && keyword
+        ? rawVendors.filter((v) => {
+          const haystack = [
+            v.businessName,
+            v.city,
+            v.state,
+            v.description,
+            v.category,
+          ]
+            .map((s) => String(s || '').toLowerCase())
+            .join(' ');
+          return haystack.includes(keyword);
+        })
+        : rawVendors;
       
       // Deduplicate vendors by ID when appending
       if (append) {
@@ -125,7 +141,7 @@ const VendorListScreen = ({ navigation }) => {
       }
       
       setVendorPage(page);
-      setVendorTotal(data.total || 0);
+      setVendorTotal(!nearMe && keyword ? newVendors.length : (data.total || 0));
       setNearbyCount(data.nearby != null ? data.nearby : null);
     } catch (err) {
       console.warn(getErrorMessage(err));
@@ -301,6 +317,7 @@ const VendorListScreen = ({ navigation }) => {
   };
 
   const sortLabel = SORT_OPTIONS.find((s) => s.value === sortBy)?.label || 'Sort';
+  const isSearchPending = !nearMe && String(search || '').trim() !== debouncedSearch;
 
   return (
     <View style={styles.container}>
@@ -368,11 +385,19 @@ const VendorListScreen = ({ navigation }) => {
 
       {/* Sort bar + count */}
       <View style={styles.sortBar}>
-        <Text style={styles.resultCount}>
-          {nearMe && nearbyCount != null
-            ? `${nearbyCount} nearby within ${radiusKm} km`
-            : `${vendors.length}/${vendorTotal} vendor${vendorTotal !== 1 ? 's' : ''}`}
-        </Text>
+        <View style={styles.resultInfoWrap}>
+          <Text style={styles.resultCount}>
+            {nearMe && nearbyCount != null
+              ? `${nearbyCount} nearby within ${radiusKm} km`
+              : `${vendors.length}/${vendorTotal} vendor${vendorTotal !== 1 ? 's' : ''}`}
+          </Text>
+          {isSearchPending ? (
+            <View style={styles.searchingRow}>
+              <ActivityIndicator size={12} color={Colors.textMuted} />
+              <Text style={styles.searchingText}>Searching...</Text>
+            </View>
+          ) : null}
+        </View>
         <Menu
           visible={sortMenuVisible}
           onDismiss={() => setSortMenuVisible(false)}
@@ -503,7 +528,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.sm,
   },
+  resultInfoWrap: { flex: 1, paddingRight: Spacing.md },
   resultCount: { fontSize: 13, color: Colors.textSecondary, fontWeight: '500' },
+  searchingRow: { flexDirection: 'row', alignItems: 'center', marginTop: 3 },
+  searchingText: { fontSize: 11, color: Colors.textMuted, marginLeft: 6 },
   sortButton: {
     flexDirection: 'row',
     alignItems: 'center',

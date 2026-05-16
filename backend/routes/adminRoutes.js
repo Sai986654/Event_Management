@@ -18,6 +18,8 @@ const {
   uploadAdobeExpressTemplateAsset,
   getAllVendors,
   deleteVendor,
+  adminDeleteRecord,
+  removeVendorPortfolioAsset,
   syncVendorsFromGoogleForms,
   syncVendorsFromGooglePlaces,
 } = require('../controllers/adminController');
@@ -114,6 +116,16 @@ router.delete('/invite-templates/:id', deleteInviteTemplate);
 // Vendor management
 router.get('/vendors', getAllVendors);
 router.delete('/vendors/:id', deleteVendor);
+router.delete('/data/:entity/:id', adminDeleteRecord);
+router.post(
+  '/vendors/:vendorId/portfolio/remove',
+  [
+    body('index').optional().isInt({ min: 0 }).withMessage('index must be a non-negative integer'),
+    body('assetUrl').optional().trim(),
+  ],
+  validate,
+  removeVendorPortfolioAsset
+);
 router.post(
   '/vendors/sync-google-forms',
   [

@@ -38,6 +38,27 @@ const INVITE_FIELD_CATALOG = [
 
 const DEFAULT_LAYER = { x: 0.2, y: 0.2, width: 0.6, height: 0.08 };
 const BUILDER_DRAFT_KEY = '@admin_adobe_builder_draft';
+const ADMIN_DELETE_ENTITIES = [
+  'media',
+  'inviteGuestVideo',
+  'inviteJob',
+  'inviteDesign',
+  'inviteDesignAsset',
+  'inviteDesignExport',
+  'instantPhoto',
+  'vendorPackage',
+  'vendorTestimonial',
+  'rawMaterialItem',
+  'review',
+  'booking',
+  'guest',
+  'event',
+  'eventActivity',
+  'eventOrder',
+  'eventOrderItem',
+  'appNotification',
+  'pushToken',
+];
 
 const AdminControlScreen = () => {
   const { user } = useContext(AuthContext);
@@ -69,6 +90,10 @@ const AdminControlScreen = () => {
   const [formsSyncForm, setFormsSyncForm] = useState({ limit: '100', spreadsheetId: '', range: '', defaultPassword: '' });
   const [placesSyncForm, setPlacesSyncForm] = useState({ query: '', city: '', state: '', lat: '', lng: '', limit: '50', radiusMeters: '15000', type: '', forceCategory: '', reviewPage: '1', reviewLimit: '20', defaultPassword: '' });
   const [lastSyncResult, setLastSyncResult] = useState(null);
+  const [cleanupForm, setCleanupForm] = useState({ entity: 'media', id: '' });
+  const [portfolioCleanupForm, setPortfolioCleanupForm] = useState({ vendorId: '', index: '', assetUrl: '' });
+  const [deletingData, setDeletingData] = useState(false);
+  const [removingPortfolioAsset, setRemovingPortfolioAsset] = useState(false);
 
   // ── Create User ─────────────────────────────────────────────────
   const [creating, setCreating] = useState(false);
@@ -424,6 +449,89 @@ const AdminControlScreen = () => {
     } finally {
       setCreating(false);
     }
+  };
+
+  const runAdminRecordDelete = async () => {
+    const idNum = Number(cleanupForm.id);
+    if (!cleanupForm.entity || !Number.isInteger(idNum) || idNum <= 0) {
+      Alert.alert('Validation', 'Select entity and provide a valid record ID.');
+      return;
+    }
+
+    Alert.alert(
+      'Delete Record',
+      `Delete ${cleanupForm.entity} #${idNum}? This cannot be undone.`,
+      [
+        { text: 'Cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setDeletingData(true);
+              await adminService.adminDeleteRecord(cleanupForm.entity, idNum);
+              setMessage(`${cleanupForm.entity} #${idNum} deleted`);
+              setMessageType('success');
+              setCleanupForm((prev) => ({ ...prev, id: '' }));
+            } catch (err) {
+              setMessage(getErrorMessage(err));
+              setMessageType('error');
+            } finally {
+              setDeletingData(false);
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const runVendorPortfolioAssetDelete = async () => {
+    const vendorIdNum = Number(portfolioCleanupForm.vendorId);
+    const indexNum = Number(portfolioCleanupForm.index);
+    const hasIndex = String(portfolioCleanupForm.index || '').trim() !== '';
+    const hasAssetUrl = String(portfolioCleanupForm.assetUrl || '').trim() !== '';
+
+    if (!Number.isInteger(vendorIdNum) || vendorIdNum <= 0) {
+      Alert.alert('Validation', 'Vendor ID must be a valid number.');
+      return;
+    }
+    if (!hasIndex && !hasAssetUrl) {
+      Alert.alert('Validation', 'Provide either portfolio index or asset URL.');
+      return;
+    }
+    if (hasIndex && (!Number.isInteger(indexNum) || indexNum < 0)) {
+      Alert.alert('Validation', 'Portfolio index must be a non-negative integer.');
+      return;
+    }
+
+    Alert.alert(
+      'Remove Portfolio Asset',
+      `Remove asset from vendor #${vendorIdNum}? This cannot be undone.`,
+      [
+        { text: 'Cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setRemovingPortfolioAsset(true);
+              const payload = hasIndex
+                ? { index: indexNum }
+                : { assetUrl: String(portfolioCleanupForm.assetUrl || '').trim() };
+              await adminService.removeVendorPortfolioAsset(vendorIdNum, payload);
+              setMessage('Vendor portfolio asset removed');
+              setMessageType('success');
+              setPortfolioCleanupForm((prev) => ({ ...prev, index: '', assetUrl: '' }));
+            } catch (err) {
+              setMessage(getErrorMessage(err));
+              setMessageType('error');
+            } finally {
+              setRemovingPortfolioAsset(false);
+            }
+          },
+        },
+      ],
+    );
   };
 
   // ── Invite Template (Adobe Express) Actions ───────────────────
@@ -1105,6 +1213,94 @@ const AdminControlScreen = () => {
     </View>
   );
 
+  const renderDataCleanup = () => (
+    <View>
+      <Text variant="titleMedium" style={styles.sectionTitle}>Data Cleanup (Admin)</Text>
+      <Text style={{ color: Colors.textSecondary, marginBottom: Spacing.md }}>
+        Delete specific records by entity and ID. Use carefully; actions are permanent.
+      </Text>
+
+      <Card style={styles.itemCard}>
+        <Card.Content>
+          <Text variant="titleSmall" style={{ fontWeight: '700', marginBottom: Spacing.sm }}>Delete Any Allowlisted Record</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: Spacing.sm }}>
+            {ADMIN_DELETE_ENTITIES.map((entity) => (
+              <Chip
+                key={entity}
+                selected={cleanupForm.entity === entity}
+                onPress={() => setCleanupForm((prev) => ({ ...prev, entity }))}
+                style={styles.chip}
+              >
+                {entity}
+              </Chip>
+            ))}
+          </ScrollView>
+          <TextInput
+            label="Record ID"
+            mode="outlined"
+            value={cleanupForm.id}
+            onChangeText={(v) => setCleanupForm((prev) => ({ ...prev, id: v.replace(/[^0-9]/g, '') }))}
+            keyboardType="number-pad"
+            style={styles.input}
+            outlineStyle={styles.outline}
+          />
+          <Button
+            mode="contained"
+            buttonColor={Colors.danger}
+            loading={deletingData}
+            disabled={deletingData}
+            onPress={runAdminRecordDelete}
+            style={styles.btn}
+          >
+            Delete Record
+          </Button>
+        </Card.Content>
+      </Card>
+
+      <Card style={styles.itemCard}>
+        <Card.Content>
+          <Text variant="titleSmall" style={{ fontWeight: '700', marginBottom: Spacing.sm }}>Remove Vendor Portfolio Asset / Video</Text>
+          <TextInput
+            label="Vendor ID"
+            mode="outlined"
+            value={portfolioCleanupForm.vendorId}
+            onChangeText={(v) => setPortfolioCleanupForm((prev) => ({ ...prev, vendorId: v.replace(/[^0-9]/g, '') }))}
+            keyboardType="number-pad"
+            style={styles.input}
+            outlineStyle={styles.outline}
+          />
+          <TextInput
+            label="Portfolio Index (optional)"
+            mode="outlined"
+            value={portfolioCleanupForm.index}
+            onChangeText={(v) => setPortfolioCleanupForm((prev) => ({ ...prev, index: v.replace(/[^0-9]/g, '') }))}
+            keyboardType="number-pad"
+            style={styles.input}
+            outlineStyle={styles.outline}
+          />
+          <TextInput
+            label="Asset URL (optional if index given)"
+            mode="outlined"
+            value={portfolioCleanupForm.assetUrl}
+            onChangeText={(v) => setPortfolioCleanupForm((prev) => ({ ...prev, assetUrl: v }))}
+            style={styles.input}
+            outlineStyle={styles.outline}
+          />
+          <Button
+            mode="contained"
+            buttonColor={Colors.danger}
+            loading={removingPortfolioAsset}
+            disabled={removingPortfolioAsset}
+            onPress={runVendorPortfolioAssetDelete}
+            style={styles.btn}
+          >
+            Remove Portfolio Asset
+          </Button>
+        </Card.Content>
+      </Card>
+    </View>
+  );
+
   const renderInviteTemplates = () => {
     const currentSceneAsset = builderForm.selectedAssets[selectedSceneIndex] || null;
     const currentSceneUploaded = uploadedAdobeAssets.find((asset) => asset.assetPath === currentSceneAsset);
@@ -1481,6 +1677,7 @@ const AdminControlScreen = () => {
           {activeTab === 'categories' && renderCategories()}
           {activeTab === 'payments' && renderPayments()}
           {activeTab === 'vendors' && renderVendorManagement()}
+          {activeTab === 'data-cleanup' && renderDataCleanup()}
           {activeTab === 'verification' && renderVerificationQueue()}
           {activeTab === 'onboarding' && renderOnboarding()}
           {activeTab === 'invite-templates' && renderInviteTemplates()}

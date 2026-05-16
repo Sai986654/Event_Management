@@ -382,6 +382,105 @@ exports.deleteVendor = asyncHandler(async (req, res) => {
   res.json({ message: 'Vendor removed from marketplace' });
 });
 
+const ADMIN_DELETE_MODELS = {
+  media: prisma.media,
+  inviteGuestVideo: prisma.inviteGuestVideo,
+  inviteJob: prisma.inviteJob,
+  inviteDesign: prisma.inviteDesign,
+  inviteDesignAsset: prisma.inviteDesignAsset,
+  inviteDesignExport: prisma.inviteDesignExport,
+  instantPhoto: prisma.instantPhoto,
+  vendorPackage: prisma.vendorPackage,
+  vendorTestimonial: prisma.vendorTestimonial,
+  rawMaterialItem: prisma.rawMaterialItem,
+  review: prisma.review,
+  booking: prisma.booking,
+  guest: prisma.guest,
+  event: prisma.event,
+  eventActivity: prisma.eventActivity,
+  eventOrder: prisma.eventOrder,
+  eventOrderItem: prisma.eventOrderItem,
+  appNotification: prisma.appNotification,
+  pushToken: prisma.pushToken,
+};
+
+exports.adminDeleteRecord = asyncHandler(async (req, res) => {
+  const entity = String(req.params.entity || '').trim();
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).json({ message: 'A valid numeric id is required' });
+  }
+
+  const model = ADMIN_DELETE_MODELS[entity];
+  if (!model) {
+    return res.status(400).json({
+      message: 'Unsupported entity for admin delete',
+      allowedEntities: Object.keys(ADMIN_DELETE_MODELS),
+    });
+  }
+
+  const existing = await model.findUnique({ where: { id } });
+  if (!existing) {
+    return res.status(404).json({ message: `${entity} record not found` });
+  }
+
+  await model.delete({ where: { id } });
+  return res.json({ message: `${entity} record deleted`, entity, id });
+});
+
+exports.removeVendorPortfolioAsset = asyncHandler(async (req, res) => {
+  const vendorId = Number(req.params.vendorId);
+  if (!Number.isInteger(vendorId) || vendorId <= 0) {
+    return res.status(400).json({ message: 'A valid numeric vendorId is required' });
+  }
+
+  const vendor = await prisma.vendor.findUnique({ where: { id: vendorId } });
+  if (!vendor) return res.status(404).json({ message: 'Vendor not found' });
+
+  const { index, assetUrl } = req.body || {};
+  const portfolio = Array.isArray(vendor.portfolio) ? [...vendor.portfolio] : [];
+  if (portfolio.length === 0) {
+    return res.status(400).json({ message: 'Vendor portfolio is empty' });
+  }
+
+  let nextPortfolio = portfolio;
+  let removed = null;
+
+  if (Number.isInteger(index)) {
+    if (index < 0 || index >= portfolio.length) {
+      return res.status(400).json({ message: `index must be between 0 and ${portfolio.length - 1}` });
+    }
+    removed = portfolio[index];
+    nextPortfolio = portfolio.filter((_, i) => i !== index);
+  } else if (typeof assetUrl === 'string' && assetUrl.trim()) {
+    const needle = assetUrl.trim();
+    const before = portfolio.length;
+    nextPortfolio = portfolio.filter((item) => {
+      const url = typeof item === 'string' ? item : String(item?.url || '');
+      return url !== needle;
+    });
+
+    if (nextPortfolio.length === before) {
+      return res.status(404).json({ message: 'No portfolio asset matched the provided assetUrl' });
+    }
+    removed = { assetUrl: needle };
+  } else {
+    return res.status(400).json({ message: 'Provide either an integer index or assetUrl in request body' });
+  }
+
+  const updated = await prisma.vendor.update({
+    where: { id: vendorId },
+    data: { portfolio: nextPortfolio },
+    select: { id: true, businessName: true, portfolio: true },
+  });
+
+  return res.json({
+    message: 'Vendor portfolio asset removed',
+    vendor: updated,
+    removed,
+  });
+});
+
 // ── Google Form Vendor Sync ────────────────────────────────────────
 
 /**

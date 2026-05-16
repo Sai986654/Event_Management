@@ -74,6 +74,16 @@ export const adminService = {
     return response.data;
   },
 
+  adminDeleteRecord: async (entity, id) => {
+    const response = await api.delete(`/admin/data/${entity}/${id}`);
+    return response.data;
+  },
+
+  removeVendorPortfolioAsset: async (vendorId, payload) => {
+    const response = await api.post(`/admin/vendors/${vendorId}/portfolio/remove`, payload);
+    return response.data;
+  },
+
   syncGoogleFormVendors: async (payload) => {
     const response = await api.post('/admin/vendors/sync-google-forms', payload);
     return response.data;
