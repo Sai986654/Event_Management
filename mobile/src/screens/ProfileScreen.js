@@ -92,6 +92,9 @@ const ProfileScreen = () => {
           setYoutube(links.youtube || '');
         } else {
           setSelectedCoords({ lat: null, lng: null });
+          // Pre-populate contact details from user account for new vendor profiles
+          setContactEmail(u.email || '');
+          setContactPhone(u.phone || '');
         }
       }
       setBusinessLookup('');

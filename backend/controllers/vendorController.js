@@ -50,11 +50,20 @@ function haversineKm(lat1, lng1, lat2, lng2) {
 exports.getVendors = asyncHandler(async (req, res) => {
   const { page, limit, skip } = paginate(req.query.page, req.query.limit);
   const where = {};
+  const q = String(req.query.q || '').trim();
 
   if (req.query.category) where.category = req.query.category.toLowerCase();
   if (req.query.city) where.city = { contains: req.query.city, mode: 'insensitive' };
   if (req.query.state) where.state = { contains: req.query.state, mode: 'insensitive' };
   if (req.query.minRating) where.averageRating = { gte: Number(req.query.minRating) };
+  if (q) {
+    where.OR = [
+      { businessName: { contains: q, mode: 'insensitive' } },
+      { city: { contains: q, mode: 'insensitive' } },
+      { state: { contains: q, mode: 'insensitive' } },
+      { description: { contains: q, mode: 'insensitive' } },
+    ];
+  }
 
   const userLat = req.query.lat ? Number(req.query.lat) : null;
   const userLng = req.query.lng ? Number(req.query.lng) : null;

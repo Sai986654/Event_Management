@@ -36,6 +36,7 @@ const Profile = () => {
   const [selectedCoords, setSelectedCoords] = useState({ lat: null, lng: null });
   const savedUserRef = useRef({});
   const savedVendorRef = useRef({});
+  const userContactRef = useRef({ email: '', phone: '' });
 
   const isVendor = user?.role === 'vendor';
 
@@ -55,6 +56,7 @@ const Profile = () => {
       if (setUser) setUser(u);
       userForm.setFieldsValue({ name: u.name || '', phone: u.phone || '' });
       savedUserRef.current = { name: u.name || '', phone: u.phone || '' };
+      userContactRef.current = { email: u.email || '', phone: u.phone || '' };
 
       // Load vendor profile if vendor role
       if (isVendor) {
@@ -177,11 +179,15 @@ const Profile = () => {
         payload.longitude = selectedCoords.lng;
       }
 
-      if (vendor) {
-        await vendorService.updateVendorProfile(vendor.id, payload);
-        message.success('Vendor profile updated');
-      } else {
-        await vendorService.createVendorProfile(payload);
+      if (!vendor) {
+        const defaults = {
+          category: 'other',
+          contactEmail: userContactRef.current.email,
+          contactPhone: userContactRef.current.phone,
+        };
+        vendorForm.setFieldsValue(defaults);
+        savedVendorRef.current = defaults;
+        setSelectedCoords({ lat: null, lng: null });
         message.success('Vendor profile created');
       }
       setVendorDirty(false);

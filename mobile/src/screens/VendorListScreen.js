@@ -37,6 +37,7 @@ const VendorListScreen = ({ navigation }) => {
   const [vendorPage, setVendorPage] = useState(1);
   const [vendorTotal, setVendorTotal] = useState(0);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [category, setCategory] = useState('all');
   const [sortBy, setSortBy] = useState('top-rated');
   const [sortMenuVisible, setSortMenuVisible] = useState(false);
@@ -85,6 +86,14 @@ const VendorListScreen = ({ navigation }) => {
     }
   }, [locationLoading]);
 
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      setDebouncedSearch(String(search || '').trim());
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
+  }, [search]);
+
   const fetchVendors = useCallback(async (locOverride, page = 1, append = false) => {
     if (page === 1) setLoading(true);
     else setLoadingMore(true);
@@ -97,9 +106,8 @@ const VendorListScreen = ({ navigation }) => {
         params.lat = loc.latitude;
         params.lng = loc.longitude;
         params.radius = radiusKm;
-      } else if (search) {
-        // Use search text as city filter when not in "near me" mode
-        params.city = search;
+      } else if (debouncedSearch) {
+        params.q = debouncedSearch;
       }
 
       const data = await vendorService.searchVendors(params);
@@ -126,7 +134,7 @@ const VendorListScreen = ({ navigation }) => {
       else setLoadingMore(false);
       setRefreshing(false);
     }
-  }, [search, category, nearMe, userLocation, radiusKm, VENDORS_PER_PAGE]);
+  }, [debouncedSearch, category, nearMe, userLocation, radiusKm, VENDORS_PER_PAGE]);
 
   // Load more vendors
   const loadMore = useCallback(() => {
