@@ -48,18 +48,74 @@ model ServiceCategory {
 }
 
 model InviteTemplate {
-  id          Int      @id @default(autoincrement())
-  key         String   @unique @db.VarChar(50)
-  name        String   @db.VarChar(120)
-  description String?  @db.VarChar(280)
-  palette     Json     @default("{}")
-  isActive    Boolean  @default(true) @map("is_active")
-  sortOrder   Int      @default(0) @map("sort_order")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id                      Int                   @id @default(autoincrement())
+  key                     String                @unique @db.VarChar(50)
+  name                    String                @db.VarChar(120)
+  description             String?               @db.VarChar(280)
+  palette                 Json                  @default("{}")
+  eventType               String?               @map("event_type") @db.VarChar(40)
+  themeKey                String?               @map("theme_key") @db.VarChar(80)
+  status                  InviteTemplateStatus  @default(draft)
+  configJson              Json                  @default("{}") @map("config_json")
+  componentVisibilityJson Json                  @default("{}") @map("component_visibility_json")
+  aiMetaJson              Json                  @default("{}") @map("ai_meta_json")
+  latestVersion           Int                   @default(1) @map("latest_version")
+  publishedAt             DateTime?             @map("published_at")
+  isActive                Boolean               @default(true) @map("is_active")
+  sortOrder               Int                   @default(0) @map("sort_order")
+  createdAt               DateTime              @default(now()) @map("created_at")
+  updatedAt               DateTime              @updatedAt @map("updated_at")
+
+  versions                InviteTemplateVersion[]
+  componentPresets        InviteComponentPreset[]
 
   @@index([isActive, sortOrder])
+  @@index([status, updatedAt(sort: Desc)])
+  @@index([eventType, themeKey, status])
   @@map("invite_templates")
+}
+
+enum InviteTemplateStatus {
+  draft
+  published
+  archived
+}
+
+model InviteTemplateVersion {
+  id                Int      @id @default(autoincrement())
+  templateId        Int      @map("template_id")
+  version           Int
+  status            InviteTemplateStatus @default(draft)
+  configJson        Json     @default("{}") @map("config_json")
+  componentVisibility Json   @default("{}") @map("component_visibility")
+  aiMetaJson        Json     @default("{}") @map("ai_meta_json")
+  createdByUserId   Int?     @map("created_by_user_id")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  template          InviteTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, version])
+  @@index([templateId, createdAt(sort: Desc)])
+  @@map("invite_template_versions")
+}
+
+model InviteComponentPreset {
+  id            Int      @id @default(autoincrement())
+  templateId    Int      @map("template_id")
+  componentType String   @map("component_type") @db.VarChar(80)
+  componentKey  String   @map("component_key") @db.VarChar(80)
+  label         String   @db.VarChar(120)
+  configJson    Json     @default("{}") @map("config_json")
+  sortOrder     Int      @default(0) @map("sort_order")
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  template      InviteTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, componentKey])
+  @@index([templateId, componentType, sortOrder])
+  @@map("invite_component_presets")
 }
 
 enum PriceType {

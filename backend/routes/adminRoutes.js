@@ -23,6 +23,18 @@ const {
   syncVendorsFromGoogleForms,
   syncVendorsFromGooglePlaces,
 } = require('../controllers/adminController');
+const {
+  listTemplateEngineThemes,
+  listTemplateEngineTemplates,
+  getTemplateEngineTemplateById,
+  createTemplateEngineTemplate,
+  updateTemplateEngineTemplate,
+  reorderTemplateEngineSections,
+  uploadTemplateEngineAsset,
+  previewTemplateEngineTemplate,
+  publishTemplateEngineTemplate,
+  generateTemplateEngineFromAI,
+} = require('../controllers/inviteTemplateEngineController');
 
 router.use(protect);
 
@@ -112,6 +124,76 @@ router.patch(
   updateInviteTemplate
 );
 router.delete('/invite-templates/:id', deleteInviteTemplate);
+
+// Invitation Template Engine
+router.get('/invite-template-engine/themes', listTemplateEngineThemes);
+router.get('/invite-template-engine/templates', listTemplateEngineTemplates);
+router.get('/invite-template-engine/templates/:id', getTemplateEngineTemplateById);
+router.post(
+  '/invite-template-engine/templates',
+  [
+    body('name').optional().trim(),
+    body('templateName').optional().trim(),
+    body('key').optional().trim(),
+    body('themeKey').optional().trim(),
+    body('eventType').optional().trim(),
+    body('config').optional().isObject().withMessage('config must be an object'),
+    body('templateConfig').optional().isObject().withMessage('templateConfig must be an object'),
+  ],
+  validate,
+  createTemplateEngineTemplate
+);
+router.patch(
+  '/invite-template-engine/templates/:id',
+  [
+    body('name').optional().trim(),
+    body('templateName').optional().trim(),
+    body('key').optional().trim(),
+    body('themeKey').optional().trim(),
+    body('eventType').optional().trim(),
+    body('status').optional().isIn(['draft', 'published', 'archived']).withMessage('Invalid status'),
+    body('config').optional().isObject().withMessage('config must be an object'),
+    body('templateConfig').optional().isObject().withMessage('templateConfig must be an object'),
+    body('componentVisibility').optional().isObject().withMessage('componentVisibility must be an object'),
+    body('aiMetaJson').optional().isObject().withMessage('aiMetaJson must be an object'),
+  ],
+  validate,
+  updateTemplateEngineTemplate
+);
+router.post(
+  '/invite-template-engine/templates/:id/reorder-sections',
+  [body('sectionOrder').isArray({ min: 1 }).withMessage('sectionOrder must be a non-empty array')],
+  validate,
+  reorderTemplateEngineSections
+);
+router.post('/invite-template-engine/templates/:id/assets', upload.single('file'), uploadTemplateEngineAsset);
+router.post(
+  '/invite-template-engine/templates/preview',
+  [
+    body('templateConfig').optional().isObject().withMessage('templateConfig must be an object'),
+    body('guestData').optional().isObject().withMessage('guestData must be an object'),
+    body('eventData').optional().isObject().withMessage('eventData must be an object'),
+  ],
+  validate,
+  previewTemplateEngineTemplate
+);
+router.post(
+  '/invite-template-engine/templates/:id/publish',
+  [body('status').optional().isIn(['draft', 'published', 'archived']).withMessage('Invalid status')],
+  validate,
+  publishTemplateEngineTemplate
+);
+router.post(
+  '/invite-template-engine/templates/ai-generate',
+  [
+    body('prompt').trim().notEmpty().withMessage('prompt is required'),
+    body('eventType').optional().trim(),
+    body('persist').optional().isBoolean().withMessage('persist must be boolean'),
+    body('sortOrder').optional().isInt().withMessage('sortOrder must be an integer'),
+  ],
+  validate,
+  generateTemplateEngineFromAI
+);
 
 // Vendor management
 router.get('/vendors', getAllVendors);

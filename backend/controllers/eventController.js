@@ -381,6 +381,7 @@ exports.publishEventNetlify = asyncHandler(async (req, res) => {
     });
 
     const origin = resolveClientBaseUrl(req);
+    
     const sharePayload = await buildSharePayload(updated, origin);
 
     res.status(isUpdate ? 200 : 201).json({

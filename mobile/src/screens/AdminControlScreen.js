@@ -135,6 +135,23 @@ const AdminControlScreen = () => {
   const gestureStartRef = useRef(null);
   const builderDraftLoadedRef = useRef(false);
 
+  // ── Dynamic Template Engine ────────────────────────────────────
+  const [templateEngineTemplates, setTemplateEngineTemplates] = useState([]);
+  const [loadingTemplateEngine, setLoadingTemplateEngine] = useState(false);
+  const [selectedTemplateEngineId, setSelectedTemplateEngineId] = useState(null);
+  const [templateEngineConfigText, setTemplateEngineConfigText] = useState('');
+  const [templateEngineVisibilityText, setTemplateEngineVisibilityText] = useState('');
+  const [templateEnginePrompt, setTemplateEnginePrompt] = useState('Premium Telugu wedding with Tirumala temple theme');
+  const [templateEnginePreviewText, setTemplateEnginePreviewText] = useState('');
+  const [savingTemplateEngine, setSavingTemplateEngine] = useState(false);
+  const [publishingTemplateEngine, setPublishingTemplateEngine] = useState(false);
+  const [generatingTemplateEngine, setGeneratingTemplateEngine] = useState(false);
+  const [uploadingTemplateEngineAsset, setUploadingTemplateEngineAsset] = useState(false);
+  const [templateEngineAssets, setTemplateEngineAssets] = useState([]);
+  const [sectionDragPreviewOrder, setSectionDragPreviewOrder] = useState([]);
+  const [activeDraggedSectionId, setActiveDraggedSectionId] = useState(null);
+  const [assetInsertSectionId, setAssetInsertSectionId] = useState('');
+
   const clamp = useCallback((value, min, max) => Math.min(max, Math.max(min, value)), []);
 
   // ── Draft persistence ──────────────────────────────────────────
@@ -277,6 +294,404 @@ const AdminControlScreen = () => {
     }
   }, []);
 
+  const hydrateTemplateEngineEditor = useCallback((template) => {
+    if (!template) {
+      setSelectedTemplateEngineId(null);
+      setTemplateEngineConfigText('');
+      setTemplateEngineVisibilityText('');
+      return;
+    }
+
+    setSelectedTemplateEngineId(template.id);
+    setTemplateEngineConfigText(JSON.stringify(template.configJson || {}, null, 2));
+    setTemplateEngineVisibilityText(JSON.stringify(template.componentVisibilityJson || {}, null, 2));
+  }, []);
+
+  const loadTemplateEngineTemplates = useCallback(async () => {
+    setLoadingTemplateEngine(true);
+    try {
+      const res = await adminService.listTemplateEngineTemplates();
+      const templates = res.templates || [];
+      setTemplateEngineTemplates(templates);
+
+      const selected = templates.find((tpl) => tpl.id === selectedTemplateEngineId) || templates[0] || null;
+      if (selected) {
+        hydrateTemplateEngineEditor(selected);
+      }
+    } catch (err) {
+      setMessage(getErrorMessage(err));
+      setMessageType('error');
+    } finally {
+      setLoadingTemplateEngine(false);
+    }
+  }, [hydrateTemplateEngineEditor, selectedTemplateEngineId]);
+
+  const selectTemplateEngineTemplate = async (templateId) => {
+    try {
+      const id = Number(templateId);
+      if (!Number.isInteger(id) || id <= 0) return;
+      const res = await adminService.getTemplateEngineTemplateById(id);
+      const template = res.template;
+      hydrateTemplateEngineEditor(template);
+      setTemplateEnginePreviewText('');
+    } catch (err) {
+      setMessage(getErrorMessage(err));
+      setMessageType('error');
+    }
+  };
+
+  const generateTemplateWithAi = async () => {
+    if (!templateEnginePrompt.trim()) {
+      Alert.alert('Validation', 'AI prompt is required');
+      return;
+    }
+
+    try {
+      setGeneratingTemplateEngine(true);
+      const res = await adminService.generateTemplateEngineFromAI({
+        prompt: templateEnginePrompt.trim(),
+        eventType: 'wedding',
+        persist: true,
+      });
+
+      setMessage('AI template generated and saved');
+      setMessageType('success');
+      await loadTemplateEngineTemplates();
+      if (res?.template?.id) {
+        await selectTemplateEngineTemplate(res.template.id);
+      }
+    } catch (err) {
+      setMessage(getErrorMessage(err));
+      setMessageType('error');
+    } finally {
+      setGeneratingTemplateEngine(false);
+    }
+  };
+
+  const saveTemplateEngineTemplate = async () => {
+    const templateId = Number(selectedTemplateEngineId);
+    if (!Number.isInteger(templateId) || templateId <= 0) {
+      Alert.alert('Validation', 'Select a template to save');
+      return;
+    }
+
+    let config;
+    let componentVisibility;
+    try {
+      config = templateEngineConfigText ? JSON.parse(templateEngineConfigText) : {};
+      componentVisibility = templateEngineVisibilityText ? JSON.parse(templateEngineVisibilityText) : {};
+    } catch (_error) {
+      Alert.alert('Validation', 'Template or visibility JSON is invalid');
+      return;
+    }
+
+    const selectedTemplate = templateEngineTemplates.find((tpl) => tpl.id === templateId);
+    if (!selectedTemplate) {
+      Alert.alert('Validation', 'Selected template not found');
+      return;
+    }
+
+    try {
+      setSavingTemplateEngine(true);
+      await adminService.updateTemplateEngineTemplate(templateId, {
+        name: selectedTemplate.name,
+        description: selectedTemplate.description,
+        themeKey: selectedTemplate.themeKey,
+        eventType: selectedTemplate.eventType,
+        config,
+        componentVisibility,
+      });
+      setMessage('Template engine saved');
+      setMessageType('success');
+      await loadTemplateEngineTemplates();
+    } catch (err) {
+      setMessage(getErrorMessage(err));
+      setMessageType('error');
+    } finally {
+      setSavingTemplateEngine(false);
+    }
+  };
+
+  const previewTemplateEngine = async () => {
+    let templateConfig;
+    try {
+      templateConfig = templateEngineConfigText ? JSON.parse(templateEngineConfigText) : {};
+    } catch (_error) {
+      Alert.alert('Validation', 'Template JSON is invalid');
+      return;
+    }
+
+    try {
+      const res = await adminService.previewTemplateEngineTemplate({
+        templateConfig,
+        guestData: {
+          name: 'Srinivas Family',
+          guestCategory: 'VIP',
+          relationship: 'Bride Uncle Family',
+          guestCount: 4,
+          qrData: 'https://vedika360.app/rsvp/demo',
+          invitationMessage: 'With divine blessings we invite you to celebrate with us.',
+        },
+        eventData: {
+          title: 'Vedika360 Royal Wedding',
+          dateText: '12 Dec 2026',
+          timeText: '7:00 PM',
+          venue: 'Tirumala Convention Hall',
+          city: 'Tirupati',
+          brideName: 'Sita',
+          groomName: 'Rama',
+        },
+      });
+      setTemplateEnginePreviewText(JSON.stringify(res.rendered || {}, null, 2));
+      setMessage('Template preview generated');
+      setMessageType('success');
+    } catch (err) {
+      setMessage(getErrorMessage(err));
+      setMessageType('error');
+    }
+  };
+
+  const publishTemplateEngine = async () => {
+    const templateId = Number(selectedTemplateEngineId);
+    if (!Number.isInteger(templateId) || templateId <= 0) {
+      Alert.alert('Validation', 'Select a template to publish');
+      return;
+    }
+
+    try {
+      setPublishingTemplateEngine(true);
+      await adminService.publishTemplateEngineTemplate(templateId, 'published');
+      setMessage('Template published');
+      setMessageType('success');
+      await loadTemplateEngineTemplates();
+    } catch (err) {
+      setMessage(getErrorMessage(err));
+      setMessageType('error');
+    } finally {
+      setPublishingTemplateEngine(false);
+    }
+  };
+
+  const reorderTemplateEngineSection = async (sectionId, direction) => {
+    const templateId = Number(selectedTemplateEngineId);
+    if (!Number.isInteger(templateId) || templateId <= 0) return;
+
+    let parsed;
+    try {
+      parsed = templateEngineConfigText ? JSON.parse(templateEngineConfigText) : {};
+    } catch (_error) {
+      Alert.alert('Validation', 'Template JSON is invalid');
+      return;
+    }
+
+    const sections = Array.isArray(parsed?.layout?.sections) ? parsed.layout.sections : [];
+    const ids = sections.map((section) => section.id).filter(Boolean);
+    const index = ids.indexOf(sectionId);
+    if (index < 0) return;
+
+    const nextIndex = direction === 'up' ? index - 1 : index + 1;
+    if (nextIndex < 0 || nextIndex >= ids.length) return;
+
+    const next = [...ids];
+    const [entry] = next.splice(index, 1);
+    next.splice(nextIndex, 0, entry);
+
+    try {
+      await adminService.reorderTemplateEngineSections(templateId, next);
+      setMessage('Template sections reordered');
+      setMessageType('success');
+      await selectTemplateEngineTemplate(templateId);
+    } catch (err) {
+      setMessage(getErrorMessage(err));
+      setMessageType('error');
+    }
+  };
+
+  const pickAndUploadTemplateEngineAsset = async () => {
+    const templateId = Number(selectedTemplateEngineId);
+    if (!Number.isInteger(templateId) || templateId <= 0) {
+      Alert.alert('Validation', 'Select a template before uploading assets');
+      return;
+    }
+
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('Permission required', 'Media library permission is required to upload assets.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.All,
+        quality: 1,
+      });
+
+      if (result.canceled || !result.assets?.length) return;
+
+      const picked = result.assets[0];
+      const fileName = picked.fileName || picked.uri.split('/').pop() || 'asset.png';
+      const mimeType = picked.mimeType || (picked.type === 'video' ? 'video/mp4' : 'image/png');
+
+      setUploadingTemplateEngineAsset(true);
+      const uploadRes = await adminService.uploadTemplateEngineAsset({
+        id: templateId,
+        file: { uri: picked.uri, fileName, mimeType },
+      });
+
+      const asset = uploadRes?.asset;
+      if (!asset?.url) throw new Error('Asset upload failed');
+
+      setTemplateEngineAssets((prev) => {
+        if (prev.some((entry) => entry.url === asset.url)) return prev;
+        return [asset, ...prev];
+      });
+
+      try {
+        const parsed = templateEngineConfigText ? JSON.parse(templateEngineConfigText) : {};
+        const backgroundAssets = Array.isArray(parsed.backgroundAssets) ? parsed.backgroundAssets : [];
+        const decorativeAssets = Array.isArray(parsed.decorativeAssets) ? parsed.decorativeAssets : [];
+        const targetKey = String(asset.mimeType || '').startsWith('video/') ? 'decorativeAssets' : 'backgroundAssets';
+        const target = targetKey === 'backgroundAssets' ? backgroundAssets : decorativeAssets;
+        if (!target.some((item) => item?.url === asset.url)) {
+          target.push({
+            id: asset.name || `asset_${Date.now()}`,
+            url: asset.url,
+            type: String(asset.mimeType || '').startsWith('video/') ? 'video' : 'image',
+            assetPath: asset.assetPath,
+          });
+          parsed.backgroundAssets = backgroundAssets;
+          parsed.decorativeAssets = decorativeAssets;
+          setTemplateEngineConfigText(JSON.stringify(parsed, null, 2));
+        }
+      } catch (_error) {
+        // Keep upload successful even if config JSON is temporarily invalid.
+      }
+
+      setMessage('Template engine asset uploaded');
+      setMessageType('success');
+    } catch (err) {
+      setMessage(getErrorMessage(err));
+      setMessageType('error');
+    } finally {
+      setUploadingTemplateEngineAsset(false);
+    }
+  };
+
+  const createSectionDragResponder = (sections, sectionId, index) => {
+    const rowHeight = 56;
+    const sectionIds = sections.map((section) => section.id).filter(Boolean);
+
+    return PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_evt, gestureState) => Math.abs(gestureState.dy) > 6,
+      onPanResponderGrant: () => {
+        setActiveDraggedSectionId(sectionId);
+        setSectionDragPreviewOrder(sectionIds);
+      },
+      onPanResponderMove: (_evt, gestureState) => {
+        if (!sectionIds.length) return;
+        const shift = Math.round(gestureState.dy / rowHeight);
+        const nextIndex = Math.max(0, Math.min(sectionIds.length - 1, index + shift));
+        if (nextIndex === index) return;
+
+        const base = sectionDragPreviewOrder.length === sectionIds.length ? [...sectionDragPreviewOrder] : [...sectionIds];
+        const currentIndex = base.indexOf(sectionId);
+        if (currentIndex < 0 || currentIndex === nextIndex) return;
+        const [entry] = base.splice(currentIndex, 1);
+        base.splice(nextIndex, 0, entry);
+        setSectionDragPreviewOrder(base);
+      },
+      onPanResponderRelease: async () => {
+        setActiveDraggedSectionId(null);
+
+        const nextOrder = sectionDragPreviewOrder.length ? [...sectionDragPreviewOrder] : [...sectionIds];
+        setSectionDragPreviewOrder([]);
+
+        if (!nextOrder.length) return;
+        if (JSON.stringify(nextOrder) === JSON.stringify(sectionIds)) return;
+
+        const templateId = Number(selectedTemplateEngineId);
+        if (!Number.isInteger(templateId) || templateId <= 0) return;
+
+        try {
+          await adminService.reorderTemplateEngineSections(templateId, nextOrder);
+          setMessage('Template sections reordered');
+          setMessageType('success');
+          await selectTemplateEngineTemplate(templateId);
+        } catch (err) {
+          setMessage(getErrorMessage(err));
+          setMessageType('error');
+        }
+      },
+      onPanResponderTerminate: () => {
+        setActiveDraggedSectionId(null);
+        setSectionDragPreviewOrder([]);
+      },
+    });
+  };
+
+  const insertTemplateEngineAssetIntoConfig = (asset, mode = 'background') => {
+    if (!asset?.url) return;
+
+    let parsed;
+    try {
+      parsed = templateEngineConfigText ? JSON.parse(templateEngineConfigText) : {};
+    } catch (_error) {
+      Alert.alert('Validation', 'Template JSON is invalid. Fix JSON first.');
+      return;
+    }
+
+    const backgroundAssets = Array.isArray(parsed.backgroundAssets) ? parsed.backgroundAssets : [];
+    const decorativeAssets = Array.isArray(parsed.decorativeAssets) ? parsed.decorativeAssets : [];
+    const layout = parsed.layout && typeof parsed.layout === 'object' ? parsed.layout : {};
+    const sections = Array.isArray(layout.sections) ? layout.sections : [];
+
+    if (mode === 'background') {
+      if (!backgroundAssets.some((item) => item?.url === asset.url)) {
+        backgroundAssets.push({
+          id: asset.name || `background_${Date.now()}`,
+          url: asset.url,
+          type: String(asset.mimeType || '').startsWith('video/') ? 'video' : 'image',
+          assetPath: asset.assetPath,
+        });
+      }
+      parsed.backgroundAssets = backgroundAssets;
+    } else if (mode === 'decorative') {
+      if (!decorativeAssets.some((item) => item?.url === asset.url)) {
+        decorativeAssets.push({
+          id: asset.name || `decor_${Date.now()}`,
+          url: asset.url,
+          type: String(asset.mimeType || '').startsWith('video/') ? 'video' : 'image',
+          assetPath: asset.assetPath,
+        });
+      }
+      parsed.decorativeAssets = decorativeAssets;
+    } else if (mode === 'section') {
+      const targetId = assetInsertSectionId;
+      if (!targetId) {
+        Alert.alert('Validation', 'Choose a target section first.');
+        return;
+      }
+      const targetIndex = sections.findIndex((section) => section.id === targetId);
+      if (targetIndex < 0) {
+        Alert.alert('Validation', 'Target section not found in layout.sections.');
+        return;
+      }
+
+      const targetSection = sections[targetIndex] || {};
+      const nextProps = {
+        ...(targetSection.props && typeof targetSection.props === 'object' ? targetSection.props : {}),
+        imageUrl: asset.url,
+      };
+      sections[targetIndex] = { ...targetSection, props: nextProps };
+      parsed.layout = { ...layout, sections };
+    }
+
+    setTemplateEngineConfigText(JSON.stringify(parsed, null, 2));
+    setMessage('Asset inserted into template config');
+    setMessageType('success');
+  };
+
   const loadAll = useCallback(async () => {
     await Promise.all([
       loadVerificationQueue(),
@@ -284,9 +699,10 @@ const AdminControlScreen = () => {
       loadAllVendors(),
       loadPaymentConfigurations(),
       loadInviteTemplates(),
+      loadTemplateEngineTemplates(),
     ]);
     setRefreshing(false);
-  }, [loadVerificationQueue, loadCategories, loadAllVendors, loadPaymentConfigurations, loadInviteTemplates]);
+  }, [loadVerificationQueue, loadCategories, loadAllVendors, loadPaymentConfigurations, loadInviteTemplates, loadTemplateEngineTemplates]);
 
   const updatePaymentConfiguration = async (entityType, patch) => {
     setSavingPaymentConfig(entityType);
@@ -1634,6 +2050,207 @@ const AdminControlScreen = () => {
     );
   };
 
+  const renderTemplateEngineStudio = () => {
+    const selectedTemplate = templateEngineTemplates.find((tpl) => tpl.id === selectedTemplateEngineId) || null;
+
+    let sections = [];
+    try {
+      const parsed = templateEngineConfigText ? JSON.parse(templateEngineConfigText) : {};
+      sections = Array.isArray(parsed?.layout?.sections) ? parsed.layout.sections : [];
+    } catch (_error) {
+      sections = [];
+    }
+
+    const orderedSections = sectionDragPreviewOrder.length
+      ? sectionDragPreviewOrder
+          .map((id) => sections.find((section) => section.id === id))
+          .filter(Boolean)
+      : sections;
+
+    return (
+      <View>
+        <Text variant="titleMedium" style={styles.sectionTitle}>Template Engine Studio</Text>
+
+        <Card style={styles.itemCard}>
+          <Card.Content>
+            <Text variant="titleSmall" style={{ fontWeight: '700', marginBottom: Spacing.md }}>AI Generation</Text>
+            <TextInput
+              label="Prompt"
+              mode="outlined"
+              multiline
+              numberOfLines={3}
+              value={templateEnginePrompt}
+              onChangeText={setTemplateEnginePrompt}
+              style={styles.input}
+              outlineStyle={styles.outline}
+            />
+            <Button mode="contained" loading={generatingTemplateEngine} disabled={generatingTemplateEngine} onPress={generateTemplateWithAi}>
+              Generate + Persist
+            </Button>
+          </Card.Content>
+        </Card>
+
+        <Card style={styles.itemCard}>
+          <Card.Content>
+            <View style={styles.tabHeader}>
+              <Text variant="titleSmall" style={{ fontWeight: '700' }}>Templates</Text>
+              {loadingTemplateEngine && <ActivityIndicator size="small" color={Colors.primary} />}
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: Spacing.sm }}>
+              {templateEngineTemplates.map((tpl) => (
+                <Chip
+                  key={tpl.id}
+                  selected={selectedTemplateEngineId === tpl.id}
+                  onPress={() => selectTemplateEngineTemplate(tpl.id)}
+                  style={styles.chip}
+                >
+                  {tpl.name}
+                </Chip>
+              ))}
+            </ScrollView>
+            {!templateEngineTemplates.length && !loadingTemplateEngine ? (
+              <Text style={styles.emptyText}>No template-engine templates available yet.</Text>
+            ) : null}
+
+            {selectedTemplate ? (
+              <Text style={{ color: Colors.textSecondary }}>
+                {selectedTemplate.key} • {selectedTemplate.status}
+              </Text>
+            ) : null}
+          </Card.Content>
+        </Card>
+
+        <Card style={styles.itemCard}>
+          <Card.Content>
+            <Text variant="titleSmall" style={{ fontWeight: '700', marginBottom: Spacing.md }}>JSON Editor</Text>
+            <TextInput
+              label="Template Config JSON"
+              mode="outlined"
+              multiline
+              numberOfLines={12}
+              value={templateEngineConfigText}
+              onChangeText={setTemplateEngineConfigText}
+              style={styles.codeInput}
+              outlineStyle={styles.outline}
+            />
+            <TextInput
+              label="Component Visibility JSON"
+              mode="outlined"
+              multiline
+              numberOfLines={4}
+              value={templateEngineVisibilityText}
+              onChangeText={setTemplateEngineVisibilityText}
+              style={[styles.codeInput, { minHeight: 120 }]}
+              outlineStyle={styles.outline}
+            />
+            <View style={styles.mappingControlsRow}>
+              <Button mode="contained" loading={savingTemplateEngine} disabled={savingTemplateEngine} onPress={saveTemplateEngineTemplate}>Save</Button>
+              <Button mode="contained-tonal" onPress={previewTemplateEngine}>Preview</Button>
+              <Button mode="outlined" loading={publishingTemplateEngine} disabled={publishingTemplateEngine} onPress={publishTemplateEngine}>Publish</Button>
+            </View>
+            <Divider style={{ marginVertical: Spacing.md }} />
+            <Button
+              mode="contained-tonal"
+              icon="upload"
+              loading={uploadingTemplateEngineAsset}
+              disabled={uploadingTemplateEngineAsset || !selectedTemplateEngineId}
+              onPress={pickAndUploadTemplateEngineAsset}
+            >
+              Upload Background / Decorative Asset
+            </Button>
+            {templateEngineAssets.length ? (
+              <View style={{ marginTop: Spacing.md }}>
+                <Text variant="labelMedium" style={styles.fieldLabel}>Asset Gallery Picker</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: Spacing.sm }}>
+                  {(sectionDragPreviewOrder.length ? orderedSections : sections)
+                    .filter((section) => section?.id)
+                    .map((section) => (
+                      <Chip
+                        key={`section-target-${section.id}`}
+                        selected={assetInsertSectionId === section.id}
+                        onPress={() => setAssetInsertSectionId(section.id)}
+                        style={styles.chip}
+                      >
+                        {section.componentType || section.id}
+                      </Chip>
+                    ))}
+                </ScrollView>
+
+                {templateEngineAssets.slice(0, 8).map((asset) => (
+                  <Card key={asset.url} style={styles.assetCard}>
+                    <Card.Content>
+                      <Text style={{ fontWeight: '700' }} numberOfLines={1}>{asset.name || 'Asset'}</Text>
+                      <Text style={{ color: Colors.textSecondary, fontSize: 12 }} numberOfLines={1}>{asset.url}</Text>
+                      <View style={[styles.mappingControlsRow, { marginTop: Spacing.xs }]}>
+                        <Button compact mode="outlined" onPress={() => insertTemplateEngineAssetIntoConfig(asset, 'background')}>As Background</Button>
+                        <Button compact mode="outlined" onPress={() => insertTemplateEngineAssetIntoConfig(asset, 'decorative')}>As Decorative</Button>
+                        <Button compact mode="contained-tonal" disabled={!assetInsertSectionId} onPress={() => insertTemplateEngineAssetIntoConfig(asset, 'section')}>
+                          To Section
+                        </Button>
+                      </View>
+                    </Card.Content>
+                  </Card>
+                ))}
+              </View>
+            ) : null}
+          </Card.Content>
+        </Card>
+
+        <Card style={styles.itemCard}>
+          <Card.Content>
+            <Text variant="titleSmall" style={{ fontWeight: '700', marginBottom: Spacing.md }}>Reorder Sections (Drag)</Text>
+            {!orderedSections.length ? (
+              <Text style={styles.emptyText}>No sections found in layout.sections.</Text>
+            ) : (
+              orderedSections.map((section, index) => {
+                const responder = createSectionDragResponder(orderedSections, section.id, index);
+                return (
+                <View
+                  key={`${section.id || section.componentType || index}`}
+                  style={[
+                    styles.assetRow,
+                    {
+                      paddingVertical: 6,
+                      borderBottomWidth: 1,
+                      borderBottomColor: '#eef2f7',
+                      backgroundColor: activeDraggedSectionId === section.id ? '#fff7ed' : 'transparent',
+                    },
+                  ]}
+                  {...responder.panHandlers}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontWeight: '600' }}>{index + 1}. {section.componentType || section.id || 'Section'}</Text>
+                    <Text style={{ color: Colors.textSecondary, fontSize: 12 }}>{section.id || 'no-id'}</Text>
+                  </View>
+                  <IconButton icon="arrow-up" size={18} onPress={() => reorderTemplateEngineSection(section.id, 'up')} disabled={index === 0} />
+                  <IconButton icon="arrow-down" size={18} onPress={() => reorderTemplateEngineSection(section.id, 'down')} disabled={index === orderedSections.length - 1} />
+                </View>
+              );})
+            )}
+            <Text style={{ color: Colors.textSecondary, fontSize: 12, marginTop: Spacing.xs }}>
+              Tip: press and drag a row vertically to reorder quickly.
+            </Text>
+          </Card.Content>
+        </Card>
+
+        <Card style={styles.itemCard}>
+          <Card.Content>
+            <Text variant="titleSmall" style={{ fontWeight: '700', marginBottom: Spacing.md }}>Renderer Output</Text>
+            <TextInput
+              mode="outlined"
+              multiline
+              numberOfLines={12}
+              value={templateEnginePreviewText || 'Run Preview to see rendered output JSON.'}
+              editable={false}
+              style={styles.codeInput}
+              outlineStyle={styles.outline}
+            />
+          </Card.Content>
+        </Card>
+      </View>
+    );
+  };
+
   return (
     <ScrollView
       style={styles.container}
@@ -1681,6 +2298,7 @@ const AdminControlScreen = () => {
           {activeTab === 'verification' && renderVerificationQueue()}
           {activeTab === 'onboarding' && renderOnboarding()}
           {activeTab === 'invite-templates' && renderInviteTemplates()}
+          {activeTab === 'template-engine' && renderTemplateEngineStudio()}
           {activeTab === 'users' && renderCreateUser()}
         </Card.Content>
       </Card>

@@ -105,6 +105,19 @@ const AdminControlCenter = () => {
   const [dragState, setDragState] = useState(null);
   const selectedAssetFilesWatched = Form.useWatch('selectedAssetFiles', manifestBuilderForm);
 
+  // ── Dynamic Template Engine Studio ───────────────────────────────
+  const [templateEngineList, setTemplateEngineList] = useState([]);
+  const [loadingTemplateEngineList, setLoadingTemplateEngineList] = useState(false);
+  const [selectedEngineTemplateId, setSelectedEngineTemplateId] = useState(null);
+  const [selectedEngineTemplate, setSelectedEngineTemplate] = useState(null);
+  const [engineTemplateConfigText, setEngineTemplateConfigText] = useState('');
+  const [engineVisibilityText, setEngineVisibilityText] = useState('');
+  const [engineAiPrompt, setEngineAiPrompt] = useState('Premium Telugu wedding with Tirumala temple theme');
+  const [renderedPreview, setRenderedPreview] = useState(null);
+  const [savingEngineTemplate, setSavingEngineTemplate] = useState(false);
+  const [publishingEngineTemplate, setPublishingEngineTemplate] = useState(false);
+  const [creatingAiTemplate, setCreatingAiTemplate] = useState(false);
+
   const loadInviteTemplates = useCallback(async () => {
     setLoadingInviteTemplates(true);
     try {
@@ -116,6 +129,211 @@ const AdminControlCenter = () => {
       setLoadingInviteTemplates(false);
     }
   }, []);
+
+  const loadTemplateEngineTemplates = useCallback(async () => {
+    setLoadingTemplateEngineList(true);
+    try {
+      const res = await adminService.listTemplateEngineTemplates();
+      const templates = res.templates || [];
+      setTemplateEngineList(templates);
+
+      const selected = templates.find((item) => item.id === selectedEngineTemplateId) || templates[0] || null;
+      if (selected) {
+        setSelectedEngineTemplateId(selected.id);
+        setSelectedEngineTemplate(selected);
+        setEngineTemplateConfigText(JSON.stringify(selected.configJson || {}, null, 2));
+        setEngineVisibilityText(JSON.stringify(selected.componentVisibilityJson || {}, null, 2));
+      }
+    } catch (err) {
+      message.error(getErrorMessage(err));
+    } finally {
+      setLoadingTemplateEngineList(false);
+    }
+  }, [selectedEngineTemplateId]);
+
+  const selectEngineTemplate = async (templateId) => {
+    if (!templateId) {
+      setSelectedEngineTemplateId(null);
+      setSelectedEngineTemplate(null);
+      setEngineTemplateConfigText('');
+      setEngineVisibilityText('');
+      return;
+    }
+    try {
+      const res = await adminService.getTemplateEngineTemplateById(templateId);
+      const template = res.template;
+      setSelectedEngineTemplateId(template.id);
+      setSelectedEngineTemplate(template);
+      setEngineTemplateConfigText(JSON.stringify(template.configJson || {}, null, 2));
+      setEngineVisibilityText(JSON.stringify(template.componentVisibilityJson || {}, null, 2));
+    } catch (err) {
+      message.error(getErrorMessage(err));
+    }
+  };
+
+  const saveEngineTemplate = async () => {
+    if (!selectedEngineTemplate?.id) {
+      message.warning('Select a template first');
+      return;
+    }
+
+    let config;
+    let componentVisibility;
+    try {
+      config = engineTemplateConfigText ? JSON.parse(engineTemplateConfigText) : {};
+      componentVisibility = engineVisibilityText ? JSON.parse(engineVisibilityText) : {};
+    } catch (_error) {
+      message.error('Template JSON or visibility JSON is invalid');
+      return;
+    }
+
+    setSavingEngineTemplate(true);
+    try {
+      await adminService.updateTemplateEngineTemplate(selectedEngineTemplate.id, {
+        name: selectedEngineTemplate.name,
+        description: selectedEngineTemplate.description,
+        themeKey: selectedEngineTemplate.themeKey,
+        eventType: selectedEngineTemplate.eventType,
+        config,
+        componentVisibility,
+      });
+      message.success('Template saved');
+      await loadTemplateEngineTemplates();
+    } catch (err) {
+      message.error(getErrorMessage(err));
+    } finally {
+      setSavingEngineTemplate(false);
+    }
+  };
+
+  const previewEngineTemplate = async () => {
+    let templateConfig;
+    try {
+      templateConfig = engineTemplateConfigText ? JSON.parse(engineTemplateConfigText) : {};
+    } catch (_error) {
+      message.error('Template JSON is invalid');
+      return;
+    }
+
+    try {
+      const res = await adminService.previewTemplateEngineTemplate({
+        templateConfig,
+        guestData: {
+          name: 'Srinivas Family',
+          guestCategory: 'VIP',
+          relationship: 'Bride Uncle Family',
+          guestCount: 4,
+          qrData: 'https://vedika360.app/rsvp/demo',
+          invitationMessage: 'With divine blessings we invite you to celebrate with us.',
+        },
+        eventData: {
+          title: 'Vedika360 Royal Wedding',
+          dateText: '12 Dec 2026',
+          timeText: '7:00 PM',
+          venue: 'Tirumala Convention Hall',
+          city: 'Tirupati',
+          brideName: 'Sita',
+          groomName: 'Rama',
+        },
+      });
+      setRenderedPreview(res.rendered || null);
+      message.success('Preview rendered');
+    } catch (err) {
+      message.error(getErrorMessage(err));
+    }
+  };
+
+  const publishEngineTemplate = async () => {
+    if (!selectedEngineTemplate?.id) {
+      message.warning('Select a template first');
+      return;
+    }
+    setPublishingEngineTemplate(true);
+    try {
+      await adminService.publishTemplateEngineTemplate(selectedEngineTemplate.id, 'published');
+      message.success('Template published');
+      await loadTemplateEngineTemplates();
+    } catch (err) {
+      message.error(getErrorMessage(err));
+    } finally {
+      setPublishingEngineTemplate(false);
+    }
+  };
+
+  const generateEngineTemplateFromAI = async () => {
+    if (!engineAiPrompt.trim()) {
+      message.warning('Enter AI prompt');
+      return;
+    }
+    setCreatingAiTemplate(true);
+    try {
+      const res = await adminService.generateTemplateEngineFromAI({
+        prompt: engineAiPrompt,
+        eventType: 'wedding',
+        persist: true,
+      });
+      if (res?.template?.id) {
+        await loadTemplateEngineTemplates();
+        await selectEngineTemplate(res.template.id);
+      }
+      message.success('AI template generated');
+    } catch (err) {
+      message.error(getErrorMessage(err));
+    } finally {
+      setCreatingAiTemplate(false);
+    }
+  };
+
+  const reorderEngineSection = async (sectionId, direction) => {
+    if (!selectedEngineTemplate?.id) {
+      message.warning('Select a template first');
+      return;
+    }
+
+    let config;
+    try {
+      config = engineTemplateConfigText ? JSON.parse(engineTemplateConfigText) : {};
+    } catch (_error) {
+      message.error('Template JSON is invalid');
+      return;
+    }
+
+    const sections = Array.isArray(config?.layout?.sections) ? config.layout.sections : [];
+    const currentOrder = sections.map((section) => section.id);
+    const index = currentOrder.indexOf(sectionId);
+    if (index < 0) return;
+    const nextIndex = direction === 'up' ? index - 1 : index + 1;
+    if (nextIndex < 0 || nextIndex >= currentOrder.length) return;
+
+    const reordered = [...currentOrder];
+    const [entry] = reordered.splice(index, 1);
+    reordered.splice(nextIndex, 0, entry);
+
+    try {
+      await adminService.reorderTemplateEngineSections(selectedEngineTemplate.id, reordered);
+      message.success('Sections reordered');
+      await selectEngineTemplate(selectedEngineTemplate.id);
+    } catch (err) {
+      message.error(getErrorMessage(err));
+    }
+  };
+
+  const uploadEngineAsset = async ({ file, onSuccess, onError }) => {
+    if (!selectedEngineTemplate?.id) {
+      message.warning('Select a template first');
+      if (onError) onError(new Error('No template selected'));
+      return;
+    }
+
+    try {
+      const res = await adminService.uploadTemplateEngineAsset({ id: selectedEngineTemplate.id, file });
+      message.success(`${res?.asset?.name || 'Asset'} uploaded`);
+      if (onSuccess) onSuccess(res);
+    } catch (err) {
+      message.error(getErrorMessage(err));
+      if (onError) onError(err);
+    }
+  };
 
   const openTemplateModal = (template = null) => {
     setEditingTemplate(template);
@@ -757,9 +975,10 @@ const AdminControlCenter = () => {
     loadVerificationQueue();
     loadCategories();
     loadInviteTemplates();
+    loadTemplateEngineTemplates();
     loadAllVendors();
     loadPaymentConfigs();
-  }, [loadVerificationQueue, loadCategories, loadInviteTemplates, loadAllVendors, loadPaymentConfigs]);
+  }, [loadVerificationQueue, loadCategories, loadInviteTemplates, loadTemplateEngineTemplates, loadAllVendors, loadPaymentConfigs]);
 
   // ── Tab items ──────────────────────────────────────────────────────
   const tabItems = [
@@ -1422,6 +1641,140 @@ const AdminControlCenter = () => {
                 ]}
               />
             </Card>
+          </Col>
+        </Row>
+      ),
+    },
+    {
+      key: 'template-engine',
+      label: <span><AppstoreOutlined /> Template Engine Studio</span>,
+      children: (
+        <Row gutter={[16, 16]}>
+          <Col xs={24} xl={8}>
+            <Card className="phase-card" title="AI Template Generation">
+              <Space direction="vertical" style={{ width: '100%' }}>
+                <Input.TextArea
+                  rows={4}
+                  value={engineAiPrompt}
+                  onChange={(event) => setEngineAiPrompt(event.target.value)}
+                  placeholder="Premium Telugu wedding with Tirumala temple theme"
+                />
+                <Button type="primary" loading={creatingAiTemplate} onClick={generateEngineTemplateFromAI}>
+                  Generate + Persist Template
+                </Button>
+              </Space>
+            </Card>
+
+            <Card className="phase-card" title="Templates" style={{ marginTop: 16 }}>
+              <Select
+                value={selectedEngineTemplateId || undefined}
+                onChange={selectEngineTemplate}
+                loading={loadingTemplateEngineList}
+                style={{ width: '100%' }}
+                options={templateEngineList.map((template) => ({
+                  value: template.id,
+                  label: `${template.name} (${template.status})`,
+                }))}
+                placeholder="Select template"
+              />
+              <div style={{ marginTop: 12 }}>
+                <Upload showUploadList={false} customRequest={uploadEngineAsset}>
+                  <Button icon={<UploadOutlined />}>Upload Background/Decor Asset</Button>
+                </Upload>
+              </div>
+              <Space style={{ marginTop: 12 }}>
+                <Button onClick={previewEngineTemplate}>Preview</Button>
+                <Button type="primary" loading={publishingEngineTemplate} onClick={publishEngineTemplate}>
+                  Publish
+                </Button>
+              </Space>
+            </Card>
+          </Col>
+
+          <Col xs={24} xl={16}>
+            <Card className="phase-card" title="Layered JSON Editor">
+              {selectedEngineTemplate ? (
+                <Space direction="vertical" style={{ width: '100%' }}>
+                  <Input
+                    value={selectedEngineTemplate.name}
+                    onChange={(event) =>
+                      setSelectedEngineTemplate((prev) => (prev ? { ...prev, name: event.target.value } : prev))
+                    }
+                    placeholder="Template name"
+                  />
+                  <Input.TextArea
+                    rows={12}
+                    value={engineTemplateConfigText}
+                    onChange={(event) => setEngineTemplateConfigText(event.target.value)}
+                    placeholder="Template config JSON"
+                  />
+                  <Input.TextArea
+                    rows={4}
+                    value={engineVisibilityText}
+                    onChange={(event) => setEngineVisibilityText(event.target.value)}
+                    placeholder="Component visibility JSON"
+                  />
+                  <Space>
+                    <Button type="primary" loading={savingEngineTemplate} onClick={saveEngineTemplate}>
+                      Save Template
+                    </Button>
+                    <Button onClick={previewEngineTemplate}>Refresh Preview</Button>
+                  </Space>
+                </Space>
+              ) : (
+                <div className="phase-empty">Select or generate a template to start editing.</div>
+              )}
+            </Card>
+
+            {selectedEngineTemplate ? (
+              <Card className="phase-card" title="Section Reorder" style={{ marginTop: 16 }}>
+                {(() => {
+                  let sections = [];
+                  try {
+                    const parsed = engineTemplateConfigText ? JSON.parse(engineTemplateConfigText) : {};
+                    sections = Array.isArray(parsed?.layout?.sections) ? parsed.layout.sections : [];
+                  } catch (_error) {
+                    sections = [];
+                  }
+                  if (!sections.length) {
+                    return <div className="phase-empty">No sections found in layout.sections.</div>;
+                  }
+                  return (
+                    <Space direction="vertical" style={{ width: '100%' }}>
+                      {sections.map((section, index) => (
+                        <div
+                          key={section.id || `${section.componentType}-${index}`}
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            border: '1px solid #f0f0f0',
+                            borderRadius: 8,
+                            padding: '8px 10px',
+                          }}
+                        >
+                          <span>{index + 1}. {section.componentType || section.id || 'Section'}</span>
+                          <Space>
+                            <Button size="small" icon={<ArrowUpOutlined />} disabled={index === 0} onClick={() => reorderEngineSection(section.id, 'up')} />
+                            <Button size="small" icon={<ArrowDownOutlined />} disabled={index === sections.length - 1} onClick={() => reorderEngineSection(section.id, 'down')} />
+                          </Space>
+                        </div>
+                      ))}
+                    </Space>
+                  );
+                })()}
+              </Card>
+            ) : null}
+
+            {renderedPreview ? (
+              <Card className="phase-card" title="Renderer Output" style={{ marginTop: 16 }}>
+                <Input.TextArea
+                  rows={14}
+                  value={JSON.stringify(renderedPreview, null, 2)}
+                  readOnly
+                />
+              </Card>
+            ) : null}
           </Col>
         </Row>
       ),
