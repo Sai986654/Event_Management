@@ -2247,15 +2247,19 @@ const AdminControlCenter = () => {
                       borderRadius: 16,
                       border: '1px solid #e6d7af',
                       overflow: 'hidden',
-                      background: effectiveRenderedPreview?.palette?.background || '#fff7eb',
-                      backdropFilter: 'saturate(110%) blur(1px)',
+                      background: previewVisualModel.backgroundUrl
+                        ? 'rgba(255,253,247,0.78)'
+                        : effectiveRenderedPreview?.palette?.background || '#fff7eb',
+                      backdropFilter: previewVisualModel.backgroundUrl ? 'blur(1px)' : undefined,
                     }}
                   >
                     <div
                       style={{
                         padding: '14px 16px',
-                        background: 'linear-gradient(135deg, #0f172a 0%, #1f2b49 65%, #3f8c72 100%)',
-                        color: '#f8f1df',
+                        background: effectiveRenderedPreview?.palette?.header
+                          ? `linear-gradient(135deg, ${effectiveRenderedPreview.palette.header} 0%, ${effectiveRenderedPreview.palette.accent || effectiveRenderedPreview.palette.header} 100%)`
+                          : 'linear-gradient(135deg, #0f172a 0%, #1f2b49 65%, #3f8c72 100%)',
+                        color: effectiveRenderedPreview?.palette?.headerText || '#f8f1df',
                         fontWeight: 700,
                       }}
                     >
@@ -2285,6 +2289,45 @@ const AdminControlCenter = () => {
                 />
               </Card>
             ) : null}
+
+            {selectedEngineTemplate ? (() => {
+              let config = {};
+              try { config = engineTemplateConfigText ? JSON.parse(engineTemplateConfigText) : {}; } catch (_e) { config = {}; }
+              const bgAssets = normalizeAssetCollection(config.backgroundAssets);
+              const decAssets = normalizeAssetCollection(config.decorativeAssets);
+              const allAssets = [...bgAssets, ...decAssets].filter((a) => a && (a.url || a.assetPath));
+              if (!allAssets.length) return (
+                <Card className="phase-card" title="Linked Assets" style={{ marginTop: 16 }}>
+                  <Alert type="warning" showIcon message="No assets linked to this template yet." description="Upload a background image above. It will auto-wire into this template's config so the preview and PDF will use it." />
+                </Card>
+              );
+              return (
+                <Card className="phase-card" title={`Linked Assets (${allAssets.length})`} style={{ marginTop: 16 }}>
+                  <Space direction="vertical" style={{ width: '100%' }}>
+                    {allAssets.map((asset, i) => {
+                      const slot = asset.assetSlot || asset.slot || asset.id || asset.key || `asset-${i}`;
+                      const url = asset.url || asset.assetPath;
+                      const isBackground = /background|texture|paper/i.test(String(slot));
+                      return (
+                        <div key={`${slot}-${i}`} style={{ display: 'flex', gap: 12, alignItems: 'center', background: '#fffdf7', border: '1px solid #e9ddc2', borderRadius: 10, padding: '8px 12px' }}>
+                          {/\.(png|jpg|jpeg|webp|gif|svg)$/i.test(String(asset.name || url)) ? (
+                            <img src={url} alt={slot} style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 8, border: '1px solid #e6d7af', flexShrink: 0 }} onError={(e) => { e.target.style.display = 'none'; }} />
+                          ) : (
+                            <div style={{ width: 64, height: 64, borderRadius: 8, background: '#f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>📄</div>
+                          )}
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontWeight: 700, fontSize: 12, color: '#8b6a1f' }}>{slot}</div>
+                            <div style={{ fontSize: 11, color: '#6b7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{asset.name || url}</div>
+                            <Tag color={isBackground ? 'gold' : 'blue'} style={{ marginTop: 4, fontSize: 10 }}>{isBackground ? 'Background' : 'Decorative'}</Tag>
+                          </div>
+                          <a href={url} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: '#1d4ed8', flexShrink: 0 }}>Open ↗</a>
+                        </div>
+                      );
+                    })}
+                  </Space>
+                </Card>
+              );
+            })() : null}
           </Col>
         </Row>
       ),
