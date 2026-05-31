@@ -2099,10 +2099,62 @@ async function buildTemplateEngineHtmlPdfBuffer({ guest, event, inviteMessage, i
 
   const sectionsToRender = sections.length ? sections : syntheticSections;
   const qrDataUrl = qrBuffer ? `data:image/png;base64,${qrBuffer.toString('base64')}` : '';
+  const useOrnateCardLayout = sections.length === 0;
   const clampWords = (value, maxWords) => {
     const words = String(value || '').trim().split(/\s+/).filter(Boolean);
     if (words.length <= maxWords) return words.join(' ');
     return `${words.slice(0, maxWords).join(' ')}...`;
+  };
+
+  const getSectionProps = (componentType) => {
+    const target = String(componentType || '').toLowerCase();
+    const section = sectionsToRender.find((entry) => String(entry?.componentType || '').toLowerCase() === target);
+    return section?.props && typeof section.props === 'object' ? section.props : {};
+  };
+
+  const headerProps = getSectionProps('GuestHeader');
+  const messageProps = getSectionProps('PersonalMessage');
+  const rsvpProps = getSectionProps('RSVPSection');
+  const timelineProps = getSectionProps('SmartRecommendations');
+  const familyProps = getSectionProps('FamilyConnection');
+  const qrProps = getSectionProps('QRPass');
+
+  const topDecorUrl = firstText(
+    assetSlotUrls.topGarlandImage,
+    assetSlotUrls.headerGarlandImage,
+    assetSlotUrls.topDecorImage
+  );
+  const heroImageUrl = firstText(
+    assetSlotUrls.heroBrideGroomImage,
+    assetSlotUrls.heroImage,
+    assetSlotUrls.coupleImage,
+    assetSlotUrls.decorativeImage
+  );
+  const mapPreviewUrl = firstText(
+    assetSlotUrls.mapPreviewImage,
+    assetSlotUrls.mapImage
+  );
+
+  const timelineRows = [
+    {
+      time: firstText(context.event.segment1Time, '9:00 AM'),
+      label: firstText(timelineProps.segment1Label, context.event.segment1Label),
+    },
+    {
+      time: firstText(context.event.segment2Time, timeText || '10:30 AM'),
+      label: firstText(timelineProps.segment2Label, context.event.segment2Label),
+    },
+    {
+      time: firstText(context.event.segment3Time, '12:00 PM'),
+      label: firstText(timelineProps.segment3Label, context.event.segment3Label),
+    },
+  ];
+
+  const ornateRect = {
+    x: Math.max(34, Math.min(contentRect.x, 46)),
+    y: Math.max(18, Math.min(contentRect.y, 36)),
+    w: Math.min(Math.max(contentRect.w, HTML_PDF_PAGE_WIDTH - 78), HTML_PDF_PAGE_WIDTH - 68),
+    h: Math.min(Math.max(contentRect.h, HTML_PDF_PAGE_HEIGHT - 72), HTML_PDF_PAGE_HEIGHT - 54),
   };
 
   const cardMarkup = sectionsToRender.map((section) => {
@@ -2184,6 +2236,56 @@ async function buildTemplateEngineHtmlPdfBuffer({ guest, event, inviteMessage, i
     `;
   }).join('');
 
+  const ornateMarkup = `
+    <div class="ornate-shell" style="left:${ornateRect.x}px;top:${ornateRect.y}px;width:${ornateRect.w}px;height:${ornateRect.h}px;">
+      ${topDecorUrl ? `<img class="ornate-garland" src="${escapeHtml(topDecorUrl)}" alt="top decor" />` : ''}
+      <div class="ornate-card">
+        <section class="ornate-hero">
+          ${heroImageUrl ? `<img class="ornate-hero-image" src="${escapeHtml(heroImageUrl)}" alt="couple" />` : ''}
+        </section>
+
+        <section class="ornate-title">
+          <div class="ornate-title-main">${escapeHtml(firstText(headerProps.title, context.event.title))}</div>
+          <div class="ornate-title-sub">${escapeHtml(firstText(headerProps.subtitle, `${context.event.brideName} \u2764 ${context.event.groomName}`))}</div>
+        </section>
+
+        <section class="ornate-meta">
+          <div class="ornate-meta-row"><span class="ornate-meta-label">Date</span><span>${escapeHtml(context.event.dateText)}${context.event.timeText ? ` | ${escapeHtml(context.event.timeText)}` : ''}</span></div>
+          <div class="ornate-meta-row"><span class="ornate-meta-label">Venue</span><span>${escapeHtml(firstText(context.event.venue, 'Venue to be announced'))}</span></div>
+        </section>
+
+        <section class="ornate-actions">
+          <div class="ornate-btn">${escapeHtml(firstText(rsvpProps.primaryLabel, 'RSVP Now'))}</div>
+          <div class="ornate-btn">${escapeHtml(firstText(rsvpProps.secondaryLabel, 'Join Live Stream'))}</div>
+        </section>
+
+        <section class="ornate-timeline">
+          ${timelineRows.map((item) => `
+            <div class="ornate-timeline-item">
+              <span class="ornate-dot"></span>
+              <div class="ornate-time">${escapeHtml(item.time)}</div>
+              <div class="ornate-label">${escapeHtml(item.label)}</div>
+            </div>
+          `).join('')}
+        </section>
+
+        <section class="ornate-family">
+          <div>${escapeHtml(firstText(familyProps.groomFamilyLabel, `Groom's Family: ${context.event.groomFamily}`))}</div>
+          <div>${escapeHtml(firstText(familyProps.brideFamilyLabel, `Bride's Family: ${context.event.brideFamily}`))}</div>
+        </section>
+
+        <section class="ornate-directions">
+          <div class="ornate-directions-text">${escapeHtml(firstText(qrProps.ctaLabel, 'Get Directions'))}</div>
+          ${mapPreviewUrl
+            ? `<img class="ornate-map" src="${escapeHtml(mapPreviewUrl)}" alt="map" />`
+            : (qrDataUrl ? `<img class="ornate-map" src="${escapeHtml(qrDataUrl)}" alt="qr" />` : '')}
+        </section>
+
+        ${firstText(messageProps.message, messageBody) ? `<section class="ornate-note">${escapeHtml(clampWords(firstText(messageProps.message, messageBody), 30))}</section>` : ''}
+      </div>
+    </div>
+  `;
+
   const pageBackground = backgroundImageUrl
     ? `background-image: url('${escapeHtml(backgroundImageUrl)}'); background-size: cover; background-position: center;`
     : `background: linear-gradient(135deg, ${escapeHtml(firstText(p.background, '#f8f3e8'))} 0%, #fffdf5 100%);`;
@@ -2256,13 +2358,166 @@ async function buildTemplateEngineHtmlPdfBuffer({ guest, event, inviteMessage, i
           .qr-title { font-size: 12px; font-weight: 700; }
           .qr-link { margin-top: 4px; font-size: 10px; color: #b91c1c; word-break: break-all; }
           .qr-image { width: 52px; height: 52px; border-radius: 6px; border: 1px solid ${escapeHtml(theme.border)}; background: #fff; }
+
+          .ornate-shell {
+            position: absolute;
+          }
+          .ornate-garland {
+            width: 100%;
+            max-height: 92px;
+            object-fit: contain;
+            object-position: center;
+            margin-bottom: 8px;
+          }
+          .ornate-card {
+            height: calc(100% - 98px);
+            background: rgba(255, 250, 240, 0.86);
+            border: 1.5px solid ${escapeHtml(theme.border)};
+            border-radius: 30px;
+            box-shadow: 0 10px 26px rgba(70, 42, 10, 0.18);
+            padding: 14px;
+            display: grid;
+            grid-template-rows: 355px auto auto auto auto auto auto;
+            gap: 10px;
+            color: ${escapeHtml(theme.text)};
+          }
+          .ornate-hero {
+            border-radius: 22px;
+            overflow: hidden;
+            border: 1.3px solid ${escapeHtml(theme.border)};
+            background: linear-gradient(180deg, rgba(255,255,255,0.8), rgba(255,248,230,0.9));
+          }
+          .ornate-hero-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: center;
+          }
+          .ornate-title {
+            text-align: center;
+            line-height: 1.25;
+            margin-top: -2px;
+          }
+          .ornate-title-main {
+            font-size: 33px;
+            color: ${escapeHtml(theme.primary)};
+            font-weight: 700;
+          }
+          .ornate-title-sub {
+            margin-top: 3px;
+            font-size: 44px;
+            color: ${escapeHtml(theme.text)};
+            font-weight: 700;
+          }
+          .ornate-meta,
+          .ornate-actions,
+          .ornate-timeline,
+          .ornate-family,
+          .ornate-directions,
+          .ornate-note {
+            border: 1.2px solid ${escapeHtml(theme.border)};
+            border-radius: 18px;
+            background: rgba(255, 255, 252, 0.92);
+          }
+          .ornate-meta {
+            padding: 10px 14px;
+            font-size: 20px;
+            line-height: 1.45;
+          }
+          .ornate-meta-row {
+            display: flex;
+            gap: 10px;
+            align-items: baseline;
+          }
+          .ornate-meta-label {
+            min-width: 62px;
+            font-weight: 700;
+            color: ${escapeHtml(theme.primary)};
+          }
+          .ornate-actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+            padding: 10px 12px;
+          }
+          .ornate-btn {
+            border: 1.1px solid ${escapeHtml(theme.border)};
+            border-radius: 999px;
+            text-align: center;
+            padding: 8px 10px;
+            font-size: 30px;
+            font-weight: 700;
+            color: ${escapeHtml(theme.text)};
+            background: linear-gradient(180deg, #fffef8, #f6edd6);
+          }
+          .ornate-timeline {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            padding: 10px 10px 8px;
+          }
+          .ornate-timeline-item {
+            text-align: center;
+            font-size: 17px;
+            line-height: 1.25;
+          }
+          .ornate-dot {
+            width: 11px;
+            height: 11px;
+            border-radius: 50%;
+            display: inline-block;
+            background: ${escapeHtml(theme.accent)};
+            margin-bottom: 6px;
+          }
+          .ornate-time {
+            font-weight: 700;
+            color: ${escapeHtml(theme.subtle)};
+          }
+          .ornate-label {
+            margin-top: 1px;
+          }
+          .ornate-family {
+            padding: 10px 14px;
+            font-size: 21px;
+            line-height: 1.35;
+            font-weight: 700;
+          }
+          .ornate-directions {
+            display: grid;
+            grid-template-columns: 1fr 130px;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 12px;
+            min-height: 84px;
+          }
+          .ornate-directions-text {
+            font-size: 31px;
+            font-weight: 700;
+            color: ${escapeHtml(theme.text)};
+          }
+          .ornate-map {
+            width: 124px;
+            height: 68px;
+            border-radius: 12px;
+            border: 1px solid ${escapeHtml(theme.border)};
+            object-fit: cover;
+            background: #fff;
+          }
+          .ornate-note {
+            padding: 8px 12px;
+            font-size: 16px;
+            line-height: 1.25;
+            color: ${escapeHtml(theme.subtle)};
+          }
         </style>
       </head>
       <body>
         <div class="page">
+          ${useOrnateCardLayout ? ornateMarkup : `
           <div class="content">
             ${cardMarkup}
           </div>
+          `}
         </div>
       </body>
     </html>
