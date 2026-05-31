@@ -177,6 +177,315 @@ const InviteDesignStudio = () => {
     }
   };
 
+  const buildCanvasLayoutFromTemplate = ({ templateMeta, baseLayout = {}, eventType }) => {
+    const templateConfig = templateMeta?.templateConfig;
+    if (!templateConfig || typeof templateConfig !== 'object') return null;
+
+    const canvasSize = String(baseLayout.canvasSize || '1080x1920');
+    const sizeMatch = canvasSize.match(/^(\d+)x(\d+)$/);
+    const canvasWidth = Number(sizeMatch?.[1]) || 1080;
+    const canvasHeight = Number(sizeMatch?.[2]) || 1920;
+    const normalizedEventType = eventType || baseLayout.eventType || 'other';
+    const normalizedMerge = buildDefaultMergeData(normalizedEventType, baseLayout.mergeData);
+
+    const pickAssetUrl = (entry) => {
+      if (!entry || typeof entry !== 'object') return '';
+      return String(entry.url || entry.assetUrl || entry.src || entry.assetPath || entry.publicId || '').trim();
+    };
+
+    const normalizeAssets = (value) => {
+      if (Array.isArray(value)) return value;
+      if (value && typeof value === 'object') return Object.values(value);
+      return [];
+    };
+
+    const slotMap = {};
+    [...normalizeAssets(templateConfig.backgroundAssets), ...normalizeAssets(templateConfig.decorativeAssets)].forEach((asset) => {
+      const slot = String(asset?.assetSlot || asset?.slot || asset?.id || asset?.key || '').trim();
+      const url = pickAssetUrl(asset);
+      if (slot && url) slotMap[slot] = url;
+    });
+
+    const backgroundAssetRef = String(templateConfig?.canvas?.backgroundAssetRef || '').trim();
+    const backgroundImageUrl =
+      slotMap[backgroundAssetRef] ||
+      slotMap.backgroundTextureImage ||
+      slotMap.backgroundImage ||
+      String(templateConfig?.canvas?.backgroundImage || '').trim() ||
+      '';
+
+    const sections = Array.isArray(templateConfig?.layout?.sections)
+      ? templateConfig.layout.sections
+      : Array.isArray(templateConfig?.components)
+        ? templateConfig.components
+        : [];
+
+    if (!sections.length) return null;
+
+    const cardX = Math.round(canvasWidth * 0.07);
+    const cardW = Math.round(canvasWidth * 0.86);
+    const pad = Math.round(canvasWidth * 0.03);
+    const gap = Math.round(canvasHeight * 0.012);
+    let cursorY = Math.round(canvasHeight * 0.08);
+    let z = 0;
+    const elements = [];
+
+    const nextId = () => `template-${Date.now()}-${z}-${Math.random().toString(36).slice(2, 7)}`;
+    const addElement = (element) => {
+      elements.push({ ...element, id: nextId(), locked: false, z: z++ });
+    };
+
+    const addCard = (height = 120) => {
+      const y = cursorY;
+      addElement({
+        type: 'shape',
+        x: cardX,
+        y,
+        width: cardW,
+        height,
+        shapeType: 'rectangle',
+        fillColor: '#fffdf7',
+        strokeColor: '#c9b07d',
+        strokeWidth: 2,
+        borderRadius: 22,
+      });
+      cursorY += height + gap;
+      return y;
+    };
+
+    if (backgroundImageUrl) {
+      addElement({
+        type: 'image',
+        x: 0,
+        y: 0,
+        width: canvasWidth,
+        height: canvasHeight,
+        src: backgroundImageUrl,
+        objectFit: 'cover',
+      });
+    }
+
+    sections
+      .filter((section) => section && section.visible !== false)
+      .sort((a, b) => Number(a?.order || 0) - Number(b?.order || 0))
+      .forEach((section) => {
+        const type = String(section?.componentType || '').toLowerCase();
+        const props = section?.props && typeof section.props === 'object' ? section.props : {};
+
+        if (type === 'guestheader' || type === 'couplehero') {
+          const y = addCard(180);
+          addElement({
+            type: 'text',
+            x: cardX + pad,
+            y: y + 24,
+            width: cardW - pad * 2,
+            height: 48,
+            text: String(props.title || '{{event.title}}'),
+            fontSize: 48,
+            fontWeight: 'bold',
+            color: '#b45309',
+            textAlign: 'center',
+            fontFamily: 'Georgia',
+          });
+          addElement({
+            type: 'text',
+            x: cardX + pad,
+            y: y + 80,
+            width: cardW - pad * 2,
+            height: 42,
+            text: String(props.subtitle || '{{hosts.brideName}} ❤ {{hosts.groomName}}'),
+            fontSize: 34,
+            fontWeight: 'bold',
+            color: '#1f2937',
+            textAlign: 'center',
+            fontFamily: 'Georgia',
+          });
+          return;
+        }
+
+        if (type === 'personalmessage') {
+          const y = addCard(200);
+          addElement({
+            type: 'text',
+            x: cardX + pad,
+            y: y + 20,
+            width: cardW - pad * 2,
+            height: 36,
+            text: String(props.salutation || 'Dear {{guest.name}},'),
+            fontSize: 30,
+            fontWeight: 'bold',
+            color: '#1f2937',
+            textAlign: 'left',
+            fontFamily: 'Arial',
+          });
+          addElement({
+            type: 'text',
+            x: cardX + pad,
+            y: y + 60,
+            width: cardW - pad * 2,
+            height: 86,
+            text: String(props.message || '{{hosts.blessingLine}}'),
+            fontSize: 24,
+            fontWeight: 'normal',
+            color: '#334155',
+            textAlign: 'left',
+            fontFamily: 'Arial',
+          });
+          addElement({
+            type: 'text',
+            x: cardX + pad,
+            y: y + 156,
+            width: cardW - pad * 2,
+            height: 28,
+            text: String(props.signature || '{{event.dateText}} | {{event.timeText}}'),
+            fontSize: 20,
+            fontWeight: 'bold',
+            color: '#475569',
+            textAlign: 'left',
+            fontFamily: 'Arial',
+          });
+          return;
+        }
+
+        if (type === 'rsvpsection') {
+          const y = addCard(90);
+          const btnGap = 20;
+          const btnW = Math.round((cardW - pad * 2 - btnGap) / 2);
+          [
+            { x: cardX + pad, label: String(props.primaryLabel || 'RSVP Now') },
+            { x: cardX + pad + btnW + btnGap, label: String(props.secondaryLabel || 'Join Live Stream') },
+          ].forEach((button) => {
+            addElement({
+              type: 'shape',
+              x: button.x,
+              y: y + 16,
+              width: btnW,
+              height: 56,
+              shapeType: 'rectangle',
+              fillColor: '#ffffff',
+              strokeColor: '#c9b07d',
+              strokeWidth: 2,
+              borderRadius: 28,
+            });
+            addElement({
+              type: 'text',
+              x: button.x,
+              y: y + 30,
+              width: btnW,
+              height: 24,
+              text: button.label,
+              fontSize: 24,
+              fontWeight: 'bold',
+              color: '#374151',
+              textAlign: 'center',
+              fontFamily: 'Arial',
+            });
+          });
+          return;
+        }
+
+        if (type === 'smartrecommendations') {
+          const y = addCard(120);
+          const colW = Math.round(cardW / 3);
+          const labels = [
+            String(props.segment1Label || 'Program 1'),
+            String(props.segment2Label || 'Program 2'),
+            String(props.segment3Label || 'Program 3'),
+          ];
+          labels.forEach((label, index) => {
+            const x = cardX + index * colW;
+            addElement({
+              type: 'text',
+              x,
+              y: y + 34,
+              width: colW,
+              height: 24,
+              text: label,
+              fontSize: 18,
+              fontWeight: 'normal',
+              color: '#334155',
+              textAlign: 'center',
+              fontFamily: 'Arial',
+            });
+          });
+          return;
+        }
+
+        if (type === 'familyconnection') {
+          const y = addCard(96);
+          addElement({
+            type: 'text',
+            x: cardX + pad,
+            y: y + 20,
+            width: cardW - pad * 2,
+            height: 26,
+            text: String(props.groomFamilyLabel || "Groom's Family: {{hosts.groomParents}}"),
+            fontSize: 22,
+            fontWeight: 'bold',
+            color: '#1f2937',
+            textAlign: 'left',
+            fontFamily: 'Arial',
+          });
+          addElement({
+            type: 'text',
+            x: cardX + pad,
+            y: y + 52,
+            width: cardW - pad * 2,
+            height: 26,
+            text: String(props.brideFamilyLabel || "Bride's Family: {{hosts.brideParents}}"),
+            fontSize: 22,
+            fontWeight: 'bold',
+            color: '#1f2937',
+            textAlign: 'left',
+            fontFamily: 'Arial',
+          });
+          return;
+        }
+
+        if (type === 'qrpass') {
+          const y = addCard(108);
+          addElement({
+            type: 'text',
+            x: cardX + pad,
+            y: y + 20,
+            width: cardW - pad * 2,
+            height: 28,
+            text: String(props.ctaLabel || 'Get Directions / RSVP'),
+            fontSize: 24,
+            fontWeight: 'bold',
+            color: '#1f2937',
+            textAlign: 'left',
+            fontFamily: 'Arial',
+          });
+          addElement({
+            type: 'text',
+            x: cardX + pad,
+            y: y + 54,
+            width: cardW - pad * 2,
+            height: 24,
+            text: String(props.helpText || '{{event.venue}}'),
+            fontSize: 16,
+            fontWeight: 'normal',
+            color: '#b91c1c',
+            textAlign: 'left',
+            fontFamily: 'Arial',
+          });
+        }
+      });
+
+    return {
+      templateKey: templateMeta?.key || baseLayout.templateKey || null,
+      canvasSize,
+      backgroundColor: String(baseLayout.backgroundColor || '#fffaf6'),
+      title: baseLayout.title || event?.title || '',
+      venue: baseLayout.venue || event?.venue || '',
+      date: baseLayout.date || event?.date || null,
+      eventType: normalizedEventType,
+      mergeData: normalizedMerge,
+      elements,
+    };
+  };
+
   const handleApplyStarterLayout = () => {
     if (!selectedDesignId) {
       message.warning('Select a design first.');
@@ -218,7 +527,7 @@ const InviteDesignStudio = () => {
 
       const firstDesign = (designsRes.designs || [])[0];
       if (firstDesign) {
-        await loadDesignDetails(firstDesign.id);
+        await loadDesignDetails(firstDesign.id, templatesRes.templates || []);
       }
     } catch (error) {
       message.error(getErrorMessage(error));
@@ -227,7 +536,7 @@ const InviteDesignStudio = () => {
     }
   };
 
-  const loadDesignDetails = async (designId) => {
+  const loadDesignDetails = async (designId, templateCatalog) => {
     if (!designId) {
       setSelectedDesignId(null);
       setSelectedDesign(null);
@@ -247,10 +556,19 @@ const InviteDesignStudio = () => {
       const designEventType = designLayout.eventType || event?.type || design.category || 'other';
       const hasRenderableElements = Array.isArray(designLayout.elements) && designLayout.elements.length > 0;
       const hasAnyLayoutContent = Object.keys(designLayout).length > 0;
+      const availableTemplates = Array.isArray(templateCatalog) && templateCatalog.length ? templateCatalog : templates;
       const fallbackTemplateKey =
         (typeof designLayout.templateKey === 'string' && designLayout.templateKey) ||
         selectedTemplate ||
         null;
+      const matchedTemplate = availableTemplates.find((template) => template.key === fallbackTemplateKey) || null;
+      const templateDrivenLayout = (!hasRenderableElements && matchedTemplate)
+        ? buildCanvasLayoutFromTemplate({
+            templateMeta: matchedTemplate,
+            baseLayout: designLayout,
+            eventType: designEventType,
+          })
+        : null;
 
       const nextLayout = hasRenderableElements
         ? {
@@ -258,6 +576,8 @@ const InviteDesignStudio = () => {
             eventType: designEventType,
             mergeData: buildDefaultMergeData(designEventType, designLayout.mergeData),
           }
+        : templateDrivenLayout
+        ? templateDrivenLayout
         : !hasAnyLayoutContent
         ? buildStarterLayout({
             eventType: designEventType,
@@ -283,7 +603,9 @@ const InviteDesignStudio = () => {
         setSelectedTemplate(nextLayout.templateKey);
       }
       setExportsList(exportRes.exports || []);
-      if (!hasRenderableElements && !hasAnyLayoutContent) {
+      if (!hasRenderableElements && templateDrivenLayout) {
+        message.info('Loaded template structure into canvas mode. Click Save to persist editable elements.');
+      } else if (!hasRenderableElements && !hasAnyLayoutContent) {
         message.info('Loaded starter layout because this design was empty. Click Save to persist it.');
       } else if (!hasRenderableElements) {
         message.warning('This design has saved JSON but no canvas elements. Nothing was auto-generated. Use "Apply Full Starter Layout" only if you want a new canvas base.');
@@ -314,6 +636,20 @@ const InviteDesignStudio = () => {
     setCreating(true);
     try {
       const draftEventType = event?.type || 'other';
+      const templateSeedLayout = selectedTemplateMeta
+        ? buildCanvasLayoutFromTemplate({
+            templateMeta: selectedTemplateMeta,
+            baseLayout: {
+              templateKey: selectedTemplate || null,
+              eventType: draftEventType,
+              mergeData: buildDefaultMergeData(draftEventType),
+              title: event?.title || '',
+              venue: event?.venue || '',
+              date: event?.date || null,
+            },
+            eventType: draftEventType,
+          })
+        : null;
       const starterLayout = buildStarterLayout({
         eventType: draftEventType,
         event,
@@ -327,7 +663,7 @@ const InviteDesignStudio = () => {
         language: 'en',
         status: 'draft',
         category: event?.type || 'general',
-        jsonLayout: starterLayout,
+        jsonLayout: templateSeedLayout || starterLayout,
       };
 
       const res = await inviteDesignService.createDesign(payload);
