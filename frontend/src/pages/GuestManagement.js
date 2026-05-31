@@ -259,12 +259,17 @@ const GuestManagement = () => {
         return;
       }
 
-      await guestService.generatePersonalizedInvite(guest.id, {
+      const result = await guestService.generatePersonalizedInvite(guest.id, {
         language: selectedLanguage,
         tone: selectedTone,
         templateKey: selectedTemplateKey,
       });
-      message.success(`Invite generated for ${guest.name}`);
+      const rendererUsed = result?.invite?.rendererUsed || 'unknown';
+      const appliedTemplateKey = result?.invite?.templateKey || selectedTemplateKey;
+      const hasBackgroundAsset = Boolean(result?.invite?.templateDiagnostics?.hasBackgroundAsset);
+      message.success(
+        `Invite generated for ${guest.name} | renderer: ${rendererUsed} | template: ${appliedTemplateKey} | background: ${hasBackgroundAsset ? 'linked' : 'not linked'}`
+      );
       fetchGuests();
     } catch (error) {
       message.error(getErrorMessage(error));

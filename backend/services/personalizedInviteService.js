@@ -1573,6 +1573,25 @@ async function generatePersonalizedInvite({ guest, event, clientBaseUrl, payload
 
   const hasAdobeTemplate = template?.templateEngine === 'adobe-express' && Array.isArray(template?.adobeExpress?.timeline) && template.adobeExpress.timeline.length > 0;
   const hasTemplateEngineJson = template?.templateEngine === 'template-engine' && template?.configJson && typeof template.configJson === 'object';
+  const rendererUsed = hasAdobeTemplate
+    ? 'adobe-express'
+    : hasTemplateEngineJson
+      ? 'template-engine'
+      : 'classic';
+
+  const templateAssetSlots = hasTemplateEngineJson ? collectAssetSlotUrls(template.configJson || {}) : {};
+  const backgroundAssetRef = hasTemplateEngineJson
+    ? String(template?.configJson?.canvas?.backgroundAssetRef || '').trim()
+    : '';
+  const hasBackgroundAsset = Boolean(
+    hasTemplateEngineJson && (
+      (backgroundAssetRef && templateAssetSlots[backgroundAssetRef]) ||
+      templateAssetSlots.backgroundTextureImage ||
+      templateAssetSlots.backgroundImage ||
+      (template?.configJson?.canvas?.backgroundImage && String(template.configJson.canvas.backgroundImage).trim())
+    )
+  );
+
   const pdfBuffer = hasAdobeTemplate
     ? await buildAdobeExpressPdfBuffer({
         guest,
@@ -1616,6 +1635,14 @@ async function generatePersonalizedInvite({ guest, event, clientBaseUrl, payload
     inviteTone: tone,
     inviteTemplateKey,
     templateName: template.name,
+    rendererUsed,
+    templateDiagnostics: {
+      templateEngine: template?.templateEngine || 'classic',
+      hasAdobeTemplate,
+      hasTemplateEngineJson,
+      hasBackgroundAsset,
+      backgroundAssetRef: backgroundAssetRef || null,
+    },
     relationship,
     customInviteMessage: customMessage || null,
     inviteUrl,

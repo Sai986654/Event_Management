@@ -277,6 +277,8 @@ exports.generatePersonalizedInviteForGuest = asyncHandler(async (req, res) => {
       tone: generated.inviteTone,
       templateKey: generated.inviteTemplateKey,
       templateName: generated.templateName,
+      rendererUsed: generated.rendererUsed,
+      templateDiagnostics: generated.templateDiagnostics,
       relationship: generated.relationship,
     },
   });
@@ -356,6 +358,8 @@ exports.generatePersonalizedInvitesBulk = asyncHandler(async (req, res) => {
         inviteUrl: generated.inviteUrl,
         templateKey: generated.inviteTemplateKey,
         templateName: generated.templateName,
+        rendererUsed: generated.rendererUsed,
+        templateDiagnostics: generated.templateDiagnostics,
       });
     } catch (error) {
       failures.push({
@@ -546,6 +550,10 @@ exports.generateAndSendInvites = asyncHandler(async (req, res) => {
         email: guest.email,
         phone: guest.phone,
         inviteUrl: generated.inviteUrl,
+        templateKey: generated.inviteTemplateKey,
+        templateName: generated.templateName,
+        rendererUsed: generated.rendererUsed,
+        templateDiagnostics: generated.templateDiagnostics,
         sent: sendStatus,
       });
     } catch (error) {
