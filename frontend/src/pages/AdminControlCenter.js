@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Button, Card, Col, Form, Input, InputNumber, Modal, Popconfirm, Row, Select, Space, Switch, Table, Tabs, Tag, Upload, message } from 'antd';
 import { DeleteOutlined, EditOutlined, PlusOutlined, AppstoreOutlined, CloudUploadOutlined, EnvironmentOutlined, ShopOutlined, TeamOutlined, UploadOutlined, UserAddOutlined, ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons';
 import { adminService } from '../services/adminService';
@@ -6,6 +6,110 @@ import { vendorService } from '../services/vendorService';
 import LocationAutocomplete from '../components/LocationAutocomplete';
 import { getErrorMessage } from '../utils/helpers';
 import './PhaseFlows.css';
+
+const PREVIEW_SAMPLE_CONTEXT = {
+  guest: {
+    name: 'Srinivas Family',
+    guestCategory: 'VIP',
+    relationship: 'Bride Uncle Family',
+    guestCount: 4,
+    qrData: 'https://vedika360.app/rsvp/demo',
+    invitationMessage: 'With divine blessings we invite you to celebrate with us.',
+  },
+  event: {
+    title: 'Vedika360 Royal Wedding',
+    dateText: '12 Dec 2026',
+    timeText: '7:00 PM',
+    venue: 'Tirumala Convention Hall',
+    city: 'Tirupati',
+    brideName: 'Sita',
+    groomName: 'Rama',
+  },
+};
+
+const coerceObject = (value) => (value && typeof value === 'object' && !Array.isArray(value) ? value : {});
+
+const resolveTemplateTokens = (value, context) => {
+  if (typeof value === 'string') {
+    return value.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (_match, token) => {
+      const resolved = String(token)
+        .split('.')
+        .reduce((acc, key) => (acc && acc[key] !== undefined ? acc[key] : undefined), context);
+      return resolved === undefined || resolved === null ? '' : String(resolved);
+    });
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((entry) => resolveTemplateTokens(entry, context));
+  }
+
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, resolveTemplateTokens(entry, context)]));
+  }
+
+  return value;
+};
+
+const buildLocalRenderedPreview = (templateConfig) => {
+  const config = coerceObject(templateConfig);
+  const layout = coerceObject(config.layout);
+
+  const baseSections = Array.isArray(layout.sections)
+    ? layout.sections
+    : Array.isArray(config.components)
+      ? config.components.map((component, index) => ({
+          id: component.id || `component_${index + 1}`,
+          componentType: component.componentType || component.type || 'Generic',
+          order: Number(component.order) || index,
+          visible: component.visible !== false,
+          props: coerceObject(component.props || component),
+          bindings: coerceObject(component.bindings),
+          style: coerceObject(component.style),
+        }))
+      : [];
+
+  const sections = baseSections
+    .filter((section) => section.visible !== false)
+    .sort((a, b) => Number(a.order || 0) - Number(b.order || 0))
+    .map((section) => ({
+      ...section,
+      props: resolveTemplateTokens(coerceObject(section.props), PREVIEW_SAMPLE_CONTEXT),
+      bindings: resolveTemplateTokens(coerceObject(section.bindings), PREVIEW_SAMPLE_CONTEXT),
+      style: resolveTemplateTokens(coerceObject(section.style), PREVIEW_SAMPLE_CONTEXT),
+    }));
+
+  return {
+    metadata: coerceObject(config.metadata),
+    canvas: coerceObject(config.canvas),
+    palette: coerceObject(config.palette),
+    typography: coerceObject(config.typography),
+    sections,
+  };
+};
+
+const getSectionPreviewText = (section) => {
+  const props = coerceObject(section.props);
+  const bindings = coerceObject(section.bindings);
+  const candidates = [
+    props.title,
+    props.heading,
+    props.subheading,
+    props.subtitle,
+    props.message,
+    props.body,
+    props.text,
+    props.label,
+    bindings.title,
+    bindings.message,
+    bindings.text,
+    bindings.value,
+  ];
+
+  const first = candidates.find((value) => typeof value === 'string' && value.trim());
+  if (first) return first;
+
+  return `${section.componentType || section.type || 'Section'} preview`;
+};
 
 const AdminControlCenter = () => {
   // ── Vendor Verification ────────────────────────────────────────────
@@ -117,6 +221,18 @@ const AdminControlCenter = () => {
   const [savingEngineTemplate, setSavingEngineTemplate] = useState(false);
   const [publishingEngineTemplate, setPublishingEngineTemplate] = useState(false);
   const [creatingAiTemplate, setCreatingAiTemplate] = useState(false);
+
+  const editorLivePreview = useMemo(() => {
+    if (!engineTemplateConfigText || !engineTemplateConfigText.trim()) return null;
+    try {
+      const config = JSON.parse(engineTemplateConfigText);
+      return buildLocalRenderedPreview(config);
+    } catch (_error) {
+      return null;
+    }
+  }, [engineTemplateConfigText]);
+
+  const effectiveRenderedPreview = renderedPreview || editorLivePreview;
 
   const loadInviteTemplates = useCallback(async () => {
     setLoadingInviteTemplates(true);
@@ -239,7 +355,9 @@ const AdminControlCenter = () => {
       setRenderedPreview(res.rendered || null);
       message.success('Preview rendered');
     } catch (err) {
-      message.error(getErrorMessage(err));
+      const fallbackPreview = buildLocalRenderedPreview(templateConfig);
+      setRenderedPreview(fallbackPreview);
+      message.warning(`${getErrorMessage(err)} Showing local preview from editor JSON.`);
     }
   };
 
@@ -1766,11 +1884,73 @@ const AdminControlCenter = () => {
               </Card>
             ) : null}
 
-            {renderedPreview ? (
+            {effectiveRenderedPreview ? (
+              <Card className="phase-card" title="Visual Preview" style={{ marginTop: 16 }}>
+                <div
+                  style={{
+                    maxWidth: 430,
+                    margin: '0 auto',
+                    borderRadius: 22,
+                    border: '2px solid #d9c37c',
+                    background: '#f5efe1',
+                    boxShadow: '0 18px 38px rgba(15, 23, 42, 0.18)',
+                    padding: 14,
+                  }}
+                >
+                  <div
+                    style={{
+                      borderRadius: 16,
+                      border: '1px solid #e6d7af',
+                      overflow: 'hidden',
+                      background: effectiveRenderedPreview?.palette?.background || '#fff7eb',
+                    }}
+                  >
+                    <div
+                      style={{
+                        padding: '14px 16px',
+                        background: 'linear-gradient(135deg, #0f172a 0%, #1f2b49 65%, #3f8c72 100%)',
+                        color: '#f8f1df',
+                        fontWeight: 700,
+                      }}
+                    >
+                      {selectedEngineTemplate?.name || 'Template Preview'}
+                    </div>
+
+                    <div style={{ padding: 14 }}>
+                      {(effectiveRenderedPreview.sections || []).slice(0, 10).map((section, index) => (
+                        <div
+                          key={section.id || `${section.componentType || section.type || 'section'}-${index}`}
+                          style={{
+                            border: '1px solid #e9ddc2',
+                            background: '#fffdf7',
+                            borderRadius: 12,
+                            padding: 10,
+                            marginBottom: 10,
+                          }}
+                        >
+                          <div style={{ fontSize: 12, color: '#8b6a1f', fontWeight: 700, marginBottom: 4 }}>
+                            {section.componentType || section.type || 'Section'}
+                          </div>
+                          <div style={{ color: '#253045', lineHeight: 1.45 }}>
+                            {getSectionPreviewText(section)}
+                          </div>
+                        </div>
+                      ))}
+
+                      {!(effectiveRenderedPreview.sections || []).length ? (
+                        <div style={{ color: '#667085' }}>No visible sections found in this template config.</div>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            ) : null}
+
+            {effectiveRenderedPreview ? (
               <Card className="phase-card" title="Renderer Output" style={{ marginTop: 16 }}>
                 <Input.TextArea
                   rows={14}
-                  value={JSON.stringify(renderedPreview, null, 2)}
+                  value={JSON.stringify(effectiveRenderedPreview, null, 2)}
                   readOnly
                 />
               </Card>
