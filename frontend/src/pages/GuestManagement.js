@@ -488,7 +488,24 @@ const GuestManagement = () => {
       }
 
       const result = await guestService.generateBulkPersonalizedInvites(eventId, payload);
-      message.success(`Generated ${result.generated}/${result.total} personalized invites`);
+      const invites = Array.isArray(result?.invites) ? result.invites : [];
+      const rendererCounts = invites.reduce((acc, invite) => {
+        const key = invite?.rendererUsed || 'unknown';
+        acc[key] = (acc[key] || 0) + 1;
+        return acc;
+      }, {});
+      const rendererSummary = Object.entries(rendererCounts)
+        .map(([renderer, count]) => `${renderer}:${count}`)
+        .join(', ');
+      const htmlFallbackCount = invites.filter(
+        (invite) => invite?.templateDiagnostics?.htmlRendererAttempted && invite?.templateDiagnostics?.htmlRendererFailed
+      ).length;
+
+      message.success(
+        `Generated ${result.generated}/${result.total} personalized invites`
+        + (rendererSummary ? ` | renderers ${rendererSummary}` : '')
+        + (htmlFallbackCount ? ` | html fallback ${htmlFallbackCount}` : '')
+      );
       fetchGuests();
     } catch (error) {
       message.error(getErrorMessage(error));

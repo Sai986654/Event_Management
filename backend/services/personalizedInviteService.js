@@ -2579,6 +2579,7 @@ async function uploadPdfToR2(pdfBuffer, key) {
 }
 
 async function generatePersonalizedInvite({ guest, event, clientBaseUrl, payload = {} }) {
+  const startedAt = Date.now();
   const templates = await getTemplateCatalog();
   const language = normalizeLanguage(payload.language || guest.inviteLanguage);
   const tone = normalizeTone(payload.tone || guest.inviteTone);
@@ -2686,6 +2687,26 @@ async function generatePersonalizedInvite({ guest, event, clientBaseUrl, payload
   const key = `invites/personalized/${event.id}/${inviteTemplateKey}/guest-${guest.id}-${Date.now()}.pdf`;
   const pdfUrl = await uploadPdfToR2(pdfBuffer, key);
 
+  const generationMs = Date.now() - startedAt;
+  if (htmlRendererFailed) {
+    console.warn('[invite-renderer] html renderer fallback engaged', {
+      guestId: guest?.id,
+      eventId: event?.id,
+      templateKey: inviteTemplateKey,
+      rendererUsed,
+      generationMs,
+      error: htmlRendererError,
+    });
+  } else {
+    console.info('[invite-renderer] invite generated', {
+      guestId: guest?.id,
+      eventId: event?.id,
+      templateKey: inviteTemplateKey,
+      rendererUsed,
+      generationMs,
+    });
+  }
+
   return {
     inviteToken,
     inviteMessage,
@@ -2703,6 +2724,7 @@ async function generatePersonalizedInvite({ guest, event, clientBaseUrl, payload
       htmlRendererAttempted,
       htmlRendererFailed,
       htmlRendererError,
+      generationMs,
     },
     relationship,
     customInviteMessage: customMessage || null,

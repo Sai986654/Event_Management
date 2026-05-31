@@ -1,5 +1,7 @@
 import api from './api';
 
+const INVITE_GENERATION_TIMEOUT_MS = 5 * 60 * 1000;
+
 export const guestService = {
   addGuests: async (eventId, guestData) => {
     const response = await api.post(`/guests`, { event: Number(eventId), ...guestData });
@@ -50,7 +52,9 @@ export const guestService = {
   },
 
   generatePersonalizedInvite: async (guestId, payload = {}) => {
-    const response = await api.post(`/guests/${guestId}/personalized-invite/generate`, payload);
+    const response = await api.post(`/guests/${guestId}/personalized-invite/generate`, payload, {
+      timeout: INVITE_GENERATION_TIMEOUT_MS,
+    });
     return response.data;
   },
 
@@ -58,6 +62,8 @@ export const guestService = {
     const response = await api.post('/guests/personalized-invites/generate-bulk', {
       eventId: Number(eventId),
       ...payload,
+    }, {
+      timeout: INVITE_GENERATION_TIMEOUT_MS,
     });
     return response.data;
   },
@@ -66,6 +72,8 @@ export const guestService = {
     const response = await api.post('/guests/personalized-invites/generate-and-send', {
       eventId: Number(eventId),
       ...payload,
+    }, {
+      timeout: INVITE_GENERATION_TIMEOUT_MS,
     });
     return response.data;
   },
