@@ -244,8 +244,9 @@ const InviteDesignStudio = () => {
 
       const design = designRes.design;
       const designLayout = design.jsonLayout && typeof design.jsonLayout === 'object' ? design.jsonLayout : {};
-      const designEventType = event?.type || design.category || 'other';
+      const designEventType = designLayout.eventType || event?.type || design.category || 'other';
       const hasRenderableElements = Array.isArray(designLayout.elements) && designLayout.elements.length > 0;
+      const hasAnyLayoutContent = Object.keys(designLayout).length > 0;
       const fallbackTemplateKey =
         (typeof designLayout.templateKey === 'string' && designLayout.templateKey) ||
         selectedTemplate ||
@@ -257,14 +258,20 @@ const InviteDesignStudio = () => {
             eventType: designEventType,
             mergeData: buildDefaultMergeData(designEventType, designLayout.mergeData),
           }
-        : buildStarterLayout({
+        : !hasAnyLayoutContent
+        ? buildStarterLayout({
             eventType: designEventType,
             event,
             templateKey: fallbackTemplateKey,
             mergeData: designLayout.mergeData,
             canvasSize: designLayout.canvasSize || design.canvasSize || '1080x1920',
             backgroundColor: designLayout.backgroundColor || '#fffaf6',
-          });
+          })
+        : {
+            ...designLayout,
+            eventType: designEventType,
+            mergeData: buildDefaultMergeData(designEventType, designLayout.mergeData),
+          };
       setSelectedDesignId(design.id);
       setSelectedDesign(design);
       setDesignName(design.name || '');
@@ -276,8 +283,10 @@ const InviteDesignStudio = () => {
         setSelectedTemplate(nextLayout.templateKey);
       }
       setExportsList(exportRes.exports || []);
-      if (!hasRenderableElements) {
-        message.info('Loaded starter layout because this design had no canvas elements yet. Click Save to persist it.');
+      if (!hasRenderableElements && !hasAnyLayoutContent) {
+        message.info('Loaded starter layout because this design was empty. Click Save to persist it.');
+      } else if (!hasRenderableElements) {
+        message.warning('This design has saved JSON but no canvas elements. Nothing was auto-generated. Use "Apply Full Starter Layout" only if you want a new canvas base.');
       }
     } catch (error) {
       message.error(getErrorMessage(error));
