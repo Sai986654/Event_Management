@@ -1,9 +1,15 @@
 const crypto = require('crypto');
+const fs = require('fs');
 const PDFDocument = require('pdfkit');
 const QRCode = require('qrcode');
 const { PutObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
 const { prisma } = require('../config/db');
 const { r2Client, R2_BUCKET, R2_PUBLIC_URL } = require('../config/r2');
+
+const HTML_PDF_PAGE_WIDTH = 794;
+const HTML_PDF_PAGE_HEIGHT = 1123;
+
+let playwrightChromium = null;
 
 const SUPPORTED_LANGUAGES = ['en', 'te'];
 const SUPPORTED_TONES = ['formal', 'friendly', 'emotional'];
@@ -1851,6 +1857,385 @@ async function loadR2AssetBuffer(assetPath) {
   }
 }
 
+function getPlaywrightChromium() {
+  if (playwrightChromium) return playwrightChromium;
+
+  try {
+    // Prefer full playwright package because it can manage browser binaries.
+    playwrightChromium = require('playwright').chromium;
+    return playwrightChromium;
+  } catch (_error) {
+    try {
+      // Fallback for environments that install playwright-core with system chromium.
+      playwrightChromium = require('playwright-core').chromium;
+      return playwrightChromium;
+    } catch (_innerError) {
+      return null;
+    }
+  }
+}
+
+function resolveChromiumExecutablePath() {
+  const candidates = [
+    process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH,
+    process.env.CHROMIUM_PATH,
+    process.platform === 'win32' ? 'C:/Program Files/Google/Chrome/Application/chrome.exe' : '',
+    process.platform === 'win32' ? 'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe' : '',
+    '/usr/bin/chromium-browser',
+    '/usr/bin/chromium',
+  ].filter(Boolean);
+
+  for (const candidate of candidates) {
+    try {
+      if (fs.existsSync(candidate)) return candidate;
+    } catch (_error) {
+      // Ignore malformed path checks.
+    }
+  }
+
+  return null;
+}
+
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function resolveContentAreaRectForHtml(contentAreaRaw) {
+  const toFiniteNumber = (value) => {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  const contentArea = contentAreaRaw && typeof contentAreaRaw === 'object' ? contentAreaRaw : {};
+  const defaultRect = {
+    x: Math.round(HTML_PDF_PAGE_WIDTH * 0.12),
+    y: Math.round(HTML_PDF_PAGE_HEIGHT * 0.18),
+    w: Math.round(HTML_PDF_PAGE_WIDTH * 0.76),
+    h: Math.round(HTML_PDF_PAGE_HEIGHT * 0.72),
+  };
+
+  const xRaw = toFiniteNumber(contentArea.x ?? contentArea.left);
+  const yRaw = toFiniteNumber(contentArea.y ?? contentArea.top);
+  const wRaw = toFiniteNumber(contentArea.width ?? contentArea.w);
+  const hRaw = toFiniteNumber(contentArea.height ?? contentArea.h);
+
+  const resolveAxis = (raw, total, fallback) => {
+    if (raw === null) return fallback;
+    if (raw >= 0 && raw <= 1) return Math.round(raw * total);
+    return Math.round(raw);
+  };
+
+  const x = resolveAxis(xRaw, HTML_PDF_PAGE_WIDTH, defaultRect.x);
+  const y = resolveAxis(yRaw, HTML_PDF_PAGE_HEIGHT, defaultRect.y);
+  const w = Math.max(220, resolveAxis(wRaw, HTML_PDF_PAGE_WIDTH, defaultRect.w));
+  const h = Math.max(260, resolveAxis(hRaw, HTML_PDF_PAGE_HEIGHT, defaultRect.h));
+
+  return { x, y, w, h };
+}
+
+async function renderHtmlToPdfBuffer(html) {
+  const chromium = getPlaywrightChromium();
+  if (!chromium) {
+    throw new Error('Playwright Chromium not available. Install playwright or playwright-core.');
+  }
+
+  const launchOptions = {
+    headless: true,
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+  };
+  const executablePath = resolveChromiumExecutablePath();
+  if (executablePath) launchOptions.executablePath = executablePath;
+
+  const browser = await chromium.launch(launchOptions);
+  try {
+    const page = await browser.newPage({
+      viewport: { width: HTML_PDF_PAGE_WIDTH, height: HTML_PDF_PAGE_HEIGHT },
+      deviceScaleFactor: 1,
+    });
+
+    await page.setContent(html, { waitUntil: 'networkidle' });
+    return await page.pdf({
+      format: 'A4',
+      printBackground: true,
+      margin: { top: '0px', right: '0px', bottom: '0px', left: '0px' },
+      preferCSSPageSize: true,
+    });
+  } finally {
+    await browser.close();
+  }
+}
+
+async function buildTemplateEngineHtmlPdfBuffer({ guest, event, inviteMessage, inviteUrl, qrBuffer, relationship, template }) {
+  const p = template?.palette || {};
+  const eventDate = event?.date ? new Date(event.date) : null;
+  const dateText = eventDate
+    ? eventDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })
+    : 'Date to be announced';
+  const timeText = eventDate
+    ? eventDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
+    : '';
+
+  const context = {
+    guest: {
+      name: guest?.name || 'Guest',
+      guestCategory: guest?.guestCategory || 'VIP',
+      relationship: relationship || guest?.relationship || 'Guest',
+      qrData: inviteUrl || '',
+      invitationMessage: inviteMessage,
+    },
+    event: {
+      title: event?.title || 'Wedding Celebration',
+      brideName: event?.brideName || 'Bride',
+      groomName: event?.groomName || 'Groom',
+      dateText,
+      timeText,
+      venue: event?.venue || 'Venue to be announced',
+      city: event?.city || '',
+      groomFamily: event?.groomFamily || 'To be announced',
+      brideFamily: event?.brideFamily || 'To be announced',
+      segment1Time: event?.segment1Time || '9:00 AM',
+      segment2Time: event?.segment2Time || (timeText || '10:30 AM'),
+      segment3Time: event?.segment3Time || '12:00 PM',
+      segment1Label: event?.segment1Label || 'Program 1',
+      segment2Label: event?.segment2Label || 'Program 2',
+      segment3Label: event?.segment3Label || 'Program 3',
+    },
+  };
+
+  const resolvedTemplateConfig = template?.configJson && typeof template.configJson === 'object'
+    ? template.configJson
+    : {};
+  const normalizedModel = normalizeSimpleTemplateModel(resolvedTemplateConfig);
+
+  const assetSlotUrls = collectAssetSlotUrls(resolvedTemplateConfig);
+  const assetUrls = collectTemplateAssetUrls(resolvedTemplateConfig);
+  const backgroundAssetRef = String(resolvedTemplateConfig?.canvas?.backgroundAssetRef || '').trim();
+  const backgroundImageUrl = firstText(
+    normalizedModel.backgroundImage,
+    assetSlotUrls[backgroundAssetRef],
+    assetSlotUrls.backgroundTextureImage,
+    assetSlotUrls.backgroundImage,
+    resolvedTemplateConfig?.canvas?.backgroundImage,
+    assetSlotUrls.decorativeImage,
+    assetUrls[0]
+  );
+
+  const theme = resolveDynamicTheme(resolvedTemplateConfig, p);
+  const contentRect = resolveContentAreaRectForHtml(normalizedModel.contentArea);
+  const sections = normalizeTemplateEngineSections(resolvedTemplateConfig, context);
+
+  const inviteLines = String(inviteMessage || '').split('\n').map((line) => line.trim()).filter(Boolean);
+  const salutation = inviteLines[0] || `Dear ${context.guest.name}`;
+  const messageBody = inviteLines.slice(1).join(' ') || context.guest.invitationMessage || '';
+
+  const syntheticSections = [
+    {
+      componentType: 'GuestHeader',
+      props: {
+        title: context.event.title,
+        subtitle: `${context.event.brideName} & ${context.event.groomName}`,
+        badgeText: context.guest.guestCategory,
+      },
+    },
+    {
+      componentType: 'PersonalMessage',
+      props: {
+        salutation,
+        message: messageBody,
+        signature: `${context.event.dateText}${context.event.timeText ? ` | ${context.event.timeText}` : ''}`,
+      },
+    },
+    {
+      componentType: 'RSVPSection',
+      props: { title: 'RSVP', primaryLabel: 'RSVP Now', secondaryLabel: 'Join Live Stream' },
+    },
+    {
+      componentType: 'SmartRecommendations',
+      props: {
+        title: 'Event Timeline',
+        segment1Label: context.event.segment1Label,
+        segment2Label: context.event.segment2Label,
+        segment3Label: context.event.segment3Label,
+      },
+    },
+    {
+      componentType: 'FamilyConnection',
+      props: {
+        groomFamilyLabel: `Groom's Family: ${context.event.groomFamily}`,
+        brideFamilyLabel: `Bride's Family: ${context.event.brideFamily}`,
+      },
+    },
+    {
+      componentType: 'QRPass',
+      props: { ctaLabel: 'Get Directions / RSVP', helpText: inviteUrl || '' },
+    },
+  ];
+
+  const sectionsToRender = sections.length ? sections : syntheticSections;
+  const qrDataUrl = qrBuffer ? `data:image/png;base64,${qrBuffer.toString('base64')}` : '';
+
+  const cardMarkup = sectionsToRender.map((section) => {
+    const type = String(section?.componentType || '').toLowerCase();
+    const props = section?.props && typeof section.props === 'object' ? section.props : {};
+
+    if (type === 'guestheader' || type === 'couplehero') {
+      return `
+        <section class="card card-header">
+          <h1>${escapeHtml(firstText(props.title, context.event.title))}</h1>
+          <p class="subtitle">${escapeHtml(firstText(props.subtitle, `${context.event.brideName} & ${context.event.groomName}`))}</p>
+          <div class="badge">${escapeHtml(firstText(props.badgeText, context.guest.guestCategory))}</div>
+        </section>
+      `;
+    }
+
+    if (type === 'personalmessage') {
+      return `
+        <section class="card card-message">
+          <h2>${escapeHtml(firstText(props.salutation, salutation))}</h2>
+          <p>${escapeHtml(firstText(props.message, messageBody))}</p>
+          <div class="muted">${escapeHtml(firstText(props.signature, `${context.event.dateText}${context.event.timeText ? ` | ${context.event.timeText}` : ''}`))}</div>
+          <div class="muted">${escapeHtml(context.event.venue)}</div>
+        </section>
+      `;
+    }
+
+    if (type === 'rsvpsection') {
+      return `
+        <section class="card card-actions">
+          <div class="btn">${escapeHtml(firstText(props.primaryLabel, 'RSVP Now'))}</div>
+          <div class="btn">${escapeHtml(firstText(props.secondaryLabel, 'Join Live Stream'))}</div>
+        </section>
+      `;
+    }
+
+    if (type === 'smartrecommendations') {
+      return `
+        <section class="card card-timeline">
+          <div class="timeline-item"><div class="dot"></div><div>${escapeHtml(firstText(props.segment1Label, context.event.segment1Label))}</div></div>
+          <div class="timeline-item"><div class="dot"></div><div>${escapeHtml(firstText(props.segment2Label, context.event.segment2Label))}</div></div>
+          <div class="timeline-item"><div class="dot"></div><div>${escapeHtml(firstText(props.segment3Label, context.event.segment3Label))}</div></div>
+        </section>
+      `;
+    }
+
+    if (type === 'familyconnection') {
+      return `
+        <section class="card card-details">
+          <div>${escapeHtml(firstText(props.groomFamilyLabel, `Groom's Family: ${context.event.groomFamily}`))}</div>
+          <div>${escapeHtml(firstText(props.brideFamilyLabel, `Bride's Family: ${context.event.brideFamily}`))}</div>
+        </section>
+      `;
+    }
+
+    if (type === 'qrpass') {
+      return `
+        <section class="card card-qr">
+          <div class="qr-content">
+            <div class="qr-title">${escapeHtml(firstText(props.ctaLabel, 'Get Directions / RSVP'))}</div>
+            <div class="qr-link">${escapeHtml(firstText(props.helpText, inviteUrl))}</div>
+          </div>
+          ${qrDataUrl ? `<img class="qr-image" src="${escapeHtml(qrDataUrl)}" alt="QR" />` : ''}
+        </section>
+      `;
+    }
+
+    const genericRows = Object.values(props).filter((value) => typeof value === 'string' && value.trim());
+    return `
+      <section class="card card-details">
+        ${genericRows.slice(0, 4).map((line) => `<div>${escapeHtml(line)}</div>`).join('')}
+      </section>
+    `;
+  }).join('');
+
+  const pageBackground = backgroundImageUrl
+    ? `background-image: url('${escapeHtml(backgroundImageUrl)}'); background-size: cover; background-position: center;`
+    : `background: linear-gradient(135deg, ${escapeHtml(firstText(p.background, '#f8f3e8'))} 0%, #fffdf5 100%);`;
+
+  const html = `
+    <!doctype html>
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <style>
+          @page { size: A4; margin: 0; }
+          * { box-sizing: border-box; }
+          html, body { margin: 0; padding: 0; width: ${HTML_PDF_PAGE_WIDTH}px; height: ${HTML_PDF_PAGE_HEIGHT}px; font-family: 'Segoe UI', 'Noto Sans Telugu', Arial, sans-serif; }
+          .page {
+            position: relative;
+            width: ${HTML_PDF_PAGE_WIDTH}px;
+            height: ${HTML_PDF_PAGE_HEIGHT}px;
+            ${pageBackground}
+            overflow: hidden;
+          }
+          .content {
+            position: absolute;
+            left: ${contentRect.x}px;
+            top: ${contentRect.y}px;
+            width: ${contentRect.w}px;
+            max-height: ${contentRect.h}px;
+            display: grid;
+            gap: 10px;
+          }
+          .card {
+            background: rgba(255, 252, 245, 0.88);
+            border: 1.2px solid ${escapeHtml(theme.border)};
+            border-radius: 16px;
+            padding: 12px 14px;
+            color: ${escapeHtml(theme.text)};
+            backdrop-filter: blur(1px);
+          }
+          .card h1, .card h2, .card p { margin: 0; }
+          .card-header h1 { text-align: center; font-size: 36px; line-height: 1.1; color: ${escapeHtml(theme.primary)}; }
+          .card-header .subtitle { margin-top: 4px; text-align: center; font-size: 22px; font-weight: 700; }
+          .badge {
+            margin: 8px auto 0;
+            padding: 4px 14px;
+            width: fit-content;
+            border-radius: 999px;
+            border: 1px solid ${escapeHtml(theme.border)};
+            background: rgba(255, 255, 255, 0.72);
+            font-weight: 700;
+          }
+          .card-message h2 { font-size: 28px; color: ${escapeHtml(theme.text)}; }
+          .card-message p { margin-top: 8px; font-size: 18px; line-height: 1.45; }
+          .muted { margin-top: 6px; font-size: 14px; color: ${escapeHtml(theme.subtle)}; font-weight: 600; }
+          .card-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+          .btn {
+            text-align: center;
+            padding: 10px 12px;
+            border-radius: 999px;
+            border: 1px solid ${escapeHtml(theme.border)};
+            font-weight: 700;
+            background: rgba(255, 255, 255, 0.9);
+          }
+          .card-timeline { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+          .timeline-item { text-align: center; font-size: 14px; }
+          .dot { width: 8px; height: 8px; border-radius: 50%; margin: 0 auto 6px; background: ${escapeHtml(theme.accent)}; }
+          .card-details { font-size: 17px; line-height: 1.45; font-weight: 600; }
+          .card-qr { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+          .qr-title { font-size: 18px; font-weight: 700; }
+          .qr-link { margin-top: 6px; font-size: 12px; color: #b91c1c; word-break: break-all; }
+          .qr-image { width: 72px; height: 72px; border-radius: 6px; border: 1px solid ${escapeHtml(theme.border)}; background: #fff; }
+        </style>
+      </head>
+      <body>
+        <div class="page">
+          <div class="content">
+            ${cardMarkup}
+          </div>
+        </div>
+      </body>
+    </html>
+  `;
+
+  return renderHtmlToPdfBuffer(html);
+}
+
 function resolveAdobeFieldValue({ fieldId, guest, event, inviteMessage, inviteUrl, relationship, customMessage }) {
   const key = String(fieldId || '').trim().toLowerCase();
   const eventDate = event?.date ? new Date(event.date) : null;
@@ -2220,11 +2605,14 @@ async function generatePersonalizedInvite({ guest, event, clientBaseUrl, payload
 
   const hasAdobeTemplate = template?.templateEngine === 'adobe-express' && Array.isArray(template?.adobeExpress?.timeline) && template.adobeExpress.timeline.length > 0;
   const hasTemplateEngineJson = template?.templateEngine === 'template-engine' && template?.configJson && typeof template.configJson === 'object';
-  const rendererUsed = hasAdobeTemplate
+  let rendererUsed = hasAdobeTemplate
     ? 'adobe-express'
     : hasTemplateEngineJson
       ? 'template-engine'
       : 'classic';
+  let htmlRendererAttempted = false;
+  let htmlRendererFailed = false;
+  let htmlRendererError = null;
 
   const templateAssetSlots = hasTemplateEngineJson ? collectAssetSlotUrls(template.configJson || {}) : {};
   const templateAssetUrls = hasTemplateEngineJson ? collectTemplateAssetUrls(template.configJson || {}) : [];
@@ -2242,8 +2630,22 @@ async function generatePersonalizedInvite({ guest, event, clientBaseUrl, payload
     )
   );
 
-  const pdfBuffer = hasAdobeTemplate
-    ? await buildAdobeExpressPdfBuffer({
+  let pdfBuffer;
+  if (hasAdobeTemplate) {
+    pdfBuffer = await buildAdobeExpressPdfBuffer({
+      guest,
+      event,
+      template,
+      inviteMessage,
+      inviteUrl,
+      qrBuffer,
+      relationship,
+      customMessage,
+    });
+  } else if (hasTemplateEngineJson) {
+    htmlRendererAttempted = true;
+    try {
+      pdfBuffer = await buildTemplateEngineHtmlPdfBuffer({
         guest,
         event,
         template,
@@ -2251,29 +2653,35 @@ async function generatePersonalizedInvite({ guest, event, clientBaseUrl, payload
         inviteUrl,
         qrBuffer,
         relationship,
-        customMessage,
-      })
-    : hasTemplateEngineJson
-      ? await buildTemplateEnginePdfBuffer({
-          guest,
-          event,
-          template,
-          inviteMessage,
-          inviteUrl,
-          qrBuffer,
-          relationship,
-        })
-    : await buildPdfBuffer({
-        guest,
-        event,
-        inviteMessage,
-        inviteUrl,
-        qrBuffer,
-        language,
-        tone,
-        relationship,
-        template,
       });
+      rendererUsed = 'template-engine-html';
+    } catch (error) {
+      htmlRendererFailed = true;
+      htmlRendererError = firstText(error?.message, String(error || ''));
+      pdfBuffer = await buildTemplateEnginePdfBuffer({
+        guest,
+        event,
+        template,
+        inviteMessage,
+        inviteUrl,
+        qrBuffer,
+        relationship,
+      });
+      rendererUsed = 'template-engine-pdfkit-fallback';
+    }
+  } else {
+    pdfBuffer = await buildPdfBuffer({
+      guest,
+      event,
+      inviteMessage,
+      inviteUrl,
+      qrBuffer,
+      language,
+      tone,
+      relationship,
+      template,
+    });
+  }
 
   const key = `invites/personalized/${event.id}/${inviteTemplateKey}/guest-${guest.id}-${Date.now()}.pdf`;
   const pdfUrl = await uploadPdfToR2(pdfBuffer, key);
@@ -2292,6 +2700,9 @@ async function generatePersonalizedInvite({ guest, event, clientBaseUrl, payload
       hasTemplateEngineJson,
       hasBackgroundAsset,
       backgroundAssetRef: backgroundAssetRef || null,
+      htmlRendererAttempted,
+      htmlRendererFailed,
+      htmlRendererError,
     },
     relationship,
     customInviteMessage: customMessage || null,

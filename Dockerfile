@@ -3,7 +3,7 @@
 FROM node:20-alpine
 
 # Prisma engines need OpenSSL on Alpine (avoids libssl detection warnings)
-RUN apk add --no-cache openssl libc6-compat ffmpeg
+RUN apk add --no-cache openssl libc6-compat ffmpeg chromium nss freetype harfbuzz ca-certificates
 
 WORKDIR /app
 
