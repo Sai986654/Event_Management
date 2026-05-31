@@ -218,6 +218,7 @@ const AdminControlCenter = () => {
   const [engineVisibilityText, setEngineVisibilityText] = useState('');
   const [engineAiPrompt, setEngineAiPrompt] = useState('Premium Telugu wedding with Tirumala temple theme');
   const [renderedPreview, setRenderedPreview] = useState(null);
+  const [previewSource, setPreviewSource] = useState(null);
   const [savingEngineTemplate, setSavingEngineTemplate] = useState(false);
   const [publishingEngineTemplate, setPublishingEngineTemplate] = useState(false);
   const [creatingAiTemplate, setCreatingAiTemplate] = useState(false);
@@ -233,6 +234,9 @@ const AdminControlCenter = () => {
   }, [engineTemplateConfigText]);
 
   const effectiveRenderedPreview = renderedPreview || editorLivePreview;
+  const effectivePreviewSource = renderedPreview
+    ? previewSource
+    : (editorLivePreview ? 'editor-live' : null);
 
   const loadInviteTemplates = useCallback(async () => {
     setLoadingInviteTemplates(true);
@@ -282,6 +286,8 @@ const AdminControlCenter = () => {
       setSelectedEngineTemplate(template);
       setEngineTemplateConfigText(JSON.stringify(template.configJson || {}, null, 2));
       setEngineVisibilityText(JSON.stringify(template.componentVisibilityJson || {}, null, 2));
+      setRenderedPreview(null);
+      setPreviewSource(null);
     } catch (err) {
       message.error(getErrorMessage(err));
     }
@@ -353,10 +359,12 @@ const AdminControlCenter = () => {
         },
       });
       setRenderedPreview(res.rendered || null);
+      setPreviewSource('backend');
       message.success('Preview rendered');
     } catch (err) {
       const fallbackPreview = buildLocalRenderedPreview(templateConfig);
       setRenderedPreview(fallbackPreview);
+      setPreviewSource('fallback');
       message.warning(`${getErrorMessage(err)} Showing local preview from editor JSON.`);
     }
   };
@@ -1885,7 +1893,28 @@ const AdminControlCenter = () => {
             ) : null}
 
             {effectiveRenderedPreview ? (
-              <Card className="phase-card" title="Visual Preview" style={{ marginTop: 16 }}>
+              <Card
+                className="phase-card"
+                title="Visual Preview"
+                style={{ marginTop: 16 }}
+                extra={(
+                  <Tag
+                    color={
+                      effectivePreviewSource === 'backend'
+                        ? 'green'
+                        : effectivePreviewSource === 'fallback'
+                          ? 'gold'
+                          : 'blue'
+                    }
+                  >
+                    {effectivePreviewSource === 'backend'
+                      ? 'Source: Backend'
+                      : effectivePreviewSource === 'fallback'
+                        ? 'Source: Fallback'
+                        : 'Source: Live Editor'}
+                  </Tag>
+                )}
+              >
                 <div
                   style={{
                     maxWidth: 430,
