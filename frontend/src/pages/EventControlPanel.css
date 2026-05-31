@@ -16,17 +16,20 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+  background:
+    radial-gradient(circle at 10% 8%, rgba(245, 230, 179, 0.24), transparent 42%),
+    linear-gradient(126deg, #0f172a 0%, #1e293b 55%, #324461 100%);
+  color: #fffef9;
   padding: 20px 24px;
-  border-radius: 8px;
+  border-radius: 16px;
+  border: 1px solid rgba(232, 200, 107, 0.26);
   margin-bottom: 24px;
 }
 
 .control-panel-header h1 {
   margin: 0 0 4px 0;
   font-size: 24px;
-  color: white;
+  color: #fffef9;
 }
 
 .control-panel-header p {
@@ -38,7 +41,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  color: white;
+  color: #f9f4e8;
   font-weight: 600;
   font-size: 14px;
 }
@@ -50,8 +53,9 @@
 
 /* ── Panel cards ─────────────────────────────────────────────────────── */
 .panel-card {
-  border-radius: 8px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+  border-radius: 16px;
+  border: 1px solid #e6dbc0;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.08);
 }
 
 .panel-card .ant-card-head-title {
@@ -61,7 +65,7 @@
 /* ── Tasks ────────────────────────────────────────────────────────── */
 .task-completed {
   text-decoration: line-through;
-  color: #999;
+  color: #8a8f98;
 }
 
 /* ── Activity feed ───────────────────────────────────────────────────── */
@@ -79,13 +83,13 @@
 
 .activity-time {
   font-size: 11px;
-  color: #999;
+  color: #8a8f98;
   margin-bottom: 2px;
 }
 
 .activity-text {
   font-size: 13px;
-  color: #333;
+  color: #1f2937;
 }
 
 /* ── Responsive ──────────────────────────────────────────────────────── */

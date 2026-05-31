@@ -108,6 +108,58 @@ const normalizeTemplateKey = (value = '') =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
 
+const inviteTemplateSchemaReady = async () => {
+  try {
+    const rows = await prisma.$queryRawUnsafe(`
+      SELECT
+        EXISTS (
+          SELECT 1
+          FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = 'invite_templates'
+            AND column_name = 'event_type'
+        ) AS has_event_type,
+        EXISTS (
+          SELECT 1
+          FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = 'invite_templates'
+            AND column_name = 'theme_key'
+        ) AS has_theme_key,
+        EXISTS (
+          SELECT 1
+          FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = 'invite_templates'
+            AND column_name = 'status'
+        ) AS has_status,
+        EXISTS (
+          SELECT 1
+          FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = 'invite_templates'
+            AND column_name = 'config_json'
+        ) AS has_config_json
+    `);
+    const row = rows?.[0] || {};
+    return Boolean(row.has_event_type && row.has_theme_key && row.has_status && row.has_config_json);
+  } catch (_error) {
+    return false;
+  }
+};
+
+const ensureInviteTemplateSchemaReady = async (res) => {
+  const ready = await inviteTemplateSchemaReady();
+  if (ready) return true;
+
+  res.status(503).json({
+    message:
+      'Invite template schema is not ready on the active database. Run prisma migrate deploy on the active database and retry.',
+    code: 'INVITE_TEMPLATE_SCHEMA_MIGRATION_PENDING',
+  });
+  return false;
+};
+
 exports.uploadAdobeExpressTemplateAsset = asyncHandler(async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ message: 'No file uploaded' });
@@ -278,6 +330,8 @@ exports.importAdobeExpressTemplateManifest = asyncHandler(async (req, res) => {
 });
 
 exports.getInviteTemplates = asyncHandler(async (_req, res) => {
+  if (!(await ensureInviteTemplateSchemaReady(res))) return;
+
   const templates = await prisma.inviteTemplate.findMany({
     orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
   });
@@ -286,6 +340,8 @@ exports.getInviteTemplates = asyncHandler(async (_req, res) => {
 });
 
 exports.createInviteTemplate = asyncHandler(async (req, res) => {
+  if (!(await ensureInviteTemplateSchemaReady(res))) return;
+
   const key = normalizeTemplateKey(req.body.key || req.body.name);
   if (!key) return res.status(400).json({ message: 'Template key is required' });
 
@@ -311,6 +367,8 @@ exports.createInviteTemplate = asyncHandler(async (req, res) => {
 });
 
 exports.updateInviteTemplate = asyncHandler(async (req, res) => {
+  if (!(await ensureInviteTemplateSchemaReady(res))) return;
+
   const id = Number(req.params.id);
   const existing = await prisma.inviteTemplate.findUnique({ where: { id } });
   if (!existing) return res.status(404).json({ message: 'Invite template not found' });
@@ -342,6 +400,8 @@ exports.updateInviteTemplate = asyncHandler(async (req, res) => {
 });
 
 exports.deleteInviteTemplate = asyncHandler(async (req, res) => {
+  if (!(await ensureInviteTemplateSchemaReady(res))) return;
+
   const id = Number(req.params.id);
   const template = await prisma.inviteTemplate.findUnique({ where: { id } });
   if (!template) return res.status(404).json({ message: 'Invite template not found' });

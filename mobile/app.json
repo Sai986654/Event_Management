@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Vedika 360",
+    "name": "Vedika360",
     "slug": "vedika360-mobile",
     "version": "1.0.0",
     "scheme": "vedika360",
@@ -10,7 +10,7 @@
     "splash": {
       "image": "./assets/icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#0a4f7a"
+      "backgroundColor": "#0F172A"
     },
     "assetBundlePatterns": [
       "**/*"
@@ -19,13 +19,13 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.vedika360.myapp",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "Allow Vedika 360 to access your location to show nearby vendors."
+        "NSLocationWhenInUseUsageDescription": "Allow Vedika360 to access your location to show nearby vendors."
       }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon.png",
-        "backgroundColor": "#0a4f7a"
+        "backgroundColor": "#0F172A"
       },
       "googleServicesFile": "./google-services.json",
       "package": "com.vedika360.myapp",
@@ -45,21 +45,21 @@
         "expo-notifications",
         {
           "icon": "./assets/notification-icon.png",
-          "color": "#0a4f7a",
+          "color": "#B9942A",
           "defaultChannel": "default"
         }
       ],
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Allow Vedika 360 to access your location to show nearby vendors."
+          "locationWhenInUsePermission": "Allow Vedika360 to access your location to show nearby vendors."
         }
       ],
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow Vedika 360 to access your photos to upload blessing images for events.",
-          "cameraPermission": "Allow Vedika 360 to use the camera to capture blessing photos for events."
+          "photosPermission": "Allow Vedika360 to access your photos to upload blessing images for events.",
+          "cameraPermission": "Allow Vedika360 to use the camera to capture blessing photos for events."
         }
       ]
     ],

@@ -40,7 +40,7 @@ const VendorDetailScreen = ({ route, navigation }) => {
   }, [vendorId]);
 
   if (loading) return <ActivityIndicator style={{ flex: 1 }} size="large" color={Colors.primary} />;
-  if (!vendor) return <Text style={{ textAlign: 'center', marginTop: 40 }}>Vendor not found</Text>;
+  if (!vendor) return <Text style={{ textAlign: 'center', marginTop: 40 }}>Wedding vendor not found</Text>;
 
   const portfolio = Array.isArray(vendor.portfolio) ? vendor.portfolio : [];
   const testimonials = vendor.testimonials || [];
@@ -168,7 +168,7 @@ const VendorDetailScreen = ({ route, navigation }) => {
         {/* ── Portfolio / Media ── */}
         {portfolio.length > 0 && (
           <View style={styles.section}>
-            <Text variant="titleMedium" style={styles.sectionTitle}>Portfolio ({portfolio.length})</Text>
+            <Text variant="titleMedium" style={styles.sectionTitle}>Wedding Portfolio ({portfolio.length})</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.mediaScroll}>
               {portfolio.map((item, idx) => {
                 const url = typeof item === 'string' ? item : item.url;
@@ -204,7 +204,7 @@ const VendorDetailScreen = ({ route, navigation }) => {
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text variant="titleSmall" style={{ fontWeight: '700', color: Colors.textPrimary }}>{t.clientName}</Text>
-                      <Text variant="bodySmall" style={{ color: '#d4a642' }}>{'★'.repeat(t.rating)}{'☆'.repeat(5 - t.rating)}</Text>
+                      <Text variant="bodySmall" style={{ color: Colors.primaryDark }}>{'★'.repeat(t.rating)}{'☆'.repeat(5 - t.rating)}</Text>
                     </View>
                   </View>
                   <Text variant="bodyMedium" style={styles.testimonialContent}>"{t.content}"</Text>
@@ -263,7 +263,7 @@ const VendorDetailScreen = ({ route, navigation }) => {
                 <Card.Content>
                   <View style={styles.reviewHeader}>
                     <Text variant="titleSmall" style={{ fontWeight: '600' }}>{review.user?.name || 'User'}</Text>
-                    <Text variant="bodySmall" style={{ color: '#d4a642' }}>{'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}</Text>
+                    <Text variant="bodySmall" style={{ color: Colors.primaryDark }}>{'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}</Text>
                   </View>
                   <Text variant="bodySmall" style={styles.reviewComment}>{review.comment}</Text>
                 </Card.Content>
@@ -351,19 +351,19 @@ const VendorDetailScreen = ({ route, navigation }) => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  hero: { alignItems: 'center', padding: Spacing.xl, paddingTop: Spacing.xxl, backgroundColor: Colors.surface },
+  hero: { alignItems: 'center', padding: Spacing.xl, paddingTop: Spacing.xxl, backgroundColor: Colors.secondary, borderBottomLeftRadius: Radius.lg, borderBottomRightRadius: Radius.lg },
   avatarCircle: {
     width: 72, height: 72, borderRadius: 36,
     backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center', marginBottom: Spacing.md,
   },
-  avatarLetter: { color: '#fff', fontSize: 32, fontWeight: '800' },
-  bizName: { fontWeight: '800', color: Colors.textPrimary, textAlign: 'center' },
+  avatarLetter: { color: Colors.textOnPrimary, fontSize: 32, fontWeight: '800' },
+  bizName: { fontWeight: '800', color: Colors.textOnDark, textAlign: 'center' },
   chipRow: { flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.sm },
   catChip: { backgroundColor: Colors.surfaceVariant },
   catChipText: { textTransform: 'capitalize' },
   verifiedChip: { backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.success + '44' },
-  ratingLine: { color: Colors.textSecondary, marginTop: Spacing.sm },
-  locationLine: { color: Colors.textMuted, marginTop: 2 },
+  ratingLine: { color: Colors.textOnDark, marginTop: Spacing.sm },
+  locationLine: { color: 'rgba(249, 244, 232, 0.86)', marginTop: 2 },
   basePrice: { color: Colors.primary, fontWeight: '800', marginTop: Spacing.md },
   section: { paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md },
   sectionTitle: { fontWeight: '700', color: Colors.textPrimary, marginBottom: Spacing.md },
@@ -376,25 +376,25 @@ const styles = StyleSheet.create({
   mediaThumb: { width: SCREEN_W * 0.55, marginRight: Spacing.md, borderRadius: Radius.md, overflow: 'hidden', backgroundColor: Colors.surfaceVariant },
   mediaImage: { width: '100%', height: SCREEN_W * 0.4, borderRadius: Radius.md },
   fullscreenHint: { position: 'absolute', right: 6, bottom: 6, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 },
-  fullscreenHintText: { color: '#fff', fontSize: 10, fontWeight: '600' },
+  fullscreenHintText: { color: Colors.textOnDark, fontSize: 10, fontWeight: '600' },
   mediaCaption: { color: Colors.textMuted, paddingHorizontal: 6, paddingVertical: 4 },
   viewerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)' },
   viewerTopBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', paddingTop: Spacing.xxl, paddingHorizontal: Spacing.lg, gap: Spacing.sm },
   viewerTopBtn: { backgroundColor: 'rgba(255,255,255,0.18)', borderRadius: 16, paddingHorizontal: 10, paddingVertical: 6 },
-  viewerTopBtnText: { color: '#fff', fontWeight: '700' },
-  viewerZoomText: { color: '#fff', fontWeight: '700', marginRight: Spacing.sm },
+  viewerTopBtnText: { color: Colors.textOnDark, fontWeight: '700' },
+  viewerZoomText: { color: Colors.textOnDark, fontWeight: '700', marginRight: Spacing.sm },
   viewerBody: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: Spacing.md },
   viewerPinchArea: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
   viewerImage: { width: SCREEN_W * 0.92, height: '85%' },
   viewerBottomBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.xl, paddingBottom: Spacing.xl },
   viewerNavBtn: { backgroundColor: 'rgba(255,255,255,0.18)', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 8 },
   viewerNavBtnDisabled: { opacity: 0.35 },
-  viewerNavBtnText: { color: '#fff', fontWeight: '700' },
-  viewerCountText: { color: '#fff', fontWeight: '600' },
-  testimonialCard: { marginBottom: Spacing.md, borderRadius: Radius.md, elevation: 1, backgroundColor: Colors.surface },
+  viewerNavBtnText: { color: Colors.textOnDark, fontWeight: '700' },
+  viewerCountText: { color: Colors.textOnDark, fontWeight: '600' },
+  testimonialCard: { marginBottom: Spacing.md, borderRadius: Radius.md, elevation: 1, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface },
   testimonialHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.sm },
-  testimonialAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#d4a642', justifyContent: 'center', alignItems: 'center' },
-  testimonialAvatarText: { color: '#fff', fontWeight: '700', fontSize: 16 },
+  testimonialAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center' },
+  testimonialAvatarText: { color: Colors.textOnPrimary, fontWeight: '700', fontSize: 16 },
   testimonialContent: { color: Colors.textSecondary, fontStyle: 'italic', lineHeight: 22 },
   reviewCard: { marginBottom: Spacing.sm, borderRadius: Radius.sm, elevation: 1, backgroundColor: Colors.surface },
   reviewHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },

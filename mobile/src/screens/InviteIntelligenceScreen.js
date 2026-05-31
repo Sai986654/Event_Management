@@ -53,7 +53,7 @@ const InviteIntelligenceScreen = () => {
   const [listOwnerNotes, setListOwnerNotes] = useState('');
   const [analyzed, setAnalyzed] = useState(null);
   const [targetGroup, setTargetGroup] = useState('all');
-  const [reminderMessage, setReminderMessage] = useState('Namaste! Invitation reminder from Vedika 360. Please check your invite and RSVP.');
+  const [reminderMessage, setReminderMessage] = useState('Namaste! Invitation reminder from Vedika360. Please check your invite and RSVP.');
   const [collageStyle, setCollageStyle] = useState('traditional');
   const [collageStatus, setCollageStatus] = useState(null);
 

@@ -51,7 +51,7 @@ const VendorStack = () => (
 const BrandTitle = () => (
   <View style={brandStyles.row}>
     <Image source={require('../../assets/icon.jpeg')} style={brandStyles.iconImage} />
-    <RNText style={brandStyles.title}>Vedika 360</RNText>
+    <RNText style={brandStyles.title}>Vedika360</RNText>
   </View>
 );
 const brandStyles = StyleSheet.create({

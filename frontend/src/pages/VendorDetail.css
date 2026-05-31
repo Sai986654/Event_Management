@@ -6,10 +6,12 @@
 
 .vendor-header-card {
   margin-bottom: 24px;
+  border: 1px solid #e6dbc0;
+  border-radius: 16px;
 }
 
 .vendor-description {
-  color: #555;
+  color: #4b5563;
   font-size: 15px;
   line-height: 1.6;
   margin-bottom: 16px;
@@ -19,7 +21,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 16px;
-  color: #666;
+  color: #6b7280;
 }
 
 .vendor-meta span {
@@ -29,24 +31,25 @@
 }
 
 .vendor-rating-card {
-  border: 1px solid #f0f0f0;
-  border-radius: 8px;
+  border: 1px solid #e6dbc0;
+  border-radius: 12px;
 }
 
 /* Package Cards */
 .package-card {
   height: 100%;
   border-radius: 12px;
+  border: 1px solid #e6dbc0;
   transition: transform 0.2s, box-shadow 0.2s;
 }
 
 .package-card:hover {
   transform: translateY(-4px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
 }
 
 .package-featured {
-  border: 2px solid #667eea;
+  border: 2px solid #d4af37;
 }
 
 .package-content {
@@ -62,17 +65,17 @@
 .price-amount {
   font-size: 32px;
   font-weight: 700;
-  color: #667eea;
+  color: #6b5220;
 }
 
 .price-type {
-  color: #888;
+  color: #6b7280;
   font-size: 14px;
 }
 
 .package-description {
   text-align: center;
-  color: #666;
+  color: #6b7280;
   min-height: 44px;
 }
 
@@ -84,7 +87,7 @@
 
 .package-includes li {
   padding: 6px 0;
-  color: #333;
+  color: #374151;
   display: flex;
   align-items: flex-start;
 }
@@ -96,10 +99,10 @@
 }
 
 .vendor-portfolio-item {
-  border: 1px solid #dce7f3;
+  border: 1px solid #e6dbc0;
   border-radius: 12px;
   padding: 8px;
-  background: #f9fcff;
+  background: #fffef8;
 }
 
 .vendor-portfolio-image,
@@ -112,7 +115,7 @@
 
 .vendor-portfolio-item p {
   margin: 8px 0 2px;
-  color: #475467;
+  color: #6b7280;
   font-size: 13px;
 }
 

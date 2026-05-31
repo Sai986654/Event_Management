@@ -56,7 +56,7 @@ const BookingsScreen = () => {
             <Text variant="titleMedium" style={styles.title} numberOfLines={1}>
               {isVendor ? (item.event?.title || 'Event') : (item.vendor?.businessName || 'Vendor')}
             </Text>
-            <Chip compact textStyle={{ fontSize: 11, color: '#fff', fontWeight: '600' }} style={{ backgroundColor: getStatusColor(item.status), borderRadius: Radius.sm }}>
+            <Chip compact textStyle={{ fontSize: 11, color: Colors.textOnDark, fontWeight: '600' }} style={{ backgroundColor: getStatusColor(item.status), borderRadius: Radius.sm }}>
               {item.status}
             </Chip>
           </View>
@@ -92,7 +92,7 @@ const BookingsScreen = () => {
         renderItem={renderBooking}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchBookings(); }} colors={[Colors.primary]} />}
         contentContainerStyle={styles.listContent}
-        ListEmptyComponent={<Text style={styles.emptyText}>No bookings yet.</Text>}
+        ListEmptyComponent={<Text style={styles.emptyText}>No wedding bookings yet.</Text>}
       />
     </View>
   );
@@ -101,7 +101,7 @@ const BookingsScreen = () => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   listContent: { padding: Spacing.md },
-  card: { marginBottom: Spacing.md, borderRadius: Radius.lg, elevation: 2, backgroundColor: Colors.surface },
+  card: { marginBottom: Spacing.md, borderRadius: Radius.lg, elevation: 2, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   title: { fontWeight: '700', flex: 1, marginRight: Spacing.sm, color: Colors.textPrimary },
   meta: { color: Colors.textSecondary, marginTop: 4 },

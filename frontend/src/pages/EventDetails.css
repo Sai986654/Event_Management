@@ -5,14 +5,17 @@
 }
 
 .event-header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-  color: white;
+  background:
+    radial-gradient(circle at 10% 8%, rgba(245, 230, 179, 0.24), transparent 42%),
+    linear-gradient(126deg, #0f172a 0%, #1e293b 55%, #31435f 100%) !important;
+  color: #fffef9;
   margin-bottom: 24px;
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   padding: 24px;
-  border: none !important;
+  border: 1px solid rgba(232, 200, 107, 0.24) !important;
+  border-radius: 20px !important;
 }
 
 .event-header .ant-card-body {
@@ -27,14 +30,15 @@
 .event-header-content h1 {
   margin: 0 0 8px 0;
   font-size: 28px;
-  color: white;
+  color: #fffef9;
 }
 
 .event-type {
   display: inline-block;
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(245, 230, 179, 0.22);
   padding: 4px 12px;
-  border-radius: 4px;
+  border-radius: 999px;
+  border: 1px solid rgba(245, 230, 179, 0.46);
   font-size: 12px;
   text-transform: uppercase;
   margin-bottom: 12px;
@@ -44,7 +48,7 @@
   display: flex;
   gap: 24px;
   flex-wrap: wrap;
-  color: rgba(255, 255, 255, 0.9);
+  color: rgba(250, 244, 233, 0.9);
 }
 
 .event-meta span {
@@ -60,14 +64,14 @@
 
 /* Override Ant Design button text color inside the gradient header */
 .event-actions .ant-btn-default {
-  background: rgba(255, 255, 255, 0.9);
-  border-color: transparent;
-  color: #333;
+  background: rgba(255, 248, 229, 0.94);
+  border-color: #ead9ad;
+  color: #3d2f10;
 }
 
 .event-actions .ant-btn-default:hover {
-  background: #fff;
-  color: #1a1a2e;
+  background: #fffdf6;
+  color: #2f2309;
 }
 
 .event-actions .ant-badge-status-text {
@@ -76,16 +80,16 @@
 
 .event-netlify-card {
   margin-bottom: 16px;
-  border: 1px solid #d7e6f4;
-  border-radius: 12px;
+  border: 1px solid #e4d7b8;
+  border-radius: 16px;
 }
 
 .event-share-panel {
   margin-bottom: 16px;
   padding: 16px;
-  border: 1px solid #e5edf5;
+  border: 1px solid #e6dbc0;
   border-radius: 16px;
-  background: linear-gradient(180deg, #fbfdff 0%, #f4f8fc 100%);
+  background: linear-gradient(180deg, #fffef8 0%, #fff8ea 100%);
 }
 
 .event-share-panel__controls {
@@ -115,15 +119,15 @@
 .details-table td:first-child {
   font-weight: 600;
   width: 200px;
-  color: #666;
+  color: #6b7280;
 }
 
 .owner-contact-card {
   margin-top: 16px;
   padding: 14px;
-  border: 1px solid #e7edf5;
+  border: 1px solid #e6dbc0;
   border-radius: 12px;
-  background: #fbfdff;
+  background: #fffef8;
 }
 
 .owner-contact-card h3 {

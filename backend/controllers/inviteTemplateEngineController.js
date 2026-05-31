@@ -17,10 +17,49 @@ const coerceObject = (value) => (value && typeof value === 'object' && !Array.is
 const templateEngineTablesReady = async () => {
   try {
     const rows = await prisma.$queryRawUnsafe(
-      "SELECT to_regclass('public.invite_template_versions')::text AS invite_template_versions, to_regclass('public.invite_component_presets')::text AS invite_component_presets"
+      `
+      SELECT
+        to_regclass('public.invite_template_versions')::text AS invite_template_versions,
+        to_regclass('public.invite_component_presets')::text AS invite_component_presets,
+        EXISTS (
+          SELECT 1
+          FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = 'invite_templates'
+            AND column_name = 'event_type'
+        ) AS has_event_type,
+        EXISTS (
+          SELECT 1
+          FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = 'invite_templates'
+            AND column_name = 'theme_key'
+        ) AS has_theme_key,
+        EXISTS (
+          SELECT 1
+          FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = 'invite_templates'
+            AND column_name = 'status'
+        ) AS has_status,
+        EXISTS (
+          SELECT 1
+          FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = 'invite_templates'
+            AND column_name = 'config_json'
+        ) AS has_config_json
+      `
     );
     const row = rows?.[0] || {};
-    return Boolean(row.invite_template_versions && row.invite_component_presets);
+    return Boolean(
+      row.invite_template_versions &&
+      row.invite_component_presets &&
+      row.has_event_type &&
+      row.has_theme_key &&
+      row.has_status &&
+      row.has_config_json
+    );
   } catch (_error) {
     return false;
   }

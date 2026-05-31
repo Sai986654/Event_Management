@@ -166,12 +166,12 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   pad: { padding: Spacing.lg },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: Spacing.xxl },
-  hero: { marginBottom: Spacing.md, backgroundColor: Colors.primary, borderRadius: Radius.lg },
-  heroTitle: { color: '#fff', fontWeight: '800' },
-  heroMeta: { color: 'rgba(255,255,255,0.88)', marginTop: 4, textTransform: 'capitalize' },
-  card: { marginBottom: Spacing.md, borderRadius: Radius.lg, backgroundColor: Colors.surface, elevation: 2 },
+  hero: { marginBottom: Spacing.md, backgroundColor: Colors.secondary, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.border },
+  heroTitle: { color: Colors.textOnDark, fontWeight: '800' },
+  heroMeta: { color: 'rgba(249, 244, 232, 0.88)', marginTop: 4, textTransform: 'capitalize' },
+  card: { marginBottom: Spacing.md, borderRadius: Radius.lg, backgroundColor: Colors.surface, elevation: 2, borderWidth: 1, borderColor: Colors.border },
   cardTitle: { fontWeight: '800', marginBottom: Spacing.sm, color: Colors.textPrimary },
-  inviteBanner: { backgroundColor: '#f4f6ff', borderWidth: 1, borderColor: '#c7d2fe' },
+  inviteBanner: { backgroundColor: '#fff8e9', borderWidth: 1, borderColor: Colors.border },
   bannerTitle: { marginBottom: Spacing.sm, color: Colors.textPrimary, fontWeight: '700' },
   bannerBody: { fontSize: 14, lineHeight: 22, color: Colors.textSecondary },
   sectionTitle: { fontWeight: '700', marginBottom: Spacing.sm, color: Colors.textPrimary },
@@ -185,7 +185,7 @@ const styles = StyleSheet.create({
   qr: { width: 220, height: 220, alignSelf: 'center', marginVertical: Spacing.md },
   preview: { width: '100%', height: 180, borderRadius: Radius.md, marginTop: Spacing.sm },
   grid: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -4 },
-  thumb: { width: '30%', aspectRatio: 1, borderRadius: Radius.sm, backgroundColor: '#eee', margin: 4 },
+  thumb: { width: '30%', aspectRatio: 1, borderRadius: Radius.sm, backgroundColor: '#f3eee0', margin: 4 },
 });
 
 export default PublicEventScreen;

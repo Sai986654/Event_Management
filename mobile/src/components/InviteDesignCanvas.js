@@ -37,12 +37,12 @@ const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const cloneLayout = (value) => JSON.parse(JSON.stringify(value || DEFAULT_LAYOUT));
 
 const COLOR_OPTIONS = [
-  '#7c2d12', '#9a3412', '#b45309', '#1d4ed8', '#6d28d9', '#be185d',
+  '#7c2d12', '#9a3412', '#b45309', '#0f172a', '#7B632B', '#be185d',
   '#065f46', '#0f766e', '#1f2937', '#475569', '#111827', '#ffffff',
 ];
 
 const BACKGROUND_OPTIONS = [
-  '#fff7f2', '#fffbeb', '#eef2ff', '#fff1f2', '#f0f9ff', '#f6f8fc', '#ffffff',
+  '#fff7f2', '#fffbeb', '#fff8ea', '#fff1f2', '#f8f3e6', '#f6f8fc', '#ffffff',
 ];
 
 const InviteDesignCanvas = ({ layout, onLayoutChange, fullScreen = false, onDragStateChange = () => {} }) => {
@@ -443,7 +443,7 @@ const InviteDesignCanvas = ({ layout, onLayoutChange, fullScreen = false, onDrag
     </View>
   );
 
-  const ToolTile = ({ icon, label, color = '#667eea', bg = '#eef2ff', onPress, disabled = false }) => (
+  const ToolTile = ({ icon, label, color = Colors.secondary, bg = '#f3eee0', onPress, disabled = false }) => (
     <TouchableOpacity
       onPress={onPress}
       disabled={disabled}
@@ -466,8 +466,8 @@ const InviteDesignCanvas = ({ layout, onLayoutChange, fullScreen = false, onDrag
       <View style={styles.toolbarBlock}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           <View style={styles.toolRow}>
-            <ToolTile icon="Aa" label="Text" color="#4f46e5" bg="#eef2ff" onPress={() => addElement('text')} />
-            <ToolTile icon="▭" label="Shape" color="#7c3aed" bg="#f3e8ff" onPress={() => addElement('shape')} />
+            <ToolTile icon="Aa" label="Text" color={Colors.secondary} bg="#f3eee0" onPress={() => addElement('text')} />
+            <ToolTile icon="▭" label="Shape" color="#7B632B" bg="#fff8e9" onPress={() => addElement('shape')} />
             <ToolTile icon="━" label="Line" color="#d97706" bg="#fffbeb" onPress={() => addElement('divider')} />
             <ToolTile icon="🖼" label="Image" color="#059669" bg="#ecfdf5" onPress={() => addElement('image')} />
             <View style={styles.toolSep} />
@@ -516,8 +516,8 @@ const InviteDesignCanvas = ({ layout, onLayoutChange, fullScreen = false, onDrag
                 key={sticker.key}
                 icon={sticker.thumb}
                 label={sticker.label}
-                color="#7c3aed"
-                bg="#f5f3ff"
+                color="#7B632B"
+                bg="#fff8e9"
                 onPress={() => addLottieSticker(sticker)}
               />
             ))}
@@ -813,9 +813,9 @@ const styles = StyleSheet.create({
   themeChipText: { fontSize: 12, fontWeight: '700' },
   categoryRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingBottom: 2 },
   stickerCategoryChip: { backgroundColor: '#f8fafc', borderColor: '#cbd5e1' },
-  stickerCategoryChipActive: { backgroundColor: '#e0e7ff', borderColor: '#818cf8' },
+  stickerCategoryChipActive: { backgroundColor: '#fff3d5', borderColor: '#d9c89a' },
   stickerCategoryText: { fontSize: 11, color: '#475569', fontWeight: '600' },
-  stickerCategoryTextActive: { color: '#3730a3', fontWeight: '700' },
+  stickerCategoryTextActive: { color: '#6B5220', fontWeight: '700' },
   toolSep: { width: 1, height: 40, backgroundColor: '#e2e8f0', marginHorizontal: 4 },
   canvasSection: { alignItems: 'center', justifyContent: 'center', paddingVertical: 12, backgroundColor: '#f8fafc' },
   canvasPreview: {
@@ -825,8 +825,8 @@ const styles = StyleSheet.create({
   },
   previewElement: { position: 'absolute', borderWidth: 1, borderRadius: 4, padding: 2, overflow: 'hidden' },
   resizeHandle: { position: 'absolute', width: 16, height: 16, right: -8, bottom: -8, borderRadius: 8, backgroundColor: Colors.primary, borderWidth: 2, borderColor: '#ffffff' },
-  guideVertical: { position: 'absolute', top: 0, bottom: 0, left: '50%', width: 1, backgroundColor: '#3b82f6', opacity: 0.5 },
-  guideHorizontal: { position: 'absolute', left: 0, right: 0, top: '50%', height: 1, backgroundColor: '#3b82f6', opacity: 0.5 },
+  guideVertical: { position: 'absolute', top: 0, bottom: 0, left: '50%', width: 1, backgroundColor: '#B9942A', opacity: 0.5 },
+  guideHorizontal: { position: 'absolute', left: 0, right: 0, top: '50%', height: 1, backgroundColor: '#B9942A', opacity: 0.5 },
   safeAreaGuide: { position: 'absolute', top: '6%', left: '6%', right: '6%', bottom: '6%', borderWidth: 1, borderStyle: 'dashed', borderColor: '#f59e0b', borderRadius: 10, opacity: 0.7 },
   imagePlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f3f4f6' },
   imageFill: { width: '100%', height: '100%' },

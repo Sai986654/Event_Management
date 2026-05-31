@@ -62,10 +62,10 @@ export const paymentService = {
       currency: 'INR',
       key: order.keyId,
       amount: Math.round(Number(order.amount || 0) * 100),
-      name: 'Vedika 360',
+      name: 'Vedika360',
       order_id: order.orderId,
       prefill: {},
-      theme: { color: '#1677ff' },
+      theme: { color: '#B9942A' },
     };
 
     const result = await RazorpayCheckout.open(options);

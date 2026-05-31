@@ -85,10 +85,10 @@ const AmbientOrbs = () => (
 
 /* ── Organizer / Admin / Customer Dashboard ── */
 const SORT_OPTIONS = [
-  { key: 'date', label: 'Event Date' },
+  { key: 'date', label: 'Ceremony Date' },
   { key: 'budget', label: 'Budget' },
-  { key: 'createdAt', label: 'Listed Date' },
-  { key: 'distance', label: 'Distance' },
+  { key: 'createdAt', label: 'Created' },
+  { key: 'distance', label: 'Nearest' },
 ];
 
 // Haversine distance in km
@@ -211,7 +211,7 @@ const EventsDashboard = ({ user, navigation }) => {
           <Card style={styles.heroCard}>
             <Card.Content>
               <Text variant="headlineSmall" style={styles.greeting}>Welcome, {user?.name}! 👋</Text>
-              <Text variant="bodySmall" style={styles.heroSubtext}>Track budgets, orders, and execution in one place.</Text>
+              <Text variant="bodySmall" style={styles.heroSubtext}>Track families, budgets, vendors, and function progress in one command center.</Text>
             </Card.Content>
           </Card>
         </AnimatedEntrance>
@@ -220,14 +220,14 @@ const EventsDashboard = ({ user, navigation }) => {
         <AnimatedEntrance delay={120}>
           <View style={styles.statsRow}>
             <StatCard label="Events" value={events.length} accent />
-            <StatCard label="Upcoming" value={upcoming} color={Colors.primary} />
-            <StatCard label="Total Budget" value={formatCurrency(totalBudget)} color={Colors.success} />
+            <StatCard label="Upcoming" value={upcoming} color={Colors.primaryDark} />
+            <StatCard label="Budget" value={formatCurrency(totalBudget)} color={Colors.textPrimary} />
           </View>
         </AnimatedEntrance>
 
         {/* Event Tabs */}
         <View style={sortStyles.headerRow}>
-          <Text variant="titleMedium" style={[styles.sectionTitle, { marginTop: 0, marginBottom: 0 }]}>Your Events</Text>
+          <Text variant="titleMedium" style={[styles.sectionTitle, { marginTop: 0, marginBottom: 0 }]}>Wedding Events</Text>
           <View style={sortStyles.controls}>
             <Menu
               visible={sortMenuVisible}
@@ -268,7 +268,7 @@ const EventsDashboard = ({ user, navigation }) => {
             onPress={() => setActiveTab('active')}
           >
             <Text style={[tabStyles.tabText, activeTab === 'active' && tabStyles.tabTextActive]}>
-              Active ({activeEvents.length})
+              Live ({activeEvents.length})
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -276,7 +276,7 @@ const EventsDashboard = ({ user, navigation }) => {
             onPress={() => setActiveTab('drafts')}
           >
             <Text style={[tabStyles.tabText, activeTab === 'drafts' && tabStyles.tabTextActive]}>
-              Drafts ({draftEvents.length})
+              Planned ({draftEvents.length})
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -295,7 +295,7 @@ const EventsDashboard = ({ user, navigation }) => {
               <Card.Content>
                 <Text style={styles.emptyText}>
                   {activeTab === 'active'
-                    ? 'No active events yet. Book a vendor to move events here!'
+                    ? 'No live events yet. Book your first vendor to activate this list.'
                     : activeTab === 'completed'
                       ? 'No completed events yet. Completed events will appear here for tracking.'
                       : 'No draft events. Tap + to create your first event!'}
@@ -330,14 +330,14 @@ const EventsDashboard = ({ user, navigation }) => {
         )}
 
         {/* Quick Actions */}
-        <Text variant="titleMedium" style={styles.sectionTitle}>Quick Actions</Text>
+        <Text variant="titleMedium" style={styles.sectionTitle}>Family Quick Actions</Text>
 
         {(user?.role === 'customer' || user?.role === 'admin') && (
           <AnimatedEntrance delay={280}>
             <ActionCard
               icon="clipboard-check-outline"
               title="Plan Event End-to-End"
-              subtitle="Build quotation and place order"
+              subtitle="Build quotation and confirm bookings"
               onPress={() => navigation.navigate('Planner')}
             />
           </AnimatedEntrance>
@@ -347,7 +347,7 @@ const EventsDashboard = ({ user, navigation }) => {
             <ActionCard
               icon="chart-timeline-variant"
               title="Update Activity Progress"
-              subtitle="Track spend and progress transparently"
+              subtitle="Track spend and family progress transparently"
               onPress={() => navigation.navigate('ActivityTracker')}
             />
           </AnimatedEntrance>
@@ -357,7 +357,7 @@ const EventsDashboard = ({ user, navigation }) => {
             <ActionCard
               icon="account-group-outline"
               title="Guest Management"
-              subtitle="Add guests, track RSVPs, check-ins"
+              subtitle="Add families, track RSVPs and check-ins"
               onPress={() => navigation.navigate('GuestManagement', { eventId: events[0].id })}
             />
           </AnimatedEntrance>
@@ -367,7 +367,7 @@ const EventsDashboard = ({ user, navigation }) => {
             <ActionCard
               icon="cash-multiple"
               title="Budget Dashboard"
-              subtitle="Track allocations and spending"
+              subtitle="Track wedding allocations and spending"
               onPress={() => navigation.navigate('BudgetDashboard', { eventId: events[0].id })}
             />
           </AnimatedEntrance>
@@ -378,7 +378,7 @@ const EventsDashboard = ({ user, navigation }) => {
             <ActionCard
               icon="shield-check-outline"
               title="Admin Control Center"
-              subtitle="Verify vendors and create users"
+              subtitle="Verify vendors and manage accounts"
               onPress={() => navigation.navigate('AdminControl')}
             />
           </AnimatedEntrance>
@@ -387,7 +387,7 @@ const EventsDashboard = ({ user, navigation }) => {
           <ActionCard
             icon="party-popper"
             title="Surprise Pages ✨"
-            subtitle="Create viral interactive surprise experiences"
+              subtitle="Create emotional interactive surprise moments"
             onPress={() => navigation.navigate('SurprisePages')}
           />
         </AnimatedEntrance>
@@ -467,7 +467,7 @@ const VendorDashboard = ({ user, navigation }) => {
         <Card style={styles.heroCard}>
           <Card.Content>
             <Text variant="headlineSmall" style={styles.greeting}>Welcome, {user?.name}! 👋</Text>
-            <Text variant="bodySmall" style={styles.heroSubtext}>Stay updated on bookings and business performance.</Text>
+            <Text variant="bodySmall" style={styles.heroSubtext}>Stay updated on wedding bookings and service performance.</Text>
           </Card.Content>
         </Card>
 
@@ -498,7 +498,7 @@ const VendorDashboard = ({ user, navigation }) => {
         {bookings.length === 0 ? (
           <Card style={styles.emptyCard}>
             <Card.Content>
-              <Text style={styles.emptyText}>No bookings yet. Customers will find you on the marketplace!</Text>
+              <Text style={styles.emptyText}>No bookings yet. Families and planners will discover you in the marketplace.</Text>
             </Card.Content>
           </Card>
         ) : (
@@ -509,7 +509,7 @@ const VendorDashboard = ({ user, navigation }) => {
                   <Text variant="titleMedium" numberOfLines={1} style={styles.eventTitle}>
                     {booking.event?.title || 'Event'}
                   </Text>
-                  <Chip compact textStyle={{ fontSize: 11, color: '#fff' }} style={{ backgroundColor: getStatusColor(booking.status) }}>
+                  <Chip compact textStyle={{ fontSize: 11, color: Colors.textOnDark }} style={{ backgroundColor: getStatusColor(booking.status) }}>
                     {booking.status}
                   </Chip>
                 </View>
@@ -589,17 +589,17 @@ const DashboardScreen = ({ navigation }) => {
         <View>
           <IconButton
             icon="bell-outline"
-            iconColor="#fff"
+            iconColor={Colors.textOnDark}
             onPress={() => navigation.navigate('Notifications')}
           />
           {unreadCount > 0 && (
             <View style={{
               position: 'absolute', top: 6, right: 6,
-              backgroundColor: '#ef4444', borderRadius: 10,
+              backgroundColor: Colors.danger, borderRadius: 10,
               minWidth: 18, height: 18, justifyContent: 'center', alignItems: 'center',
-              paddingHorizontal: 4, borderWidth: 2, borderColor: '#5c6bc0',
+              paddingHorizontal: 4, borderWidth: 2, borderColor: Colors.secondary,
             }}>
-              <Text style={{ color: '#fff', fontSize: 10, fontWeight: '800', lineHeight: 13 }}>
+              <Text style={{ color: Colors.textOnDark, fontSize: 10, fontWeight: '800', lineHeight: 13 }}>
                 {unreadCount > 99 ? '99+' : unreadCount}
               </Text>
             </View>
@@ -627,14 +627,14 @@ const styles = StyleSheet.create({
   orbOne: {
     width: 220,
     height: 220,
-    backgroundColor: '#6D7CFF',
+    backgroundColor: 'rgba(212, 175, 55, 0.26)',
     top: -56,
     right: -64,
   },
   orbTwo: {
     width: 190,
     height: 190,
-    backgroundColor: '#18B6B6',
+    backgroundColor: 'rgba(30, 41, 59, 0.2)',
     bottom: 120,
     left: -76,
   },
@@ -733,7 +733,7 @@ const tabStyles = StyleSheet.create({
     color: Colors.textSecondary,
   },
   tabTextActive: {
-    color: '#fff',
+    color: Colors.textOnPrimary,
   },
 });
 

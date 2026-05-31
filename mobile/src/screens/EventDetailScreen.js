@@ -213,12 +213,12 @@ const EventDetailScreen = ({ route, navigation }) => {
   };
 
   if (loading) return <ActivityIndicator style={{ flex: 1 }} size="large" color={Colors.primary} />;
-  if (!event) return <Text style={{ textAlign: 'center', marginTop: 40 }}>Event not found</Text>;
+  if (!event) return <Text style={{ textAlign: 'center', marginTop: 40 }}>Wedding event not found</Text>;
 
   const isOrganizer = user?.role === 'organizer' || user?.role === 'admin';
   const isCustomer = user?.role === 'customer';
   const owner = event.organizer || {};
-  const ownerRoleLabel = owner.role === 'customer' ? 'Customer' : 'Event Owner';
+  const ownerRoleLabel = owner.role === 'customer' ? 'Family Owner' : 'Event Owner';
   const ownerPhone = owner.phone || '';
   const ownerEmail = owner.email || '';
   const timeline = event.timeline || [];
@@ -543,7 +543,7 @@ const EventDetailScreen = ({ route, navigation }) => {
                           {formatCurrency(bk.price)}
                         </Text>
                       </View>
-                      <Chip compact textStyle={{ color: '#fff', fontSize: 11 }} style={{ backgroundColor: getStatusColor(bk.status) }}>{bk.status}</Chip>
+                      <Chip compact textStyle={{ color: Colors.textOnDark, fontSize: 11 }} style={{ backgroundColor: getStatusColor(bk.status) }}>{bk.status}</Chip>
                     </View>
 
                     {/* Booking Actions */}
@@ -698,7 +698,7 @@ const EventDetailScreen = ({ route, navigation }) => {
       <Portal>
         <Modal visible={showEditModal} onDismiss={() => setShowEditModal(false)} contentContainerStyle={styles.modal}>
           <ScrollView>
-            <Text variant="titleLarge" style={{ fontWeight: '800', marginBottom: Spacing.lg }}>Edit Event</Text>
+            <Text variant="titleLarge" style={{ fontWeight: '800', marginBottom: Spacing.lg }}>Edit Wedding Event</Text>
             <TextInput label="Title" value={editForm.title} onChangeText={(v) => setEditForm((p) => ({ ...p, title: v }))} mode="outlined" style={styles.input} />
             <TextInput label="Description" value={editForm.description} onChangeText={(v) => setEditForm((p) => ({ ...p, description: v }))} mode="outlined" multiline numberOfLines={3} style={styles.input} />
             <LocationPicker label="Venue" value={editForm.venue} onChange={(v) => setEditForm((p) => ({ ...p, venue: v }))} onLocationPick={(loc) => setEditForm((p) => ({ ...p, venue: loc.name || loc.formattedAddress, city: loc.city || p.city }))} placeholder="Search venue..." />
@@ -741,12 +741,12 @@ const styles = StyleSheet.create({
 
   /* Section / Cards */
   section: { paddingHorizontal: Spacing.md },
-  card: { marginBottom: Spacing.sm, borderRadius: Radius.lg, elevation: 1, backgroundColor: Colors.surface },
+  card: { marginBottom: Spacing.sm, borderRadius: Radius.lg, elevation: 1, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface },
   cardTitle: { fontWeight: '700', color: Colors.textPrimary, marginBottom: Spacing.sm },
 
   /* Stats */
   statsRow: { flexDirection: 'row', marginBottom: Spacing.sm },
-  statCard: { flex: 1, marginHorizontal: 3, backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.sm, alignItems: 'center', elevation: 1 },
+  statCard: { flex: 1, marginHorizontal: 3, backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.sm, alignItems: 'center', elevation: 1, borderWidth: 1, borderColor: Colors.border },
   statValue: { fontSize: 20, fontWeight: '800', color: Colors.textPrimary },
   statLabel: { fontSize: 10, color: Colors.textSecondary, fontWeight: '600', marginTop: 2 },
 

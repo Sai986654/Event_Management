@@ -43,7 +43,7 @@ function TemplateMiniInvite({ template, selected, onPress }) {
     >
       <View style={[styles.templateCanvas, { backgroundColor: palette.background, borderColor: palette.frame }]}>
         <View style={[styles.templateCanvasHeader, { backgroundColor: palette.header }]}> 
-          <Text style={[styles.templateCanvasBrand, { color: palette.headerText }]}>Vedika 360</Text>
+          <Text style={[styles.templateCanvasBrand, { color: palette.headerText }]}>Vedika360</Text>
         </View>
         <Text style={[styles.templateCanvasCorner, styles.templateCanvasCornerLeft, { color: palette.accent }]}>{ornamentChar}</Text>
         <Text style={[styles.templateCanvasCorner, styles.templateCanvasCornerRight, { color: palette.accent }]}>{ornamentChar}</Text>
@@ -87,7 +87,7 @@ function InviteLivePreview({ template, language, tone, guestName, relationship, 
   return (
     <View style={[styles.previewCard, { backgroundColor: palette.background, borderColor: palette.frame }]}> 
       <View style={[styles.previewHeaderBand, { backgroundColor: palette.header }]}> 
-        <Text style={[styles.previewHeaderBrand, { color: palette.headerText }]}>Vedika 360</Text>
+        <Text style={[styles.previewHeaderBrand, { color: palette.headerText }]}>Vedika360</Text>
         <Text style={[styles.previewHeaderSub, { color: palette.headerText }]}>Personalized Wedding Invitation</Text>
       </View>
 
@@ -671,7 +671,7 @@ const GuestManagementScreen = ({ route }) => {
             ))}
           </View>
 
-          <Card style={{ marginVertical: Spacing.lg, backgroundColor: '#f0f4ff' }}>
+          <Card style={{ marginVertical: Spacing.lg, backgroundColor: '#fff8ea', borderWidth: 1, borderColor: Colors.border }}>
             <Card.Content>
               <Text style={{ fontSize: 12, color: Colors.textSecondary }}>
                 ✓ Template: <Text style={{ fontWeight: '700', color: Colors.textPrimary }}>{selectedTemplate?.name}</Text>
@@ -703,7 +703,7 @@ const GuestManagementScreen = ({ route }) => {
                 setFabOpen(false);
                 setShowQuickAddModal(true);
               },
-              style: [styles.fabGroupAction, { backgroundColor: '#4f63d4' }],
+              style: [styles.fabGroupAction, { backgroundColor: Colors.secondary }],
             },
             {
               icon: 'account-plus',
@@ -738,6 +738,8 @@ const styles = StyleSheet.create({
     padding: Spacing.md,
     alignItems: 'center',
     elevation: 2,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   statValue: { fontSize: 22, fontWeight: '800', color: Colors.textPrimary },
   statLabel: { fontSize: 11, color: Colors.textSecondary, fontWeight: '600', marginTop: 2 },
@@ -746,6 +748,8 @@ const styles = StyleSheet.create({
     marginTop: Spacing.sm,
     borderRadius: Radius.lg,
     elevation: 1,
+    borderWidth: 1,
+    borderColor: Colors.border,
     backgroundColor: Colors.surface,
   },
   checkinRow: { flexDirection: 'row', alignItems: 'center' },
@@ -755,6 +759,8 @@ const styles = StyleSheet.create({
     borderRadius: Radius.lg,
     backgroundColor: Colors.surface,
     elevation: 2,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   inviteTitle: { fontWeight: '800', marginBottom: Spacing.sm, color: Colors.textPrimary },
   templateRow: { paddingBottom: Spacing.sm },
@@ -872,7 +878,9 @@ const styles = StyleSheet.create({
     marginTop: 12,
     padding: Spacing.md,
     borderRadius: Radius.md,
-    backgroundColor: '#ffffffaa',
+    backgroundColor: '#fffef8',
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   previewDetailLabel: { fontSize: 11, fontWeight: '800', textTransform: 'uppercase' },
   previewDetailValue: { marginTop: 2, color: Colors.textPrimary, fontSize: 13 },
@@ -901,6 +909,8 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.sm,
     borderRadius: Radius.lg,
     elevation: 2,
+    borderWidth: 1,
+    borderColor: Colors.border,
     backgroundColor: Colors.surface,
   },
   guestCardSelected: {

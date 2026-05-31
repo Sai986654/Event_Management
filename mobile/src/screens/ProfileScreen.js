@@ -459,7 +459,7 @@ const ProfileScreen = () => {
               mode="contained-tonal"
               onPress={confirmDeleteAccount}
               loading={deletingAccount}
-              buttonColor="#fee2e2"
+              buttonColor="#fde8e8"
               textColor={Colors.danger}
               icon="delete-outline"
             >
@@ -682,7 +682,7 @@ const ProfileScreen = () => {
         Log Out
       </Button>
 
-      <Text variant="bodySmall" style={styles.version}>Vedika 360 v1.0.0</Text>
+      <Text variant="bodySmall" style={styles.version}>Vedika360 v1.0.0</Text>
     </ScrollView>
   );
 };
@@ -693,14 +693,14 @@ const styles = StyleSheet.create({
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
   // Hero
-  heroCard: { borderRadius: Radius.lg, elevation: 3, marginBottom: Spacing.lg, backgroundColor: Colors.surface },
+  heroCard: { borderRadius: Radius.lg, elevation: 3, marginBottom: Spacing.lg, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface },
   heroContent: { alignItems: 'center', paddingVertical: Spacing.xxl },
   heroName: { fontWeight: '800', marginTop: Spacing.md, color: Colors.textPrimary },
   heroEmail: { color: Colors.textSecondary, marginTop: Spacing.xs },
   avatarBtn: { marginTop: Spacing.md, borderRadius: Radius.full },
   heroTags: { flexDirection: 'row', gap: 8, marginTop: Spacing.sm, flexWrap: 'wrap', justifyContent: 'center' },
   roleChip: { borderRadius: 12 },
-  roleChipText: { color: '#fff', fontWeight: '600', fontSize: 12 },
+  roleChipText: { color: Colors.textOnDark, fontWeight: '600', fontSize: 12 },
   statusChip: { borderRadius: 12 },
   statusChipText: { fontWeight: '600', fontSize: 12 },
 
@@ -708,7 +708,7 @@ const styles = StyleSheet.create({
   tabs: { marginBottom: Spacing.lg },
 
   // Section card
-  sectionCard: { borderRadius: Radius.lg, elevation: 2, marginBottom: Spacing.lg, backgroundColor: Colors.surface },
+  sectionCard: { borderRadius: Radius.lg, elevation: 2, marginBottom: Spacing.lg, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface },
   sectionTitle: { fontWeight: '700', color: Colors.textPrimary },
   divider: { marginVertical: Spacing.md },
 
@@ -724,19 +724,19 @@ const styles = StyleSheet.create({
   catChip: { marginRight: Spacing.sm, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border },
   catChipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
   catChipText: { color: Colors.textSecondary, fontSize: 12 },
-  catChipTextActive: { color: '#fff', fontSize: 12 },
+  catChipTextActive: { color: Colors.textOnPrimary, fontSize: 12 },
 
   // Admin note
   adminNote: {
-    backgroundColor: '#fff7ed',
+    backgroundColor: '#fff7e6',
     borderWidth: 1,
-    borderColor: '#fed7aa',
+    borderColor: '#edd7a4',
     borderRadius: Radius.sm,
     padding: Spacing.md,
     marginBottom: Spacing.md,
   },
-  adminNoteLabel: { fontWeight: '700', color: '#9a3412', marginBottom: 4 },
-  adminNoteText: { color: '#9a3412' },
+  adminNoteLabel: { fontWeight: '700', color: '#6B5220', marginBottom: 4 },
+  adminNoteText: { color: '#6B5220' },
 
   // Save button
   saveBtn: { borderRadius: Radius.sm, marginTop: Spacing.sm, backgroundColor: Colors.primary },

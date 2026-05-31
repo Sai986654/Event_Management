@@ -1,17 +1,19 @@
 .public-event-page {
-  background: white;
+  background: linear-gradient(180deg, #fffef9 0%, #faf5e9 100%);
 }
 
 .event-hero {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+  background:
+    radial-gradient(circle at 10% 8%, rgba(245, 230, 179, 0.24), transparent 42%),
+    linear-gradient(126deg, #0f172a 0%, #1e293b 55%, #30425e 100%);
+  color: #fffef9;
   padding: 80px 24px;
   text-align: center;
 }
 
 .hero-content h1 {
   font-size: 48px;
-  font-weight: bold;
+  font-weight: 700;
   margin-bottom: 12px;
 }
 
@@ -19,9 +21,10 @@
   font-size: 18px;
   opacity: 0.9;
   display: inline-block;
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(245, 230, 179, 0.2);
   padding: 8px 16px;
-  border-radius: 4px;
+  border-radius: 999px;
+  border: 1px solid rgba(245, 230, 179, 0.42);
 }
 
 .event-container {
@@ -31,8 +34,9 @@
 }
 
 .event-details-card {
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-radius: 16px;
+  border: 1px solid #e6dbc0;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.08);
 }
 
 .event-details-card h2 {
@@ -43,7 +47,7 @@
 .detail-item {
   margin-bottom: 24px;
   padding-bottom: 24px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid #eee3ca;
 }
 
 .detail-item:last-child {
@@ -53,19 +57,20 @@
 .detail-item h3 {
   margin: 0 0 8px 0;
   font-size: 16px;
-  color: #667eea;
+  color: #6b5220;
 }
 
 .detail-item p {
   margin: 0;
   font-size: 16px;
-  color: #333;
+  color: #374151;
   line-height: 1.6;
 }
 
 .rsvp-card {
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-radius: 16px;
+  border: 1px solid #e6dbc0;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.08);
   position: sticky;
   top: 80px;
 }

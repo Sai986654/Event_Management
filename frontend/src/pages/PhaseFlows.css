@@ -11,9 +11,9 @@
 .phase-hero {
   border-radius: 22px !important;
   background:
-    radial-gradient(circle at 18% 12%, rgba(255, 255, 255, 0.24), transparent 42%),
-    linear-gradient(135deg, #0f4b7f 0%, #1f7a8c 52%, #49a078 100%) !important;
-  box-shadow: 0 18px 42px rgba(17, 75, 104, 0.26) !important;
+    radial-gradient(circle at 18% 12%, rgba(245, 230, 179, 0.24), transparent 42%),
+    linear-gradient(126deg, #0f172a 0%, #1e293b 54%, #31445f 100%) !important;
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.3) !important;
 }
 
 .phase-hero .ant-card-body {
@@ -22,8 +22,8 @@
 
 .phase-card {
   border-radius: 18px !important;
-  border: 1px solid #dbe8f2 !important;
-  box-shadow: 0 12px 30px rgba(17, 41, 66, 0.08) !important;
+  border: 1px solid #e6dbc0 !important;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.1) !important;
   animation: phaseFadeUp 420ms ease both;
 }
 
@@ -33,7 +33,7 @@
 .phase-stack > .ant-card:nth-child(5) { animation-delay: 190ms; }
 
 .phase-empty {
-  color: #667085;
+  color: #6b7280;
   text-align: center;
   padding: 18px 0;
 }
@@ -51,7 +51,7 @@
 }
 
 .phase-note {
-  color: #667085;
+  color: #6b7280;
 }
 
 .phase-table .ant-table {
@@ -62,7 +62,7 @@
 .phase-section-title {
   margin: 0 0 6px;
   font-weight: 800;
-  color: #1d2939;
+  color: #1f2937;
 }
 
 .planner-package-list {
@@ -79,22 +79,22 @@
 
 .planner-vendor-card {
   border-radius: 12px !important;
-  border: 1px solid #e8ecf7 !important;
+  border: 1px solid #e6dbc0 !important;
 }
 
 .planner-vendor-card.selected {
-  border-color: #667eea !important;
-  box-shadow: 0 8px 18px rgba(102, 126, 234, 0.16) !important;
+  border-color: #d4af37 !important;
+  box-shadow: 0 8px 18px rgba(212, 175, 55, 0.22) !important;
 }
 
 .planner-package-card {
   border-radius: 12px !important;
-  border: 1px solid #e8ecf7 !important;
+  border: 1px solid #e6dbc0 !important;
 }
 
 .planner-package-card.selected {
-  border-color: #667eea !important;
-  box-shadow: 0 8px 18px rgba(102, 126, 234, 0.16) !important;
+  border-color: #d4af37 !important;
+  box-shadow: 0 8px 18px rgba(212, 175, 55, 0.22) !important;
 }
 
 .planner-list {
@@ -110,7 +110,7 @@
 
 .planner-review-card {
   border-radius: 10px !important;
-  border: 1px solid #edf0f7 !important;
+  border: 1px solid #e6dbc0 !important;
 }
 
 .planner-progress-head {
@@ -118,7 +118,7 @@
   justify-content: space-between;
   align-items: center;
   padding: 4px 2px 6px;
-  border-bottom: 1px solid #eef1f7;
+  border-bottom: 1px solid #ece1c8;
 }
 
 .planner-layout {
@@ -128,20 +128,20 @@
 }
 
 .planner-step-rail {
-  border: 1px solid #e9edf8;
+  border: 1px solid #e6dbc0;
   border-radius: 12px;
   padding: 10px;
-  background: #fbfcff;
+  background: #fffef8;
   max-height: 72vh;
   overflow: auto;
 }
 
 .planner-step-item {
   width: 100%;
-  border: 1px solid #e9edf8;
+  border: 1px solid #e6dbc0;
   border-radius: 10px;
   background: #fff;
-  color: #344054;
+  color: #374151;
   text-align: left;
   padding: 9px 10px;
   margin-bottom: 8px;
@@ -152,24 +152,24 @@
 }
 
 .planner-step-item:hover {
-  border-color: #d2dcff;
+  border-color: #d4af37;
 }
 
 .planner-step-item.active {
-  border-color: #667eea;
-  box-shadow: 0 8px 18px rgba(102, 126, 234, 0.14);
+  border-color: #d4af37;
+  box-shadow: 0 8px 18px rgba(212, 175, 55, 0.22);
 }
 
 .planner-step-item.done {
-  background: #f8faff;
+  background: #fff8e9;
 }
 
 .planner-step-index {
   min-width: 24px;
   height: 24px;
   border-radius: 999px;
-  background: #eef2ff;
-  color: #3648a3;
+  background: #f5e6b3;
+  color: #5d4616;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -193,26 +193,26 @@
   align-items: center;
   gap: 8px;
   padding: 8px;
-  border: 1px solid #dae6f3;
+  border: 1px solid #e4d8ba;
   border-radius: 10px;
-  background: #fbfdff;
+  background: #fffef9;
 }
 
 .planner-checklist-item.done {
-  background: #effaf5;
-  border-color: #bce8d1;
+  background: #f4fbef;
+  border-color: #c9e7ba;
 }
 
 .planner-checklist-item.done span {
   text-decoration: line-through;
-  color: #5f738c;
+  color: #6b7280;
 }
 
 .planner-website-card,
 .planner-inspiration-card {
-  border: 1px solid #d7e4f2;
+  border: 1px solid #e4d8ba;
   border-radius: 12px;
-  background: #f9fcff;
+  background: #fffef8;
   padding: 10px;
 }
 
@@ -232,7 +232,7 @@
 
 .vendor-portfolio-item {
   border-radius: 12px !important;
-  border: 1px solid #d7e7f2 !important;
+  border: 1px solid #e4d8ba !important;
 }
 
 .vendor-portfolio-image,
@@ -245,7 +245,7 @@
 
 .vendor-portfolio-caption {
   margin-top: 8px;
-  color: #475467;
+  color: #6b7280;
   font-size: 13px;
 }
 

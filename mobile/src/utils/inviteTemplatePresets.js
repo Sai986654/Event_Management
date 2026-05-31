@@ -195,8 +195,8 @@ const THEMES = {
     title: '#111827',
     subtitle: '#334155',
     body: '#475569',
-    accent: '#6366f1',
-    panel: '#eef2ff',
+    accent: '#B9942A',
+    panel: '#fff8e9',
   },
   'royal-maroon': {
     backgroundColor: '#fff7f2',
@@ -215,12 +215,12 @@ const THEMES = {
     panel: '#fde68a',
   },
   'birthday-spark': {
-    backgroundColor: '#eef2ff',
-    title: '#1d4ed8',
-    subtitle: '#4338ca',
-    body: '#334155',
+    backgroundColor: '#fff8ea',
+    title: '#7c2d12',
+    subtitle: '#9a3412',
+    body: '#4b5563',
     accent: '#f97316',
-    panel: '#dbeafe',
+    panel: '#fde7c2',
   },
 };
 
@@ -238,7 +238,7 @@ export const OCCASION_PACKS = [
   {
     key: 'birthday-spark',
     name: 'Birthday Spark',
-    description: 'Playful birthday look with cool blues, orange confetti, and fun stickers.',
+    description: 'Playful birthday look with warm festive hues, orange confetti, and fun stickers.',
     palette: THEMES['birthday-spark'],
     defaultTemplateKey: 'golden-lotus',
     emojiLine: '🎉🎂🎈',
@@ -450,8 +450,8 @@ export const autoBeautifyLayout = (layout) => {
 export const COLOR_THEMES = {
   'wedding-warm': { bg: '#fff7f2', text: '#7c2d12', shape: '#fcd4b5', divider: '#b45309', label: 'Wedding Warm 🌹' },
   'royal-gold': { bg: '#fffbeb', text: '#92400e', shape: '#fde68a', divider: '#d97706', label: 'Royal Gold ✨' },
-  'birthday-pop': { bg: '#eef2ff', text: '#1d4ed8', shape: '#bfdbfe', divider: '#f97316', label: 'Birthday Pop 🎉' },
-  'pastel-baby': { bg: '#fdf4ff', text: '#7e22ce', shape: '#f0abfc', divider: '#c084fc', label: 'Pastel Baby 🍼' },
+  'birthday-pop': { bg: '#fff8ea', text: '#7c2d12', shape: '#f7d8a8', divider: '#f97316', label: 'Birthday Pop 🎉' },
+  'pastel-baby': { bg: '#fff7f2', text: '#9a3412', shape: '#fbd5c1', divider: '#d97706', label: 'Pastel Baby 🍼' },
 };
 
 export const applyColorThemeToLayout = (layout, themeKey) => {

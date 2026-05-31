@@ -49,22 +49,22 @@ export const getPaymentRequirement = (error) => {
 export const getRoleColor = (role) => {
   const colors = {
     admin: '#ff4d4f',
-    organizer: '#1890ff',
-    customer: '#722ed1',
-    vendor: '#52c41a',
-    guest: '#8c8c8c',
+    organizer: '#d4af37',
+    customer: '#1e293b',
+    vendor: '#22c55e',
+    guest: '#9ca3af',
   };
-  return colors[role] || '#8c8c8c';
+  return colors[role] || '#9ca3af';
 };
 
 export const getStatusColor = (status) => {
   const colors = {
     pending: '#fa8c16',
-    confirmed: '#52c41a',
+    confirmed: '#22c55e',
     cancelled: '#ff4d4f',
-    completed: '#1890ff',
-    planning: '#667eea',
-    draft: '#8c8c8c',
+    completed: '#334155',
+    planning: '#d4af37',
+    draft: '#9ca3af',
   };
-  return colors[status] || '#8c8c8c';
+  return colors[status] || '#9ca3af';
 };

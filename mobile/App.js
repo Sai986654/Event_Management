@@ -12,23 +12,23 @@ import { AppTheme, Colors } from './src/theme';
 const SplashScreen = () => (
   <View style={splashStyles.container}>
     <View style={splashStyles.logoContainer}>
-      <Text variant="displaySmall" style={splashStyles.logo}>Vedika 360</Text>
-      <Text variant="bodyMedium" style={splashStyles.tagline}>Event Management Platform</Text>
+      <Text variant="displaySmall" style={splashStyles.logo}>Vedika360</Text>
+      <Text variant="bodyMedium" style={splashStyles.tagline}>Premium Telugu Wedding Ecosystem</Text>
     </View>
-    <ActivityIndicator size="large" color="#fff" style={splashStyles.loader} />
+    <ActivityIndicator size="large" color={Colors.primary} style={splashStyles.loader} />
   </View>
 );
 
 const splashStyles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.primary,
+    backgroundColor: Colors.secondary,
     justifyContent: 'center',
     alignItems: 'center',
   },
   logoContainer: { alignItems: 'center' },
-  logo: { color: '#fff', fontWeight: '900', letterSpacing: 1 },
-  tagline: { color: 'rgba(255,255,255,0.8)', marginTop: 8 },
+  logo: { color: Colors.textOnDark, fontWeight: '900', letterSpacing: 1 },
+  tagline: { color: 'rgba(249, 244, 232, 0.9)', marginTop: 8 },
   loader: { marginTop: 40 },
 });
 

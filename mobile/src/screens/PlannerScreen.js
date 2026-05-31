@@ -171,7 +171,7 @@ const PlannerScreen = () => {
   };
 
   const generateQuote = async () => {
-    if (!['customer', 'admin', 'organizer'].includes(user?.role)) { setMsg('Only customer/organizer/admin can quote'); setMsgType('error'); return; }
+    if (!['customer', 'admin', 'organizer'].includes(user?.role)) { setMsg('Only family/organizer/admin can generate quotes'); setMsgType('error'); return; }
     if (!eventId) { setMsg('Please select a valid event'); setMsgType('error'); return; }
     try {
       setQuoting(true);
@@ -217,8 +217,8 @@ const PlannerScreen = () => {
       {/* Hero */}
       <Card style={styles.heroCard}>
         <Card.Content>
-          <Text variant="headlineSmall" style={styles.heroTitle}>Event Planner</Text>
-          <Text style={styles.heroSubtitle}>Select packages, use AI Co-Pilot, then quote and place your order.</Text>
+          <Text variant="headlineSmall" style={styles.heroTitle}>Wedding Planner</Text>
+          <Text style={styles.heroSubtitle}>Select vendor packages, use AI Co-Pilot, then generate and confirm your wedding quote.</Text>
         </Card.Content>
       </Card>
 
@@ -329,10 +329,10 @@ const PlannerScreen = () => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   scrollContent: { padding: Spacing.lg, paddingBottom: 40 },
-  heroCard: { marginBottom: Spacing.md, borderRadius: Radius.lg, elevation: 3, backgroundColor: Colors.surface },
+  heroCard: { marginBottom: Spacing.md, borderRadius: Radius.lg, elevation: 3, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface },
   heroTitle: { fontWeight: '800', color: Colors.textPrimary },
   heroSubtitle: { marginTop: 6, color: Colors.textSecondary, lineHeight: 20 },
-  card: { marginBottom: Spacing.md, borderRadius: Radius.lg, elevation: 2, backgroundColor: Colors.surface },
+  card: { marginBottom: Spacing.md, borderRadius: Radius.lg, elevation: 2, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface },
   sectionTitle: { fontWeight: '700', marginBottom: Spacing.sm, color: Colors.textPrimary },
   input: { marginBottom: Spacing.sm },
   outline: { borderRadius: Radius.sm },
@@ -346,7 +346,7 @@ const styles = StyleSheet.create({
   filterLabel: { marginBottom: Spacing.xs, marginLeft: Spacing.xs, color: Colors.textSecondary, fontWeight: '600' },
   pkgHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
   vendorLink: { color: Colors.primary, fontWeight: '600', textDecorationLine: 'underline' },
-  aiReason: { marginTop: 4, color: '#7c3aed', fontStyle: 'italic' },
+  aiReason: { marginTop: 4, color: '#7B632B', fontStyle: 'italic' },
   selectBtn: { marginTop: Spacing.sm, borderRadius: Radius.sm },
   criteriaRow: { flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.sm },
   criteriaInput: { flex: 1 },

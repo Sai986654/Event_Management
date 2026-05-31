@@ -6,7 +6,7 @@ import { vendorService } from '../services/vendorService';
 import { formatCurrency, getErrorMessage } from '../utils/helpers';
 import { Colors, Spacing, Radius } from '../theme';
 
-const CATEGORIES = ['all', 'catering', 'photography', 'videography', 'music', 'florist', 'venue', 'decor', 'transportation', 'other'];
+const CATEGORIES = ['all', 'photography', 'videography', 'decor', 'catering', 'music', 'venue', 'transportation', 'florist', 'other'];
 
 const CATEGORY_ICONS = {
   all: 'apps',
@@ -322,7 +322,7 @@ const VendorListScreen = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <Searchbar
-        placeholder={nearMe ? 'Showing nearby vendors...' : 'Search by city or vendor name...'}
+        placeholder={nearMe ? 'Showing nearby vendors...' : 'Search by city, vendor, or service...'}
         value={search}
         onChangeText={setSearch}
         style={styles.searchbar}
@@ -490,7 +490,7 @@ const styles = StyleSheet.create({
   nearMeIcon: { fontSize: 14, marginRight: 6 },
   nearMeIconActive: { fontSize: 14, marginRight: 6 },
   nearMeText: { fontSize: 13, fontWeight: '600', color: Colors.textPrimary },
-  nearMeTextActive: { color: '#fff' },
+  nearMeTextActive: { color: Colors.textOnPrimary },
   radiusRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -512,7 +512,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.primary,
   },
   radiusChipText: { fontSize: 11, fontWeight: '600', color: Colors.textSecondary },
-  radiusChipTextActive: { color: '#fff' },
+  radiusChipTextActive: { color: Colors.textOnPrimary },
 
   chipRow: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.sm, height: 48 },
   filterChip: { marginRight: Spacing.sm, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border },
@@ -576,7 +576,7 @@ const styles = StyleSheet.create({
   verifiedBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ecfdf5',
+    backgroundColor: '#ecfdf3',
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 12,
@@ -592,12 +592,12 @@ const styles = StyleSheet.create({
   },
   categoryTagText: { fontSize: 11, color: Colors.primary, fontWeight: '500' },
   packageCountTag: {
-    backgroundColor: '#fff7ed',
+    backgroundColor: '#fff5df',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 10,
   },
-  packageCountText: { fontSize: 11, color: '#ea580c', fontWeight: '500' },
+  packageCountText: { fontSize: 11, color: '#7B632B', fontWeight: '600' },
 
   // Description
   vendorDesc: { color: Colors.textSecondary, marginBottom: Spacing.sm, lineHeight: 20 },
@@ -610,7 +610,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.sm,
   },
   starsRow: { flexDirection: 'row', alignItems: 'center' },
-  starIcon: { fontSize: 16, color: '#f59e0b', marginRight: 4 },
+  starIcon: { fontSize: 16, color: Colors.primaryDark, marginRight: 4 },
   ratingValue: { fontSize: 14, fontWeight: '700', color: Colors.textPrimary, marginRight: 4 },
   reviewCount: { fontSize: 12, color: Colors.textMuted },
   noRating: { fontSize: 12, color: Colors.textMuted, fontStyle: 'italic' },

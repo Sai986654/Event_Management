@@ -48,13 +48,13 @@ const RegisterScreen = ({ navigation }) => {
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         <View style={styles.brandHeader}>
           <Image source={require('../../assets/icon.jpeg')} style={styles.logoImage} />
-          <Text variant="displaySmall" style={styles.brandName}>Vedika 360</Text>
-          <Text variant="bodySmall" style={styles.brandTagline}>RELY ON US FOR EVERYTHING</Text>
+          <Text variant="displaySmall" style={styles.brandName}>Vedika360</Text>
+          <Text variant="bodySmall" style={styles.brandTagline}>Premium Telugu Wedding Ecosystem</Text>
         </View>
 
         <View style={styles.card}>
           <Text variant="headlineMedium" style={styles.title}>Get Started</Text>
-          <Text variant="bodyMedium" style={styles.subtitle}>Join Vedika 360 — rely on us for everything</Text>
+          <Text variant="bodyMedium" style={styles.subtitle}>Create your profile for a family-first Telugu wedding experience</Text>
 
           {error ? <HelperText type="error" visible>{error}</HelperText> : null}
 
@@ -85,8 +85,8 @@ const RegisterScreen = ({ navigation }) => {
             value={role}
             onValueChange={setRole}
             buttons={[
-              { value: 'customer', label: 'Customer' },
-              { value: 'organizer', label: 'Organizer' },
+              { value: 'customer', label: 'Bride/Groom/Family' },
+              { value: 'organizer', label: 'Planner' },
               { value: 'vendor', label: 'Vendor' },
             ]}
             style={styles.segmented}
@@ -154,12 +154,14 @@ const styles = StyleSheet.create({
     width: 80, height: 80, borderRadius: 40, marginBottom: Spacing.md,
   },
   brandName: { color: Colors.primary, fontWeight: '900', letterSpacing: 1 },
-  brandTagline: { color: Colors.textMuted, marginTop: Spacing.sm, letterSpacing: 3, fontWeight: '600' },
+  brandTagline: { color: '#7B632B', marginTop: Spacing.sm, letterSpacing: 1.2, fontWeight: '700' },
   card: {
     backgroundColor: Colors.surface,
     borderRadius: Radius.lg,
     padding: Spacing.xxl,
     elevation: 4,
+    borderWidth: 1,
+    borderColor: Colors.border,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
@@ -169,7 +171,7 @@ const styles = StyleSheet.create({
   subtitle: { textAlign: 'center', color: Colors.textSecondary, marginBottom: Spacing.xxl, marginTop: Spacing.xs },
   input: { marginBottom: Spacing.md },
   inputOutline: { borderRadius: Radius.sm },
-  roleLabel: { marginBottom: Spacing.sm, color: Colors.textPrimary, fontWeight: '600' },
+  roleLabel: { marginBottom: Spacing.sm, color: '#5A471B', fontWeight: '700' },
   segmented: { marginBottom: Spacing.lg },
   button: { marginTop: Spacing.sm, backgroundColor: Colors.primary, borderRadius: Radius.sm },
   buttonContent: { paddingVertical: 8 },

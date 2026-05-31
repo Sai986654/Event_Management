@@ -40,13 +40,13 @@ const LoginScreen = ({ navigation }) => {
           <View style={styles.logoContainer}>
             <Image source={require('../../assets/icon.jpeg')} style={styles.logoImage} />
           </View>
-          <Text variant="displaySmall" style={styles.brandName}>Vedika 360</Text>
-          <Text variant="bodySmall" style={styles.brandTagline}>RELY ON US FOR EVERYTHING</Text>
+          <Text variant="displaySmall" style={styles.brandName}>Vedika360</Text>
+          <Text variant="bodySmall" style={styles.brandTagline}>Premium Telugu Wedding Ecosystem</Text>
         </View>
 
         <View style={styles.card}>
           <Text variant="headlineMedium" style={styles.title}>Welcome Back</Text>
-          <Text variant="bodyMedium" style={styles.subtitle}>Sign in to your account</Text>
+          <Text variant="bodyMedium" style={styles.subtitle}>Sign in to continue your wedding planning journey</Text>
 
           {error ? <HelperText type="error" visible style={styles.errorText}>{error}</HelperText> : null}
 
@@ -129,7 +129,7 @@ const LoginScreen = ({ navigation }) => {
             style={styles.outlineBtn}
             icon="open-in-new"
           >
-            Open public event
+            Open wedding invite page
           </Button>
         </View>
       </ScrollView>
@@ -147,13 +147,15 @@ const styles = StyleSheet.create({
     height: 90,
     borderRadius: 45,
   },
-  brandName: { color: Colors.primary, fontWeight: '900', letterSpacing: 1 },
-  brandTagline: { color: Colors.textMuted, marginTop: Spacing.sm, letterSpacing: 3, fontWeight: '600' },
+  brandName: { color: Colors.secondary, fontWeight: '900', letterSpacing: 1 },
+  brandTagline: { color: '#7B632B', marginTop: Spacing.sm, letterSpacing: 1.2, fontWeight: '700' },
   card: {
     backgroundColor: Colors.surface,
     borderRadius: Radius.lg,
     padding: Spacing.xxl,
     elevation: 4,
+    borderWidth: 1,
+    borderColor: Colors.border,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
@@ -173,7 +175,7 @@ const styles = StyleSheet.create({
   divider: { flex: 1, height: 1, backgroundColor: Colors.border },
   dividerText: { marginHorizontal: Spacing.md, color: Colors.textMuted, fontSize: 13 },
   inviteLabel: { marginBottom: Spacing.sm, color: Colors.textSecondary },
-  outlineBtn: { borderRadius: Radius.sm, borderColor: Colors.primary },
+  outlineBtn: { borderRadius: Radius.sm, borderColor: Colors.primary, borderWidth: 1.2 },
 });
 
 export default LoginScreen;

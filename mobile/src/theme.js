@@ -3,34 +3,36 @@ import { StyleSheet } from 'react-native';
 
 // ── Brand Palette ──
 export const Colors = {
-  primary: '#667eea',
-  primaryDark: '#5a6fd6',
-  secondary: '#764ba2',
-  accent: '#f093fb',
-  success: '#10b981',
+  primary: '#D4AF37',
+  primaryDark: '#B9942A',
+  secondary: '#0F172A',
+  accent: '#E8C86B',
+  success: '#22C55E',
   warning: '#f59e0b',
-  danger: '#ef4444',
-  info: '#3b82f6',
+  danger: '#EF4444',
+  info: '#8B6A1F',
 
-  background: '#f6f8fc',
-  surface: '#ffffff',
-  surfaceVariant: '#eef2ff',
-  card: '#ffffff',
+  background: '#FAF8F2',
+  surface: '#FFFFFF',
+  surfaceVariant: '#F5E6B3',
+  card: '#FFFFFF',
+  darkSurface: '#1E293B',
 
-  textPrimary: '#1d2939',
-  textSecondary: '#667085',
-  textMuted: '#98a2b3',
-  textOnPrimary: '#ffffff',
+  textPrimary: '#1F2937',
+  textSecondary: '#6B7280',
+  textMuted: '#9CA3AF',
+  textOnPrimary: '#2F2309',
+  textOnDark: '#F9F4E8',
 
-  border: '#e5e7eb',
-  divider: '#f0f1f3',
+  border: '#E6DBC0',
+  divider: '#ECE1C8',
 
   statusPending: '#f59e0b',
-  statusConfirmed: '#10b981',
-  statusCancelled: '#ef4444',
-  statusCompleted: '#3b82f6',
-  statusPlanning: '#667eea',
-  statusDraft: '#98a2b3',
+  statusConfirmed: '#22C55E',
+  statusCancelled: '#EF4444',
+  statusCompleted: '#334155',
+  statusPlanning: '#D4AF37',
+  statusDraft: '#9CA3AF',
 };
 
 export const Spacing = {
@@ -46,7 +48,7 @@ export const Spacing = {
 export const Radius = {
   sm: 8,
   md: 12,
-  lg: 16,
+  lg: 18,
   xl: 20,
   full: 999,
 };
@@ -64,9 +66,10 @@ export const AppTheme = {
     outline: Colors.border,
     onSurface: Colors.textPrimary,
     onSurfaceVariant: Colors.textSecondary,
+    onPrimary: Colors.textOnPrimary,
     error: Colors.danger,
   },
-  roundness: 14,
+  roundness: 16,
 };
 
 // ── Shared Styles ──
@@ -83,12 +86,14 @@ export const SharedStyles = StyleSheet.create({
     marginBottom: Spacing.md,
     borderRadius: Radius.lg,
     elevation: 3,
+    borderWidth: 1,
+    borderColor: Colors.border,
     backgroundColor: Colors.surface,
   },
   heroCardAccent: {
     marginBottom: Spacing.md,
     borderRadius: Radius.lg,
-    backgroundColor: Colors.primary,
+    backgroundColor: Colors.secondary,
   },
   heroTitle: {
     fontWeight: '800',
@@ -106,7 +111,7 @@ export const SharedStyles = StyleSheet.create({
   },
   heroSubtitleLight: {
     marginTop: 6,
-    color: 'rgba(255,255,255,0.88)',
+    color: Colors.textOnDark,
     fontSize: 13,
     lineHeight: 20,
   },
@@ -114,6 +119,8 @@ export const SharedStyles = StyleSheet.create({
     marginBottom: Spacing.md,
     borderRadius: Radius.lg,
     elevation: 2,
+    borderWidth: 1,
+    borderColor: Colors.border,
     backgroundColor: Colors.card,
   },
   sectionTitle: {
@@ -171,7 +178,7 @@ export const SharedStyles = StyleSheet.create({
 });
 
 export const headerScreenOptions = {
-  headerStyle: { backgroundColor: Colors.primary },
-  headerTintColor: Colors.textOnPrimary,
+  headerStyle: { backgroundColor: Colors.secondary },
+  headerTintColor: Colors.textOnDark,
   headerTitleStyle: { fontWeight: '700' },
 };
