@@ -1303,20 +1303,32 @@ function buildTemplateEnginePdfBuffer({ guest, event, inviteMessage, inviteUrl, 
 
           if (type === 'personalmessage') {
             drawContainer(rect, { radius: containerRadius, fill: containerFill, borderColor: containerBorder, borderWidth: containerBorderWidth });
-            drawText(salutation, rect.x + 12, rect.y + 12, { width: rect.w - 24, size: styleNumber(sectionStyle, ['salutationSize', 'titleSize'], titleSize - 1), bold: true, color: titleColor, align: contentAlign });
-            const messageY = rect.y + 34;
-            const tailHeight = 32;
-            const messageMaxHeight = Math.max(14, rect.h - (messageY - rect.y) - tailHeight);
+            const innerX = rect.x + 12;
+            const innerW = rect.w - 24;
+            const salutationSize = styleNumber(sectionStyle, ['salutationSize', 'titleSize'], titleSize - 1);
+            const messageLineGap = styleNumber(sectionStyle, ['lineGap'], 2);
+
+            doc.font('Helvetica-Bold').fontSize(salutationSize);
+            const salutationText = firstText(salutation, 'Dear Guest');
+            const salutationHeight = doc.heightOfString(salutationText, { width: innerW, lineGap: 1 });
+            const salutationY = rect.y + 12;
+            drawText(salutationText, innerX, salutationY, { width: innerW, size: salutationSize, bold: true, color: titleColor, align: contentAlign });
+
+            const messageY = salutationY + salutationHeight + 6;
+            const dateY = rect.y + rect.h - 30;
+            const venueY = rect.y + rect.h - 16;
+            const messageBottomLimit = Math.min(dateY - 4, venueY - 18);
+            const messageMaxHeight = Math.max(12, messageBottomLimit - messageY);
             const fittedBody = fitTextToHeight(body, {
-              width: rect.w - 24,
+              width: innerW,
               maxHeight: messageMaxHeight,
               fontName: 'Helvetica',
               fontSize: bodySize,
-              lineGap: styleNumber(sectionStyle, ['lineGap'], 2),
+              lineGap: messageLineGap,
             });
-            drawText(fittedBody, rect.x + 12, messageY, { width: rect.w - 24, size: bodySize, color: bodyColor, lineGap: styleNumber(sectionStyle, ['lineGap'], 2), align: contentAlign });
-            drawText(dateLine, rect.x + 12, rect.y + rect.h - 30, { width: rect.w - 24, size: Math.max(8, bodySize - 1), bold: true, color: subtitleColor, align: contentAlign });
-            drawText(venueLine, rect.x + 12, rect.y + rect.h - 16, { width: rect.w - 24, size: Math.max(8, bodySize - 1), color: p.subtle || subtitleColor, align: contentAlign });
+            drawText(fittedBody, innerX, messageY, { width: innerW, size: bodySize, color: bodyColor, lineGap: messageLineGap, align: contentAlign });
+            drawText(dateLine, innerX, dateY, { width: innerW, size: Math.max(8, bodySize - 1), bold: true, color: subtitleColor, align: contentAlign });
+            drawText(venueLine, innerX, venueY, { width: innerW, size: Math.max(8, bodySize - 1), color: p.subtle || subtitleColor, align: contentAlign });
             return;
           }
 
@@ -1348,8 +1360,15 @@ function buildTemplateEnginePdfBuffer({ guest, event, inviteMessage, inviteUrl, 
 
           if (type === 'familyconnection') {
             drawContainer(rect, { radius: containerRadius, fill: containerFill, borderColor: containerBorder, borderWidth: containerBorderWidth });
-            drawText(groomFamilyLine, rect.x + 12, rect.y + 12, { width: rect.w - 24, size: styleNumber(sectionStyle, ['fontSize', 'textSize'], 10), bold: true, color: titleColor, align: contentAlign });
-            drawText(brideFamilyLine, rect.x + 12, rect.y + Math.min(rect.h - 18, 30), { width: rect.w - 24, size: styleNumber(sectionStyle, ['fontSize', 'textSize'], 10), bold: true, color: titleColor, align: contentAlign });
+            const famSize = styleNumber(sectionStyle, ['fontSize', 'textSize'], 10);
+            const famX = rect.x + 12;
+            const famW = rect.w - 24;
+            const firstY = rect.y + 10;
+            drawText(groomFamilyLine, famX, firstY, { width: famW, size: famSize, bold: true, color: titleColor, align: contentAlign });
+            doc.font('Helvetica-Bold').fontSize(famSize);
+            const firstHeight = doc.heightOfString(firstText(groomFamilyLine, ''), { width: famW, lineGap: 1 });
+            const secondY = Math.min(rect.y + rect.h - famSize - 4, firstY + firstHeight + 4);
+            drawText(brideFamilyLine, famX, secondY, { width: famW, size: famSize, bold: true, color: titleColor, align: contentAlign });
             return;
           }
 
