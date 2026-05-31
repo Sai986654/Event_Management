@@ -2078,10 +2078,19 @@ async function buildTemplateEngineHtmlPdfBuffer({ guest, event, inviteMessage, i
 
   const sectionsToRender = sections.length ? sections : syntheticSections;
   const qrDataUrl = qrBuffer ? `data:image/png;base64,${qrBuffer.toString('base64')}` : '';
+  const clampWords = (value, maxWords) => {
+    const words = String(value || '').trim().split(/\s+/).filter(Boolean);
+    if (words.length <= maxWords) return words.join(' ');
+    return `${words.slice(0, maxWords).join(' ')}...`;
+  };
 
   const cardMarkup = sectionsToRender.map((section) => {
     const type = String(section?.componentType || '').toLowerCase();
     const props = section?.props && typeof section.props === 'object' ? section.props : {};
+
+    if (type === 'guestbadge') {
+      return '';
+    }
 
     if (type === 'guestheader' || type === 'couplehero') {
       return `
@@ -2094,10 +2103,11 @@ async function buildTemplateEngineHtmlPdfBuffer({ guest, event, inviteMessage, i
     }
 
     if (type === 'personalmessage') {
+      const resolvedBody = clampWords(firstText(props.message, messageBody), 42);
       return `
         <section class="card card-message">
           <h2>${escapeHtml(firstText(props.salutation, salutation))}</h2>
-          <p>${escapeHtml(firstText(props.message, messageBody))}</p>
+          <p>${escapeHtml(resolvedBody)}</p>
           <div class="muted">${escapeHtml(firstText(props.signature, `${context.event.dateText}${context.event.timeText ? ` | ${context.event.timeText}` : ''}`))}</div>
           <div class="muted">${escapeHtml(context.event.venue)}</div>
         </section>
@@ -2116,9 +2126,9 @@ async function buildTemplateEngineHtmlPdfBuffer({ guest, event, inviteMessage, i
     if (type === 'smartrecommendations') {
       return `
         <section class="card card-timeline">
-          <div class="timeline-item"><div class="dot"></div><div>${escapeHtml(firstText(props.segment1Label, context.event.segment1Label))}</div></div>
-          <div class="timeline-item"><div class="dot"></div><div>${escapeHtml(firstText(props.segment2Label, context.event.segment2Label))}</div></div>
-          <div class="timeline-item"><div class="dot"></div><div>${escapeHtml(firstText(props.segment3Label, context.event.segment3Label))}</div></div>
+          <div class="timeline-item"><div class="dot"></div><div class="timeline-time">${escapeHtml(context.event.segment1Time)}</div><div>${escapeHtml(firstText(props.segment1Label, context.event.segment1Label))}</div></div>
+          <div class="timeline-item"><div class="dot"></div><div class="timeline-time">${escapeHtml(context.event.segment2Time)}</div><div>${escapeHtml(firstText(props.segment2Label, context.event.segment2Label))}</div></div>
+          <div class="timeline-item"><div class="dot"></div><div class="timeline-time">${escapeHtml(context.event.segment3Time)}</div><div>${escapeHtml(firstText(props.segment3Label, context.event.segment3Label))}</div></div>
         </section>
       `;
     }
@@ -2145,6 +2155,7 @@ async function buildTemplateEngineHtmlPdfBuffer({ guest, event, inviteMessage, i
     }
 
     const genericRows = Object.values(props).filter((value) => typeof value === 'string' && value.trim());
+    if (genericRows.length < 2) return '';
     return `
       <section class="card card-details">
         ${genericRows.slice(0, 4).map((line) => `<div>${escapeHtml(line)}</div>`).join('')}
@@ -2179,48 +2190,51 @@ async function buildTemplateEngineHtmlPdfBuffer({ guest, event, inviteMessage, i
             width: ${contentRect.w}px;
             max-height: ${contentRect.h}px;
             display: grid;
-            gap: 10px;
+            gap: 8px;
           }
           .card {
-            background: rgba(255, 252, 245, 0.88);
+            background: rgba(255, 252, 245, 0.9);
             border: 1.2px solid ${escapeHtml(theme.border)};
             border-radius: 16px;
-            padding: 12px 14px;
+            padding: 10px 12px;
             color: ${escapeHtml(theme.text)};
             backdrop-filter: blur(1px);
           }
           .card h1, .card h2, .card p { margin: 0; }
-          .card-header h1 { text-align: center; font-size: 36px; line-height: 1.1; color: ${escapeHtml(theme.primary)}; }
-          .card-header .subtitle { margin-top: 4px; text-align: center; font-size: 22px; font-weight: 700; }
+          .card-header h1 { text-align: center; font-size: 18px; line-height: 1.1; color: ${escapeHtml(theme.primary)}; }
+          .card-header .subtitle { margin-top: 3px; text-align: center; font-size: 14px; font-weight: 700; }
           .badge {
-            margin: 8px auto 0;
-            padding: 4px 14px;
+            margin: 6px auto 0;
+            padding: 2px 12px;
             width: fit-content;
             border-radius: 999px;
             border: 1px solid ${escapeHtml(theme.border)};
             background: rgba(255, 255, 255, 0.72);
             font-weight: 700;
+            font-size: 12px;
           }
-          .card-message h2 { font-size: 28px; color: ${escapeHtml(theme.text)}; }
-          .card-message p { margin-top: 8px; font-size: 18px; line-height: 1.45; }
-          .muted { margin-top: 6px; font-size: 14px; color: ${escapeHtml(theme.subtle)}; font-weight: 600; }
+          .card-message h2 { font-size: 17px; color: ${escapeHtml(theme.text)}; }
+          .card-message p { margin-top: 6px; font-size: 12px; line-height: 1.38; }
+          .muted { margin-top: 4px; font-size: 11px; color: ${escapeHtml(theme.subtle)}; font-weight: 600; }
           .card-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
           .btn {
             text-align: center;
-            padding: 10px 12px;
+            padding: 7px 10px;
             border-radius: 999px;
             border: 1px solid ${escapeHtml(theme.border)};
             font-weight: 700;
+            font-size: 12px;
             background: rgba(255, 255, 255, 0.9);
           }
           .card-timeline { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
-          .timeline-item { text-align: center; font-size: 14px; }
-          .dot { width: 8px; height: 8px; border-radius: 50%; margin: 0 auto 6px; background: ${escapeHtml(theme.accent)}; }
-          .card-details { font-size: 17px; line-height: 1.45; font-weight: 600; }
+          .timeline-item { text-align: center; font-size: 11px; }
+          .timeline-time { font-size: 10px; font-weight: 700; color: ${escapeHtml(theme.subtle)}; margin-bottom: 2px; }
+          .dot { width: 6px; height: 6px; border-radius: 50%; margin: 0 auto 4px; background: ${escapeHtml(theme.accent)}; }
+          .card-details { font-size: 11px; line-height: 1.35; font-weight: 700; }
           .card-qr { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-          .qr-title { font-size: 18px; font-weight: 700; }
-          .qr-link { margin-top: 6px; font-size: 12px; color: #b91c1c; word-break: break-all; }
-          .qr-image { width: 72px; height: 72px; border-radius: 6px; border: 1px solid ${escapeHtml(theme.border)}; background: #fff; }
+          .qr-title { font-size: 12px; font-weight: 700; }
+          .qr-link { margin-top: 4px; font-size: 10px; color: #b91c1c; word-break: break-all; }
+          .qr-image { width: 52px; height: 52px; border-radius: 6px; border: 1px solid ${escapeHtml(theme.border)}; background: #fff; }
         </style>
       </head>
       <body>
