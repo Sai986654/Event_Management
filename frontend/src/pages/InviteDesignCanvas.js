@@ -213,6 +213,7 @@ const InviteDesignCanvas = ({
   const canvasRef = useRef(null);
   const elementsRef = useRef(elements);
   const dragStateRef = useRef(null);
+  const resizeStateRef = useRef(null);
 
   const selectedElement = elements.find((el) => el.id === selectedElementId);
   const stickerCategoryCounts = useMemo(
@@ -814,6 +815,157 @@ const InviteDesignCanvas = ({
     window.removeEventListener('mouseup', handleDragEnd);
   }, [handleDragMove]);
 
+  const handleResizeMove = useCallback(
+    (event) => {
+      const resizeState = resizeStateRef.current;
+      if (!resizeState) return;
+
+      const shouldSnap = snapToGrid && !event.shiftKey;
+      setIsShiftSnapBypass(!shouldSnap && snapToGrid);
+
+      const deltaX = (event.clientX - resizeState.startClientX) / resizeState.scaleX;
+      const deltaY = (event.clientY - resizeState.startClientY) / resizeState.scaleY;
+
+      let nextX = resizeState.startX;
+      let nextY = resizeState.startY;
+      let nextWidth = resizeState.startWidth;
+      let nextHeight = resizeState.startHeight;
+
+      if (resizeState.direction.includes('e')) {
+        nextWidth = resizeState.startWidth + deltaX;
+      }
+      if (resizeState.direction.includes('s')) {
+        nextHeight = resizeState.startHeight + deltaY;
+      }
+      if (resizeState.direction.includes('w')) {
+        nextWidth = resizeState.startWidth - deltaX;
+        nextX = resizeState.startX + deltaX;
+      }
+      if (resizeState.direction.includes('n')) {
+        nextHeight = resizeState.startHeight - deltaY;
+        nextY = resizeState.startY + deltaY;
+      }
+
+      if (shouldSnap) {
+        nextX = snapValue(nextX);
+        nextY = snapValue(nextY);
+        nextWidth = snapValue(nextWidth);
+        nextHeight = snapValue(nextHeight);
+      }
+
+      const minWidth = resizeState.minWidth;
+      const minHeight = resizeState.minHeight;
+
+      if (nextWidth < minWidth) {
+        if (resizeState.direction.includes('w')) {
+          nextX -= (minWidth - nextWidth);
+        }
+        nextWidth = minWidth;
+      }
+      if (nextHeight < minHeight) {
+        if (resizeState.direction.includes('n')) {
+          nextY -= (minHeight - nextHeight);
+        }
+        nextHeight = minHeight;
+      }
+
+      if (nextX < 0) {
+        nextWidth += nextX;
+        nextX = 0;
+      }
+      if (nextY < 0) {
+        nextHeight += nextY;
+        nextY = 0;
+      }
+
+      if (nextX + nextWidth > canvasWidth) {
+        nextWidth = canvasWidth - nextX;
+      }
+      if (nextY + nextHeight > canvasHeight) {
+        nextHeight = canvasHeight - nextY;
+      }
+
+      if (nextWidth < minWidth) {
+        nextWidth = minWidth;
+        nextX = Math.max(0, canvasWidth - nextWidth);
+      }
+      if (nextHeight < minHeight) {
+        nextHeight = minHeight;
+        nextY = Math.max(0, canvasHeight - nextHeight);
+      }
+
+      const nextElements = (elementsRef.current || []).map((element) =>
+        element.id === resizeState.elementId
+          ? {
+              ...element,
+              x: nextX,
+              y: nextY,
+              width: nextWidth,
+              height: nextHeight,
+            }
+          : element
+      );
+
+      elementsRef.current = nextElements;
+      setElements(nextElements);
+      updateLayout(nextElements);
+      setDragGuide({ show: false, xCanvas: null, yCanvas: null });
+    },
+    [canvasHeight, canvasWidth, snapToGrid, snapValue, updateLayout]
+  );
+
+  const handleResizeEnd = useCallback(() => {
+    resizeStateRef.current = null;
+    setIsShiftSnapBypass(false);
+    window.removeEventListener('mousemove', handleResizeMove);
+    window.removeEventListener('mouseup', handleResizeEnd);
+  }, [handleResizeMove]);
+
+  const handleResizeMouseDown = useCallback(
+    (event, element, direction) => {
+      if (event.button !== 0 || element.locked) return;
+      event.preventDefault();
+      event.stopPropagation();
+
+      const scaleX = previewWidth / canvasWidth;
+      const scaleY = previewHeight / canvasHeight;
+      const width = Math.max(1, Number(element.width) || 120);
+      const rawHeight = Number(element.height);
+      const height = Number.isFinite(rawHeight)
+        ? Math.max(1, rawHeight)
+        : Math.max(48, Math.round((Number(element.fontSize) || 24) * 1.6));
+
+      resizeStateRef.current = {
+        elementId: element.id,
+        direction,
+        startClientX: event.clientX,
+        startClientY: event.clientY,
+        startX: Number(element.x || 0),
+        startY: Number(element.y || 0),
+        startWidth: width,
+        startHeight: height,
+        minWidth: 24,
+        minHeight: element.type === 'divider' ? 6 : 24,
+        scaleX,
+        scaleY,
+      };
+
+      setSelectedElementId(element.id);
+      window.addEventListener('mousemove', handleResizeMove);
+      window.addEventListener('mouseup', handleResizeEnd);
+    },
+    [canvasHeight, canvasWidth, handleResizeEnd, handleResizeMove, previewHeight, previewWidth]
+  );
+
+  useEffect(() => {
+    return () => {
+      window.removeEventListener('mousemove', handleDragMove);
+      window.removeEventListener('mouseup', handleDragEnd);
+      window.removeEventListener('mousemove', handleResizeMove);
+      window.removeEventListener('mouseup', handleResizeEnd);
+    };
+  }, [handleDragEnd, handleDragMove, handleResizeEnd, handleResizeMove]);
+
   const handleElementMouseDown = useCallback(
     (event, element) => {
       if (event.button !== 0 || element.locked) return;
@@ -1203,6 +1355,17 @@ const InviteDesignCanvas = ({
                             );
                           })()
                         )}
+                        {selectedElementId === element.id && !element.locked ? (
+                          <>
+                            {['nw', 'ne', 'sw', 'se'].map((direction) => (
+                              <span
+                                key={`${element.id}-${direction}`}
+                                className={`canvas-resize-handle canvas-resize-${direction}`}
+                                onMouseDown={(event) => handleResizeMouseDown(event, element, direction)}
+                              />
+                            ))}
+                          </>
+                        ) : null}
                       </div>
                     );
                   })}
@@ -1273,7 +1436,7 @@ const InviteDesignCanvas = ({
                 <span style={{ margin: '0 10px' }} />
                 <Switch checked={snapToGrid} onChange={setSnapToGrid} /> Snap
                 <div style={{ marginTop: 8, color: isShiftSnapBypass ? '#b45309' : '#64748b' }}>
-                  Hold Shift while dragging to temporarily disable snap. Arrow keys move selected item.
+                  Hold Shift while dragging or resizing to temporarily disable snap. Arrow keys move selected item.
                 </div>
               </div>
             </div>

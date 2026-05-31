@@ -243,11 +243,28 @@ const InviteDesignStudio = () => {
       ]);
 
       const design = designRes.design;
-      const nextLayout = {
-        ...(design.jsonLayout || {}),
-        eventType: event?.type || design.category || 'other',
-        mergeData: buildDefaultMergeData(event?.type || design.category || 'other', design.jsonLayout?.mergeData),
-      };
+      const designLayout = design.jsonLayout && typeof design.jsonLayout === 'object' ? design.jsonLayout : {};
+      const designEventType = event?.type || design.category || 'other';
+      const hasRenderableElements = Array.isArray(designLayout.elements) && designLayout.elements.length > 0;
+      const fallbackTemplateKey =
+        (typeof designLayout.templateKey === 'string' && designLayout.templateKey) ||
+        selectedTemplate ||
+        null;
+
+      const nextLayout = hasRenderableElements
+        ? {
+            ...designLayout,
+            eventType: designEventType,
+            mergeData: buildDefaultMergeData(designEventType, designLayout.mergeData),
+          }
+        : buildStarterLayout({
+            eventType: designEventType,
+            event,
+            templateKey: fallbackTemplateKey,
+            mergeData: designLayout.mergeData,
+            canvasSize: designLayout.canvasSize || design.canvasSize || '1080x1920',
+            backgroundColor: designLayout.backgroundColor || '#fffaf6',
+          });
       setSelectedDesignId(design.id);
       setSelectedDesign(design);
       setDesignName(design.name || '');
@@ -255,7 +272,13 @@ const InviteDesignStudio = () => {
       setDesignLanguage(design.language || 'en');
       setLayoutText(JSON.stringify(nextLayout, null, 2));
       setCanvasLayout(nextLayout);
+      if (nextLayout.templateKey) {
+        setSelectedTemplate(nextLayout.templateKey);
+      }
       setExportsList(exportRes.exports || []);
+      if (!hasRenderableElements) {
+        message.info('Loaded starter layout because this design had no canvas elements yet. Click Save to persist it.');
+      }
     } catch (error) {
       message.error(getErrorMessage(error));
     }
@@ -281,21 +304,21 @@ const InviteDesignStudio = () => {
 
     setCreating(true);
     try {
+      const draftEventType = event?.type || 'other';
+      const starterLayout = buildStarterLayout({
+        eventType: draftEventType,
+        event,
+        templateKey: selectedTemplate || null,
+        mergeData: buildDefaultMergeData(draftEventType),
+      });
+
       const payload = {
         eventId: Number(eventId),
         name: trimmedName,
         language: 'en',
         status: 'draft',
         category: event?.type || 'general',
-        jsonLayout: {
-          templateKey: selectedTemplate || null,
-          title: event?.title || '',
-          venue: event?.venue || '',
-          date: event?.date || null,
-          eventType: event?.type || 'other',
-          mergeData: buildDefaultMergeData(event?.type || 'other'),
-          notes: 'Edit this layout JSON to match your final invitation design.',
-        },
+        jsonLayout: starterLayout,
       };
 
       const res = await inviteDesignService.createDesign(payload);
