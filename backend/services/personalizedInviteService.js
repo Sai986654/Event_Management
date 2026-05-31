@@ -933,6 +933,51 @@ function collectTemplateAssetUrls(templateConfig) {
     .filter(Boolean);
 }
 
+function normalizeSimpleTemplateModel(templateConfig = {}) {
+  const canvas = templateConfig?.canvas && typeof templateConfig.canvas === 'object' ? templateConfig.canvas : {};
+  const contentArea =
+    (templateConfig?.contentArea && typeof templateConfig.contentArea === 'object')
+      ? templateConfig.contentArea
+      : (canvas?.contentArea && typeof canvas.contentArea === 'object')
+        ? canvas.contentArea
+        : null;
+
+  const theme = templateConfig?.theme && typeof templateConfig.theme === 'object'
+    ? templateConfig.theme
+    : {};
+
+  return {
+    backgroundImage: firstText(
+      templateConfig?.backgroundImage,
+      canvas?.backgroundImage,
+      canvas?.backgroundImageUrl
+    ),
+    contentArea,
+    theme,
+  };
+}
+
+function resolveDynamicTheme(templateConfig = {}, palette = {}) {
+  const model = normalizeSimpleTemplateModel(templateConfig);
+  const t = model.theme || {};
+
+  const primary = firstText(t.primary, t.primaryColor, palette.header, palette.primary, '#8DBD4A');
+  const accent = firstText(t.accent, t.accentColor, palette.accent, '#B8872A');
+  const border = firstText(t.border, t.borderColor, palette.border, palette.divider, '#C9B07D');
+  const surface = firstText(t.surface, t.surfaceColor, palette.surface, palette.badge, '#FFFDF7');
+  const text = firstText(t.text, t.textColor, palette.textPrimary, palette.title, '#2F2415');
+  const subtle = firstText(t.subtle, t.textSecondary, palette.textSecondary, palette.subtitle, '#6B5A45');
+
+  return {
+    primary,
+    accent,
+    border,
+    surface,
+    text,
+    subtle,
+  };
+}
+
 function buildTemplateEnginePdfBuffer({ guest, event, inviteMessage, inviteUrl, qrBuffer, relationship, template }) {
   return new Promise(async (resolve, reject) => {
     try {
@@ -1049,6 +1094,228 @@ function buildTemplateEnginePdfBuffer({ guest, event, inviteMessage, inviteUrl, 
         assetUrls[0]
       );
       const backgroundImageBuffer = await loadR2AssetBuffer(backgroundImageUrl);
+
+      const hasLayoutSections = Array.isArray(resolvedTemplateConfig?.layout?.sections) && resolvedTemplateConfig.layout.sections.length > 0;
+      const hasComponents = Array.isArray(resolvedTemplateConfig?.components) && resolvedTemplateConfig.components.length > 0;
+      const useBackgroundContentModel = !hasLayoutSections && !hasComponents && (
+        resolvedTemplateConfig?.backgroundImage ||
+        resolvedTemplateConfig?.contentArea ||
+        resolvedTemplateConfig?.theme
+      );
+
+      if (useBackgroundContentModel) {
+        // Background artwork is immutable; only dynamic data is rendered over it.
+        if (backgroundImageBuffer) {
+          doc.image(backgroundImageBuffer, 0, 0, { cover: [W, H], align: 'center', valign: 'center' });
+        } else {
+          doc.rect(0, 0, W, H).fill(p.background || '#F8F3E8');
+        }
+
+        const t = (resolvedTemplateConfig?.theme && typeof resolvedTemplateConfig.theme === 'object')
+          ? resolvedTemplateConfig.theme
+          : {};
+        const theme = {
+          primary: String(t.primary || p.primary || p.header || '#8B6A2F'),
+          accent: String(t.accent || p.accent || '#B8872A'),
+          border: String(t.border || p.border || p.divider || '#C9B07D'),
+          surface: String(t.surface || p.surface || '#FFFDF7'),
+          text: String(t.text || t.textPrimary || p.textPrimary || p.body || '#2F2415'),
+          subtle: String(t.textSecondary || p.textSecondary || p.subtle || '#6B5A45'),
+        };
+
+        const contentAreaRaw = (resolvedTemplateConfig?.contentArea && typeof resolvedTemplateConfig.contentArea === 'object')
+          ? resolvedTemplateConfig.contentArea
+          : (resolvedTemplateConfig?.canvas?.contentArea && typeof resolvedTemplateConfig.canvas.contentArea === 'object')
+            ? resolvedTemplateConfig.canvas.contentArea
+            : {};
+
+        const toNumber = (value) => {
+          const n = Number(value);
+          return Number.isFinite(n) ? n : null;
+        };
+
+        const resolveRect = (raw, container) => {
+          const src = raw && typeof raw === 'object' ? raw : {};
+          const xRaw = toNumber(src.x ?? src.left);
+          const yRaw = toNumber(src.y ?? src.top);
+          const wRaw = toNumber(src.width ?? src.w);
+          const hRaw = toNumber(src.height ?? src.h);
+
+          const x = xRaw === null ? container.x : (xRaw >= 0 && xRaw <= 1 ? container.x + xRaw * container.w : container.x + xRaw);
+          const yPos = yRaw === null ? container.y : (yRaw >= 0 && yRaw <= 1 ? container.y + yRaw * container.h : container.y + yRaw);
+          const w = wRaw === null ? container.w : (wRaw > 0 && wRaw <= 1 ? container.w * wRaw : wRaw);
+          const h = hRaw === null ? container.h : (hRaw > 0 && hRaw <= 1 ? container.h * hRaw : hRaw);
+
+          return {
+            x,
+            y: yPos,
+            w: Math.max(80, w),
+            h: Math.max(120, h),
+          };
+        };
+
+        const defaultContentRect = { x: W * 0.14, y: H * 0.20, w: W * 0.72, h: H * 0.70 };
+        const contentRect = resolveRect(contentAreaRaw, defaultContentRect);
+
+        const inviteLines = String(inviteMessage || '').split('\n').map((line) => line.trim()).filter(Boolean);
+        const bodyMessage = inviteLines.slice(1, -1).join(' ') || inviteLines.slice(1).join(' ') || inviteLines[0] || '';
+        const guestLine = firstText(`Guest: ${context.guest.name}`, openingLine);
+        const familyLineA = firstText(`Groom's Family: ${event?.groomFamily}`, "Groom's Family: To be announced");
+        const familyLineB = firstText(`Bride's Family: ${event?.brideFamily}`, "Bride's Family: To be announced");
+
+        const timelineItems = [
+          { time: firstText(context.event.segment1Time, '9:00 AM'), label: firstText(context.event.segment1Label, 'Program 1') },
+          { time: firstText(context.event.segment2Time, timeText || '10:30 AM'), label: firstText(context.event.segment2Label, 'Program 2') },
+          { time: firstText(context.event.segment3Time, '12:00 PM'), label: firstText(context.event.segment3Label, 'Program 3') },
+        ];
+
+        const base = {
+          header: 120,
+          message: 118,
+          rsvp: 44,
+          timeline: 76,
+          family: 60,
+          qr: 88,
+          footer: 20,
+          gap: 10,
+        };
+        const baseTotal = base.header + base.message + base.rsvp + base.timeline + base.family + base.qr + base.footer + base.gap * 6;
+        const scale = Math.max(0.64, Math.min(1, contentRect.h / baseTotal, contentRect.w / 430));
+
+        const dim = {
+          header: base.header * scale,
+          message: base.message * scale,
+          rsvp: base.rsvp * scale,
+          timeline: base.timeline * scale,
+          family: base.family * scale,
+          qr: base.qr * scale,
+          footer: base.footer * scale,
+          gap: base.gap * scale,
+          pad: 12 * scale,
+          radius: 14 * scale,
+        };
+
+        const drawCard = (xPos, yPos, width, height) => {
+          doc.save().fillOpacity(0.88).roundedRect(xPos, yPos + 1.4, width, height, dim.radius).fill('#000000').restore();
+          doc.save().fillOpacity(0.9).roundedRect(xPos, yPos, width, height, dim.radius).fill(theme.surface).restore();
+          doc.lineWidth(0.9).strokeColor(theme.border).roundedRect(xPos, yPos, width, height, dim.radius).stroke();
+        };
+
+        const fitText = (text, width, maxHeight, fontName, fontSize, lineGap) => {
+          const source = String(text || '').trim();
+          if (!source) return '';
+          doc.font(fontName).fontSize(fontSize);
+          const h = doc.heightOfString(source, { width, lineGap });
+          if (h <= maxHeight) return source;
+
+          const words = source.split(/\s+/).filter(Boolean);
+          if (words.length <= 1) return source;
+          let low = 1;
+          let high = words.length;
+          let best = `${words[0]}...`;
+          while (low <= high) {
+            const mid = Math.floor((low + high) / 2);
+            const candidate = `${words.slice(0, mid).join(' ')}...`;
+            const candidateH = doc.heightOfString(candidate, { width, lineGap });
+            if (candidateH <= maxHeight) {
+              best = candidate;
+              low = mid + 1;
+            } else {
+              high = mid - 1;
+            }
+          }
+          return best;
+        };
+
+        let cursor = contentRect.y;
+
+        // Header (no separate decorative components from artwork).
+        const headerRect = { x: contentRect.x, y: cursor, w: contentRect.w, h: dim.header };
+        drawCard(headerRect.x, headerRect.y, headerRect.w, headerRect.h);
+        doc.font('Helvetica-Bold').fontSize(18 * scale).fillColor(theme.text)
+          .text(firstText(event?.title, headerTitle), headerRect.x + dim.pad, headerRect.y + dim.pad, { width: headerRect.w - dim.pad * 2, align: 'center' });
+        doc.font('Helvetica-Bold').fontSize(15 * scale).fillColor(theme.text)
+          .text(firstText(`${context.event.brideName} ❤ ${context.event.groomName}`, namesLine), headerRect.x + dim.pad, headerRect.y + dim.pad + 28 * scale, { width: headerRect.w - dim.pad * 2, align: 'center' });
+        doc.font('Helvetica').fontSize(10 * scale).fillColor(theme.subtle)
+          .text(guestLine, headerRect.x + dim.pad, headerRect.y + dim.pad + 52 * scale, { width: headerRect.w - dim.pad * 2, align: 'center' });
+        cursor += dim.header + dim.gap;
+
+        // Personal message
+        const messageRect = { x: contentRect.x, y: cursor, w: contentRect.w, h: dim.message };
+        drawCard(messageRect.x, messageRect.y, messageRect.w, messageRect.h);
+        doc.font('Helvetica-Bold').fontSize(12 * scale).fillColor(theme.text)
+          .text(firstText(`Priyamaina ${context.guest.name} garu`, salutation), messageRect.x + dim.pad, messageRect.y + dim.pad, { width: messageRect.w - dim.pad * 2, align: 'left' });
+        const messageBodyY = messageRect.y + dim.pad + 18 * scale;
+        const fittedBody = fitText(bodyMessage, messageRect.w - dim.pad * 2, messageRect.h - 52 * scale, 'Helvetica', 9.4 * scale, 1.6);
+        doc.font('Helvetica').fontSize(9.4 * scale).fillColor(theme.text)
+          .text(fittedBody, messageRect.x + dim.pad, messageBodyY, { width: messageRect.w - dim.pad * 2, align: 'left', lineGap: 1.6 });
+        doc.font('Helvetica-Bold').fontSize(8.6 * scale).fillColor(theme.subtle)
+          .text(dateLine, messageRect.x + dim.pad, messageRect.y + messageRect.h - 24 * scale, { width: messageRect.w - dim.pad * 2, align: 'left' });
+        doc.font('Helvetica').fontSize(8.4 * scale).fillColor(theme.subtle)
+          .text(venueLine, messageRect.x + dim.pad, messageRect.y + messageRect.h - 13 * scale, { width: messageRect.w - dim.pad * 2, align: 'left' });
+        cursor += dim.message + dim.gap;
+
+        // RSVP buttons
+        const rsvpRect = { x: contentRect.x, y: cursor, w: contentRect.w, h: dim.rsvp };
+        const btnGap = 10 * scale;
+        const btnW = (rsvpRect.w - btnGap) / 2;
+        const drawButton = (xPos, label) => {
+          doc.save().fillOpacity(0.98).roundedRect(xPos, rsvpRect.y, btnW, rsvpRect.h, rsvpRect.h / 2).fill(theme.accent).restore();
+          doc.lineWidth(0.8).strokeColor(theme.border).roundedRect(xPos, rsvpRect.y, btnW, rsvpRect.h, rsvpRect.h / 2).stroke();
+          doc.font('Helvetica-Bold').fontSize(10.5 * scale).fillColor('#ffffff').text(label, xPos, rsvpRect.y + rsvpRect.h / 2 - 4.8 * scale, { width: btnW, align: 'center' });
+        };
+        drawButton(rsvpRect.x, firstText(rsvpPrimary, 'RSVP Now'));
+        drawButton(rsvpRect.x + btnW + btnGap, firstText(rsvpSecondary, 'Join Live Stream'));
+        cursor += dim.rsvp + dim.gap;
+
+        // Timeline
+        const timelineRect = { x: contentRect.x, y: cursor, w: contentRect.w, h: dim.timeline };
+        drawCard(timelineRect.x, timelineRect.y, timelineRect.w, timelineRect.h);
+        const itemW = timelineRect.w / 3;
+        timelineItems.forEach((item, idx) => {
+          const colX = timelineRect.x + idx * itemW;
+          const cx = colX + itemW / 2;
+          doc.circle(cx, timelineRect.y + 12 * scale, 3.2 * scale).fill(theme.accent);
+          doc.font('Helvetica-Bold').fontSize(8.2 * scale).fillColor(theme.subtle)
+            .text(firstText(item.time, '--'), colX, timelineRect.y + 18 * scale, { width: itemW, align: 'center' });
+          doc.font('Helvetica').fontSize(8 * scale).fillColor(theme.text)
+            .text(firstText(item.label, 'Program'), colX + 4 * scale, timelineRect.y + 34 * scale, { width: itemW - 8 * scale, align: 'center' });
+        });
+        cursor += dim.timeline + dim.gap;
+
+        // Family details
+        const familyRect = { x: contentRect.x, y: cursor, w: contentRect.w, h: dim.family };
+        drawCard(familyRect.x, familyRect.y, familyRect.w, familyRect.h);
+        doc.font('Helvetica-Bold').fontSize(9.8 * scale).fillColor(theme.text)
+          .text(familyLineA, familyRect.x + dim.pad, familyRect.y + 11 * scale, { width: familyRect.w - dim.pad * 2, align: 'left' });
+        doc.font('Helvetica-Bold').fontSize(9.8 * scale).fillColor(theme.text)
+          .text(familyLineB, familyRect.x + dim.pad, familyRect.y + 29 * scale, { width: familyRect.w - dim.pad * 2, align: 'left' });
+        cursor += dim.family + dim.gap;
+
+        // QR + directions
+        const qrRect = { x: contentRect.x, y: cursor, w: contentRect.w, h: dim.qr };
+        drawCard(qrRect.x, qrRect.y, qrRect.w, qrRect.h);
+        doc.font('Helvetica-Bold').fontSize(10 * scale).fillColor(theme.text)
+          .text(firstText(qrProps.ctaLabel, 'Get Directions / RSVP'), qrRect.x + dim.pad, qrRect.y + 12 * scale, { width: qrRect.w - 80 * scale, align: 'left' });
+        if (inviteUrl) {
+          const fittedUrl = fitText(inviteUrl, qrRect.w - 88 * scale, 24 * scale, 'Helvetica', 7.4 * scale, 1);
+          doc.font('Helvetica').fontSize(7.4 * scale).fillColor(p.link || '#1d4ed8')
+            .text(fittedUrl, qrRect.x + dim.pad, qrRect.y + 30 * scale, { width: qrRect.w - 88 * scale, align: 'left' });
+        }
+        if (qrBuffer) {
+          const qrSize = Math.min(48 * scale, qrRect.h - 16 * scale);
+          doc.image(qrBuffer, qrRect.x + qrRect.w - qrSize - dim.pad, qrRect.y + (qrRect.h - qrSize) / 2, { width: qrSize, height: qrSize });
+        }
+        cursor += dim.qr + dim.gap;
+
+        // Footer message
+        const footerText = firstText(resolvedTemplateConfig?.footerMessage, 'With blessings from Vedika360');
+        doc.font('Helvetica').fontSize(8.4 * scale).fillColor(theme.subtle)
+          .text(footerText, contentRect.x + 4, Math.min(cursor, contentRect.y + contentRect.h - dim.footer), { width: contentRect.w - 8, align: 'center' });
+
+        doc.end();
+        return;
+      }
 
       if (backgroundImageBuffer) {
         doc.image(backgroundImageBuffer, 0, 0, { cover: [W, H], align: 'center', valign: 'center' });
