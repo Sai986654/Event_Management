@@ -66,6 +66,55 @@ const GuestManagement = () => {
   const previewGuestName = previewGuest?.name || 'Guest';
   const previewRelationship = previewGuest?.relationship || 'guest';
 
+  const coerceObject = (value) => (value && typeof value === 'object' && !Array.isArray(value) ? value : {});
+  const resolveTemplateTokens = (value, context) => {
+    if (typeof value === 'string') {
+      return value.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (_match, token) => {
+        const resolved = String(token)
+          .split('.')
+          .reduce((acc, key) => (acc && acc[key] !== undefined ? acc[key] : undefined), context);
+        return resolved === undefined || resolved === null ? '' : String(resolved);
+      });
+    }
+    if (Array.isArray(value)) return value.map((entry) => resolveTemplateTokens(entry, context));
+    if (value && typeof value === 'object') {
+      return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, resolveTemplateTokens(v, context)]));
+    }
+    return value;
+  };
+
+  const eventDate = previewGuest?.event?.date ? new Date(previewGuest.event.date) : null;
+  const previewContext = {
+    guest: {
+      name: previewGuestName,
+      guestCategory: previewGuest?.guestCategory || 'VIP',
+      relationship: previewRelationship,
+      invitationMessage: previewGuest?.customInviteMessage || '',
+    },
+    event: {
+      title: previewGuest?.event?.title || selectedTemplate?.name || 'Wedding Celebration',
+      brideName: previewGuest?.event?.brideName || 'Bride',
+      groomName: previewGuest?.event?.groomName || 'Groom',
+      dateText: eventDate ? eventDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : '',
+      timeText: eventDate ? eventDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }) : '',
+      venue: previewGuest?.event?.venue || 'Venue',
+      city: previewGuest?.event?.city || '',
+      groomFamily: previewGuest?.event?.groomFamily || 'To be announced',
+      brideFamily: previewGuest?.event?.brideFamily || 'To be announced',
+    },
+  };
+
+  const selectedTemplateConfig = coerceObject(selectedTemplate?.templateConfig);
+  const selectedTemplateSections = Array.isArray(selectedTemplateConfig?.layout?.sections)
+    ? selectedTemplateConfig.layout.sections
+    : [];
+  const getSectionProps = (componentType) => {
+    const section = selectedTemplateSections.find(
+      (item) => String(item?.componentType || '').toLowerCase() === String(componentType || '').toLowerCase()
+    );
+    return resolveTemplateTokens(coerceObject(section?.props), previewContext);
+  };
+
   const sampleCopy = {
     en: {
       formal: 'It would be our honor to have your gracious presence at our wedding celebration.',
@@ -79,11 +128,15 @@ const GuestManagement = () => {
     },
   };
 
-  const previewBody = sampleCopy[selectedLanguage]?.[selectedTone] || sampleCopy.en.friendly;
-  const previewSalutation =
-    selectedLanguage === 'te'
-      ? `Priyamaina ${previewGuestName} garu`
-      : `Dear ${previewGuestName}`;
+  const headerProps = getSectionProps('GuestHeader');
+  const messageProps = getSectionProps('PersonalMessage');
+  const previewTitleFromTemplate = headerProps.title || selectedTemplate?.name || 'Template Preview';
+  const previewSubtitleFromTemplate = headerProps.subtitle || '';
+  const previewBodyFallback = sampleCopy[selectedLanguage]?.[selectedTone] || sampleCopy.en.friendly;
+  const previewBody = messageProps.message || previewBodyFallback;
+  const previewSalutation = messageProps.salutation || (selectedLanguage === 'te'
+    ? `Priyamaina ${previewGuestName} garu`
+    : `Dear ${previewGuestName}`);
   const templateEngineLabel = selectedTemplate?.templateEngine || 'classic';
   const templateDebug = selectedTemplate?.debug || {};
   const previewModeLabel = selectedDesign ? 'Invite Studio Design' : `Template Engine: ${templateEngineLabel}`;
@@ -562,12 +615,12 @@ const GuestManagement = () => {
                 <div className="invite-live-preview-inner">
                   <div className="invite-live-preview-top">Vedika 360</div>
                   <div className="invite-live-preview-title">
-                    {selectedDesign?.name || selectedTemplate?.name || 'Template Preview'}
+                    {selectedDesign?.name || previewTitleFromTemplate}
                   </div>
                   <div className="invite-live-preview-meta">
                     {selectedDesign
                       ? `Invite Studio Design • ${previewRelationship}`
-                      : `${selectedLanguage === 'te' ? 'Telugu' : 'English'} • ${selectedTone} • ${previewRelationship}`}
+                      : `${previewSubtitleFromTemplate || `${selectedLanguage === 'te' ? 'Telugu' : 'English'} • ${selectedTone}`} • ${previewRelationship}`}
                   </div>
                   <div className="invite-live-preview-salutation">{previewSalutation}</div>
                   <div className="invite-live-preview-body">

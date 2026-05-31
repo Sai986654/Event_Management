@@ -57,9 +57,10 @@
 }
 
 .invite-live-preview-inner {
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.68);
   border-radius: 10px;
   padding: 14px;
+  backdrop-filter: blur(1px);
 }
 
 .invite-live-preview-top {

@@ -386,6 +386,9 @@ async function listInviteTemplates() {
       description: t.description,
       ornamentStyle: t.ornamentStyle || 'traditional',
       templateEngine: t.templateEngine || 'classic',
+      templateConfig: t?.templateEngine === 'template-engine' && t?.configJson && typeof t.configJson === 'object'
+        ? t.configJson
+        : null,
       previewImageUrl,
       debug: {
         hasTemplateEngineConfig,
