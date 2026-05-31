@@ -761,60 +761,10 @@ const AdminControlCenter = () => {
 
     try {
       const res = await adminService.uploadTemplateEngineAsset({ id: selectedEngineTemplate.id, file });
-      const uploadedAsset = res?.asset;
-
-      if (uploadedAsset?.url) {
-        try {
-          const parsedConfig = engineTemplateConfigText ? JSON.parse(engineTemplateConfigText) : {};
-          const config = coerceObject(parsedConfig);
-          const currentBackgroundAssets = normalizeAssetCollection(config.backgroundAssets);
-          const currentDecorativeAssets = normalizeAssetCollection(config.decorativeAssets);
-          const existingSlots = new Set(
-            [...currentBackgroundAssets, ...currentDecorativeAssets]
-              .map((asset) => String(asset?.assetSlot || asset?.slot || '').trim())
-              .filter(Boolean)
-          );
-
-          const looksLikeBackground = /bg|background|texture|paper|floral/i.test(String(uploadedAsset.name || ''));
-          const preferredSlot = looksLikeBackground ? 'backgroundTextureImage' : 'decorativeImage';
-          let slot = preferredSlot;
-
-          if (existingSlots.has(slot)) {
-            let suffix = 2;
-            while (existingSlots.has(`${slot}${suffix}`)) suffix += 1;
-            slot = `${slot}${suffix}`;
-          }
-
-          const assetEntry = {
-            id: slot,
-            assetSlot: slot,
-            url: uploadedAsset.url,
-            mimeType: uploadedAsset.mimeType,
-            name: uploadedAsset.name,
-          };
-
-          const nextBackgroundAssets = looksLikeBackground
-            ? [...currentBackgroundAssets, assetEntry]
-            : currentBackgroundAssets;
-
-          const nextDecorativeAssets = looksLikeBackground
-            ? currentDecorativeAssets
-            : [...currentDecorativeAssets, assetEntry];
-
-          const nextConfig = {
-            ...config,
-            canvas: {
-              ...coerceObject(config.canvas),
-              ...(looksLikeBackground ? { backgroundImage: uploadedAsset.url, backgroundAssetRef: slot } : {}),
-            },
-            backgroundAssets: nextBackgroundAssets,
-            decorativeAssets: nextDecorativeAssets,
-          };
-
-          setEngineTemplateConfigText(JSON.stringify(nextConfig, null, 2));
-        } catch (_error) {
-          // Keep upload success even if JSON editor currently has invalid content.
-        }
+      if (res?.template) {
+        setSelectedEngineTemplate(res.template);
+        setEngineTemplateConfigText(JSON.stringify(res.template.configJson || {}, null, 2));
+        setEngineVisibilityText(JSON.stringify(res.template.componentVisibilityJson || {}, null, 2));
       }
 
       message.success(`${res?.asset?.name || 'Asset'} uploaded`);

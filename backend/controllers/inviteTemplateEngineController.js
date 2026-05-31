@@ -14,6 +14,53 @@ const {
 
 const coerceObject = (value) => (value && typeof value === 'object' && !Array.isArray(value) ? value : {});
 
+const normalizeAssetCollection = (value) => {
+  if (Array.isArray(value)) return value;
+  if (value && typeof value === 'object') return Object.values(value);
+  return [];
+};
+
+const isBackgroundSlot = (slot) => /background|texture|paper/i.test(String(slot || ''));
+
+const upsertAssetBySlot = (items, entry) => {
+  const slot = String(entry?.assetSlot || '').trim();
+  if (!slot) return items;
+
+  const next = normalizeAssetCollection(items).filter(Boolean);
+  const idx = next.findIndex((item) => String(item?.assetSlot || item?.slot || '').trim() === slot);
+  if (idx >= 0) {
+    next[idx] = {
+      ...next[idx],
+      ...entry,
+    };
+    return next;
+  }
+
+  return [...next, entry];
+};
+
+const pickDefaultSlot = ({ config, fileName = '' }) => {
+  const requestedLooksBackground = /bg|background|texture|paper|floral/i.test(String(fileName));
+  const backgroundAssets = normalizeAssetCollection(config?.backgroundAssets);
+  const decorativeAssets = normalizeAssetCollection(config?.decorativeAssets);
+  const usedSlots = new Set(
+    [...backgroundAssets, ...decorativeAssets]
+      .map((asset) => String(asset?.assetSlot || asset?.slot || '').trim())
+      .filter(Boolean)
+  );
+
+  if (requestedLooksBackground) {
+    if (!usedSlots.has('backgroundTextureImage')) return 'backgroundTextureImage';
+    if (!usedSlots.has('backgroundImage')) return 'backgroundImage';
+  }
+
+  if (!usedSlots.has('decorativeImage')) return 'decorativeImage';
+
+  let suffix = 2;
+  while (usedSlots.has(`decorativeImage${suffix}`)) suffix += 1;
+  return `decorativeImage${suffix}`;
+};
+
 const templateEngineTablesReady = async () => {
   try {
     const rows = await prisma.$queryRawUnsafe(
@@ -319,16 +366,82 @@ exports.uploadTemplateEngineAsset = asyncHandler(async (req, res) => {
 
   const extension = path.extname(req.file.originalname || '').toLowerCase();
 
+  const rawSlot = String(req.body?.assetSlot || req.body?.slot || '').trim();
+  const config = coerceObject(template.configJson);
+  const slot = rawSlot || pickDefaultSlot({ config, fileName: req.file.originalname });
+
+  const assetEntry = {
+    id: slot,
+    key: slot,
+    slot,
+    assetSlot: slot,
+    name: req.file.originalname || uploaded.publicId.split('/').pop(),
+    mimeType: req.file.mimetype,
+    extension,
+    size: req.file.size,
+    assetPath: uploaded.publicId,
+    publicId: uploaded.publicId,
+    url: uploaded.url,
+    uploadedAt: new Date().toISOString(),
+  };
+
+  const isBackground = isBackgroundSlot(slot);
+  const nextConfig = {
+    ...config,
+    backgroundAssets: isBackground
+      ? upsertAssetBySlot(config.backgroundAssets, assetEntry)
+      : normalizeAssetCollection(config.backgroundAssets),
+    decorativeAssets: isBackground
+      ? normalizeAssetCollection(config.decorativeAssets)
+      : upsertAssetBySlot(config.decorativeAssets, assetEntry),
+    canvas: {
+      ...coerceObject(config.canvas),
+      ...(isBackground
+        ? {
+            backgroundAssetRef: slot,
+            backgroundImage: uploaded.url,
+          }
+        : {}),
+    },
+  };
+
+  const updated = await prisma.$transaction(async (tx) => {
+    const updatedTemplate = await tx.inviteTemplate.update({
+      where: { id: template.id },
+      data: {
+        configJson: nextConfig,
+        latestVersion: template.latestVersion + 1,
+      },
+    });
+
+    await tx.inviteTemplateVersion.create({
+      data: {
+        templateId: updatedTemplate.id,
+        version: updatedTemplate.latestVersion,
+        status: updatedTemplate.status,
+        configJson: nextConfig,
+        componentVisibility: updatedTemplate.componentVisibilityJson,
+        aiMetaJson: updatedTemplate.aiMetaJson,
+        createdByUserId: req.user?.id || null,
+      },
+    });
+
+    return updatedTemplate;
+  });
+
   res.status(201).json({
     message: 'Asset uploaded successfully',
     asset: {
       name: req.file.originalname || uploaded.publicId.split('/').pop(),
+      slot,
+      isBackground,
       mimeType: req.file.mimetype,
       extension,
       size: req.file.size,
       assetPath: uploaded.publicId,
       url: uploaded.url,
     },
+    template: updated,
   });
 });
 

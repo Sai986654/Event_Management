@@ -853,16 +853,22 @@ function getSectionByComponentType(sections, typeName) {
 }
 
 function collectAssetSlotUrls(templateConfig) {
+  const normalizeAssetCollection = (value) => {
+    if (Array.isArray(value)) return value;
+    if (value && typeof value === 'object') return Object.values(value);
+    return [];
+  };
+
   const assets = {};
   const collect = (entry) => {
     if (!entry || typeof entry !== 'object') return;
-    const slot = String(entry.assetSlot || '').trim();
-    const url = String(entry.url || '').trim();
+    const slot = String(entry.assetSlot || entry.slot || entry.id || entry.key || '').trim();
+    const url = String(entry.url || entry.assetUrl || entry.src || entry.assetPath || entry.publicId || '').trim();
     if (slot && url) assets[slot] = url;
   };
 
-  const backgroundAssets = Array.isArray(templateConfig?.backgroundAssets) ? templateConfig.backgroundAssets : [];
-  const decorativeAssets = Array.isArray(templateConfig?.decorativeAssets) ? templateConfig.decorativeAssets : [];
+  const backgroundAssets = normalizeAssetCollection(templateConfig?.backgroundAssets);
+  const decorativeAssets = normalizeAssetCollection(templateConfig?.decorativeAssets);
   backgroundAssets.forEach(collect);
   decorativeAssets.forEach(collect);
   return assets;
