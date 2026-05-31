@@ -1022,8 +1022,8 @@ function buildTemplateEnginePdfBuffer({ guest, event, inviteMessage, inviteUrl, 
 
       if (backgroundImageBuffer) {
         doc.image(backgroundImageBuffer, 0, 0, { fit: [W, H], align: 'center', valign: 'center' });
-        doc.save().fillOpacity(0.1).rect(0, 0, W, H).fill('#fffaf0').restore();
-        doc.save().fillOpacity(0.82).roundedRect(cardX, cardTop, cardW, cardBottom - cardTop, 24).fill('#fffdf7').restore();
+        doc.save().fillOpacity(0.06).rect(0, 0, W, H).fill('#fffaf0').restore();
+        doc.save().fillOpacity(0.68).roundedRect(cardX, cardTop, cardW, cardBottom - cardTop, 24).fill('#fffdf7').restore();
       } else {
         doc.rect(0, 0, W, H).fill(p.background || '#F8F3E8');
         doc.roundedRect(cardX, cardTop, cardW, cardBottom - cardTop, 24).fill('#fffdf7');
@@ -1062,6 +1062,194 @@ function buildTemplateEnginePdfBuffer({ guest, event, inviteMessage, inviteUrl, 
       const rsvpPrimary = firstText(rsvpProps?.actions?.[0]?.label, rsvpProps.primaryAction, 'RSVP Now');
       const rsvpSecondary = firstText(rsvpProps?.actions?.[1]?.label, rsvpProps.secondaryAction, 'Join Live Stream');
 
+      const rawPlacements =
+        (resolvedTemplateConfig?.layout?.componentPlacements && typeof resolvedTemplateConfig.layout.componentPlacements === 'object')
+          ? resolvedTemplateConfig.layout.componentPlacements
+          : (resolvedTemplateConfig?.layout?.placements && typeof resolvedTemplateConfig.layout.placements === 'object')
+            ? resolvedTemplateConfig.layout.placements
+            : (resolvedTemplateConfig?.canvas?.componentPlacements && typeof resolvedTemplateConfig.canvas.componentPlacements === 'object')
+              ? resolvedTemplateConfig.canvas.componentPlacements
+              : {};
+
+      const absoluteMode = String(resolvedTemplateConfig?.layout?.mode || '').toLowerCase() === 'absolute';
+      const useAbsoluteLayout = absoluteMode || Object.keys(rawPlacements).length > 0;
+
+      if (useAbsoluteLayout) {
+        const toNumber = (value) => {
+          const n = Number(value);
+          return Number.isFinite(n) ? n : null;
+        };
+
+        const resolveRect = (rect, container) => {
+          const src = rect && typeof rect === 'object' ? rect : {};
+          const xRaw = toNumber(src.x ?? src.left);
+          const yRaw = toNumber(src.y ?? src.top);
+          const wRaw = toNumber(src.width ?? src.w);
+          const hRaw = toNumber(src.height ?? src.h);
+
+          const x = xRaw === null ? container.x : (xRaw >= 0 && xRaw <= 1 ? container.x + xRaw * container.w : container.x + xRaw);
+          const yPos = yRaw === null ? container.y : (yRaw >= 0 && yRaw <= 1 ? container.y + yRaw * container.h : container.y + yRaw);
+          const w = wRaw === null ? container.w : (wRaw > 0 && wRaw <= 1 ? container.w * wRaw : wRaw);
+          const h = hRaw === null ? container.h : (hRaw > 0 && hRaw <= 1 ? container.h * hRaw : hRaw);
+
+          return {
+            x,
+            y: yPos,
+            w: Math.max(10, w),
+            h: Math.max(10, h),
+          };
+        };
+
+        const canvasContent = (resolvedTemplateConfig?.canvas?.contentArea && typeof resolvedTemplateConfig.canvas.contentArea === 'object')
+          ? resolvedTemplateConfig.canvas.contentArea
+          : (resolvedTemplateConfig?.canvas?.contentBox && typeof resolvedTemplateConfig.canvas.contentBox === 'object')
+            ? resolvedTemplateConfig.canvas.contentBox
+            : {};
+
+        const defaultContentContainer = backgroundImageBuffer
+          ? { x: W * 0.12, y: H * 0.17, w: W * 0.76, h: H * 0.70 }
+          : { x: cardX + 18, y: cardTop + 18, w: cardW - 36, h: cardBottom - cardTop - 36 };
+        const contentRect = resolveRect(canvasContent, defaultContentContainer);
+
+        const defaultPlacements = {
+          GuestHeader: { x: 0.03, y: 0.00, width: 0.94, height: 0.14 },
+          GuestBadge: { x: 0.35, y: 0.13, width: 0.30, height: 0.05 },
+          CoupleHero: { x: 0.04, y: 0.20, width: 0.92, height: 0.30 },
+          PersonalMessage: { x: 0.04, y: 0.52, width: 0.92, height: 0.16 },
+          RSVPSection: { x: 0.04, y: 0.70, width: 0.92, height: 0.08 },
+          SmartRecommendations: { x: 0.04, y: 0.79, width: 0.92, height: 0.10 },
+          FamilyConnection: { x: 0.04, y: 0.90, width: 0.92, height: 0.08 },
+          QRPass: { x: 0.04, y: 1.00, width: 0.92, height: 0.10 },
+          FooterMessage: { x: 0.04, y: 1.11, width: 0.92, height: 0.06 },
+        };
+
+        const findPlacement = (section) => {
+          const byId = rawPlacements?.[section?.id];
+          const byType = rawPlacements?.[section?.componentType];
+          const byTypeLower = rawPlacements?.[String(section?.componentType || '').toLowerCase()];
+          const fallback = defaultPlacements[String(section?.componentType || '')] || null;
+          return byId || byType || byTypeLower || fallback;
+        };
+
+        const drawContainer = (rect, radius = 14, fill = 'rgba(255,253,247,0.86)') => {
+          doc.save();
+          doc.fillOpacity(1);
+          doc.roundedRect(rect.x, rect.y, rect.w, rect.h, radius).fill(fill);
+          doc.restore();
+          doc.lineWidth(0.8).strokeColor(p.divider || '#D9C39A').roundedRect(rect.x, rect.y, rect.w, rect.h, radius).stroke();
+        };
+
+        const drawText = (text, xPos, yPos, options = {}) => {
+          doc.font(options.bold ? 'Helvetica-Bold' : 'Helvetica')
+            .fontSize(options.size || 11)
+            .fillColor(options.color || p.body || '#1f2937')
+            .text(firstText(text, options.fallback || ''), xPos, yPos, {
+              width: options.width,
+              align: options.align || 'left',
+              lineGap: options.lineGap || 1,
+            });
+        };
+
+        sections.forEach((section) => {
+          const placement = findPlacement(section);
+          if (!placement) return;
+          const rect = resolveRect(placement, contentRect);
+          const type = String(section?.componentType || '').toLowerCase();
+
+          if (type === 'guestheader') {
+            const heading = firstText(section?.props?.title, headerTitle);
+            const subtitle = firstText(section?.props?.subtitle, namesLine);
+            drawText(heading, rect.x + 10, rect.y + 8, { width: rect.w - 20, align: 'center', size: 14, bold: true, color: p.title || '#4B3621' });
+            drawText(subtitle, rect.x + 10, rect.y + 32, { width: rect.w - 20, align: 'center', size: 11, color: p.subtitle || '#6B5A45' });
+            drawText(openingLine, rect.x + 10, rect.y + 48, { width: rect.w - 20, align: 'center', size: 9.2, color: p.subtle || '#6B7280' });
+            return;
+          }
+
+          if (type === 'guestbadge') {
+            drawContainer(rect, 12, '#fff6dc');
+            drawText(badgeText, rect.x + 4, rect.y + Math.max(6, rect.h / 2 - 5), { width: rect.w - 8, align: 'center', size: 10, bold: true, color: p.badgeText || p.title || '#4B3621' });
+            return;
+          }
+
+          if (type === 'couplehero') {
+            drawContainer(rect, 18, '#f8f3e8');
+            if (heroImageBuffer) {
+              doc.image(heroImageBuffer, rect.x, rect.y, { fit: [rect.w, rect.h], align: 'center', valign: 'center' });
+              doc.lineWidth(0.8).strokeColor(p.divider || '#D9C39A').roundedRect(rect.x, rect.y, rect.w, rect.h, 18).stroke();
+            } else {
+              drawText(firstText(section?.props?.title, namesLine), rect.x + 12, rect.y + rect.h / 2 - 8, { width: rect.w - 24, align: 'center', size: 15, bold: true, color: p.title || '#4B3621' });
+            }
+            return;
+          }
+
+          if (type === 'personalmessage') {
+            drawContainer(rect, 12, '#fffdf7');
+            drawText(salutation, rect.x + 12, rect.y + 12, { width: rect.w - 24, size: 12.5, bold: true, color: p.title || '#4B3621' });
+            drawText(body, rect.x + 12, rect.y + 34, { width: rect.w - 24, size: 9.8, color: p.body || '#1f2937', lineGap: 2 });
+            drawText(dateLine, rect.x + 12, rect.y + rect.h - 30, { width: rect.w - 24, size: 8.8, bold: true, color: p.subtitle || '#6B5A45' });
+            drawText(venueLine, rect.x + 12, rect.y + rect.h - 16, { width: rect.w - 24, size: 8.8, color: p.subtle || '#6B7280' });
+            return;
+          }
+
+          if (type === 'rsvpsection') {
+            const halfW = (rect.w - 12) / 2;
+            const left = { x: rect.x, y: rect.y, w: halfW, h: rect.h };
+            const right = { x: rect.x + halfW + 12, y: rect.y, w: halfW, h: rect.h };
+            drawContainer(left, 14, '#fff6dc');
+            drawContainer(right, 14, '#fff6dc');
+            drawText(rsvpPrimary, left.x + 6, left.y + left.h / 2 - 5, { width: left.w - 12, align: 'center', size: 10.5, bold: true, color: p.title || '#4B3621' });
+            drawText(rsvpSecondary, right.x + 6, right.y + right.h / 2 - 5, { width: right.w - 12, align: 'center', size: 10.5, bold: true, color: p.title || '#4B3621' });
+            return;
+          }
+
+          if (type === 'smartrecommendations') {
+            drawContainer(rect, 12, '#fffdf7');
+            const itemW = rect.w / 3;
+            scheduleItems.slice(0, 3).forEach((item, idx) => {
+              const colX = rect.x + idx * itemW;
+              const cx = colX + itemW / 2;
+              doc.circle(cx, rect.y + 10, 4).fill(p.accent || '#C28A2E');
+              doc.circle(cx, rect.y + 10, 1.6).fill('#fffdf7');
+              drawText(firstText(item?.time, '--'), colX, rect.y + 18, { width: itemW, align: 'center', size: 8.2, bold: true, color: p.subtitle || '#6B5A45' });
+              drawText(firstText(item?.label, 'Program'), colX + 4, rect.y + 34, { width: itemW - 8, align: 'center', size: 8.2, color: p.body || '#1f2937' });
+            });
+            return;
+          }
+
+          if (type === 'familyconnection') {
+            drawContainer(rect, 12, '#fffdf7');
+            drawText(groomFamilyLine, rect.x + 12, rect.y + 12, { width: rect.w - 24, size: 10, bold: true, color: p.title || '#4B3621' });
+            drawText(brideFamilyLine, rect.x + 12, rect.y + Math.min(rect.h - 18, 30), { width: rect.w - 24, size: 10, bold: true, color: p.title || '#4B3621' });
+            return;
+          }
+
+          if (type === 'qrpass' && qrBuffer) {
+            drawContainer(rect, 12, '#fffdf7');
+            if (mapPreviewBuffer && rect.w > 200) {
+              const mapW = Math.max(100, rect.w - 90);
+              doc.image(mapPreviewBuffer, rect.x + 10, rect.y + 8, { fit: [mapW, rect.h - 16], align: 'center', valign: 'center' });
+              doc.lineWidth(0.5).strokeColor('#d4c9a8').roundedRect(rect.x + 10, rect.y + 8, mapW, rect.h - 16, 8).stroke();
+            } else {
+              drawText(firstText(qrProps.ctaLabel, 'Scan for RSVP / Entry'), rect.x + 12, rect.y + 12, { width: rect.w - 80, size: 10, bold: true, color: p.subtitle || '#6B5A45' });
+              if (inviteUrl) {
+                drawText(inviteUrl, rect.x + 12, rect.y + 30, { width: rect.w - 80, size: 8, color: p.link || '#1d4ed8' });
+              }
+            }
+            const qrSize = Math.min(64, rect.h - 14);
+            doc.image(qrBuffer, rect.x + rect.w - qrSize - 10, rect.y + (rect.h - qrSize) / 2, { width: qrSize, height: qrSize });
+            return;
+          }
+
+          if (type === 'footermessage') {
+            drawText(firstText(section?.props?.text, section?.props?.message, section?.bindings?.text), rect.x + 6, rect.y + 2, { width: rect.w - 12, align: 'center', size: 8.5, color: p.subtle || '#6B7280' });
+          }
+        });
+
+        _drawOrnateDivider(doc, cardBottom - 20, cardX + 40, cardX + cardW - 40, p.divider || p.accent || '#C28A2E');
+        doc.end();
+        return;
+      }
+
       // Header strip
       doc.save().roundedRect(cardX + 8, y, cardW - 16, 48, 14).fill(p.header || '#6D4C2F').restore();
       doc.font('Helvetica-Bold').fontSize(19).fillColor(p.headerText || '#fffdf7')
@@ -1089,19 +1277,29 @@ function buildTemplateEnginePdfBuffer({ guest, event, inviteMessage, inviteUrl, 
         .text(badgeText, cardX + (cardW - 120) / 2, y + 7, { width: 120, align: 'center' });
       y += 30;
 
-      if (heroImageBuffer) {
-        const heroH = 232;
-        doc.roundedRect(cardX + 18, y, cardW - 36, heroH, 20).fill('#f8f3e8');
-        doc.image(heroImageBuffer, cardX + 18, y, { fit: [cardW - 36, heroH], align: 'center', valign: 'center' });
-        doc.lineWidth(1).strokeColor(p.divider || '#D9C39A').roundedRect(cardX + 18, y, cardW - 36, heroH, 20).stroke();
-        y += heroH + 12;
-      } else {
-        const heroH = 152;
-        doc.roundedRect(cardX + 18, y, cardW - 36, heroH, 20).fill('#f8f3e8');
-        doc.lineWidth(1).strokeColor(p.divider || '#D9C39A').roundedRect(cardX + 18, y, cardW - 36, heroH, 20).stroke();
-        doc.font('Helvetica-Bold').fontSize(20).fillColor(p.title || '#4B3621')
-          .text(namesLine, cardX + 34, y + 58, { width: cardW - 68, align: 'center' });
-        y += heroH + 12;
+      const heroTitle = firstText(heroProps.title, heroProps.heading, heroSection?.bindings?.title);
+      const heroSubtitle = firstText(heroProps.subtitle, heroSection?.bindings?.subtitle, heroProps.caption);
+      const shouldRenderHeroCard = Boolean(heroImageBuffer || heroTitle || heroSubtitle);
+
+      if (shouldRenderHeroCard) {
+        if (heroImageBuffer) {
+          const heroH = 188;
+          doc.roundedRect(cardX + 18, y, cardW - 36, heroH, 20).fill('#f8f3e8');
+          doc.image(heroImageBuffer, cardX + 18, y, { fit: [cardW - 36, heroH], align: 'center', valign: 'center' });
+          doc.lineWidth(1).strokeColor(p.divider || '#D9C39A').roundedRect(cardX + 18, y, cardW - 36, heroH, 20).stroke();
+          y += heroH + 12;
+        } else {
+          const heroH = 82;
+          doc.roundedRect(cardX + 18, y, cardW - 36, heroH, 16).fill('#fbf6ea');
+          doc.lineWidth(0.8).strokeColor(p.divider || '#D9C39A').roundedRect(cardX + 18, y, cardW - 36, heroH, 16).stroke();
+          doc.font('Helvetica-Bold').fontSize(13).fillColor(p.title || '#4B3621')
+            .text(heroTitle || namesLine, cardX + 34, y + 20, { width: cardW - 68, align: 'center' });
+          if (heroSubtitle) {
+            doc.font('Helvetica').fontSize(9.2).fillColor(p.subtitle || '#6B5A45')
+              .text(heroSubtitle, cardX + 34, y + 44, { width: cardW - 68, align: 'center' });
+          }
+          y += heroH + 10;
+        }
       }
 
       doc.roundedRect(cardX + 18, y, cardW - 36, 122, 14).fill(p.badge || '#fff9ee');
@@ -1151,21 +1349,26 @@ function buildTemplateEnginePdfBuffer({ guest, event, inviteMessage, inviteUrl, 
 
       // Map + QR card
       if (qrBuffer && y + 120 < cardBottom - 20) {
-        doc.roundedRect(cardX + 18, y, cardW - 36, 108, 12).fill('#fffdf7');
-        doc.lineWidth(0.8).strokeColor(p.divider || '#D9C39A').roundedRect(cardX + 18, y, cardW - 36, 108, 12).stroke();
-        doc.font('Helvetica-Bold').fontSize(10).fillColor(p.subtitle || '#6B5A45').text('Get Directions / RSVP', cardX + 28, y + 12, { width: 210, align: 'left' });
         if (mapPreviewBuffer) {
+          doc.roundedRect(cardX + 18, y, cardW - 36, 108, 12).fill('#fffdf7');
+          doc.lineWidth(0.8).strokeColor(p.divider || '#D9C39A').roundedRect(cardX + 18, y, cardW - 36, 108, 12).stroke();
+          doc.font('Helvetica-Bold').fontSize(10).fillColor(p.subtitle || '#6B5A45').text('Get Directions / RSVP', cardX + 28, y + 12, { width: 210, align: 'left' });
           doc.image(mapPreviewBuffer, cardX + 28, y + 32, { fit: [184, 66], align: 'center', valign: 'center' });
           doc.lineWidth(0.5).strokeColor('#d4c9a8').roundedRect(cardX + 28, y + 32, 184, 66, 8).stroke();
+          doc.image(qrBuffer, cardX + cardW - 18 - 84, y + 12, { width: 84, height: 84 });
+          if (inviteUrl) {
+            doc.font('Helvetica').fontSize(8.2).fillColor(p.link || '#1d4ed8').text(inviteUrl, cardX + 220, y + 81, { width: cardW - 250, align: 'left' });
+          }
         } else {
-          doc.roundedRect(cardX + 28, y + 32, 184, 66, 8).fill('#f6f1e2');
-          doc.lineWidth(0.5).strokeColor('#d4c9a8').roundedRect(cardX + 28, y + 32, 184, 66, 8).stroke();
-          doc.font('Helvetica').fontSize(9).fillColor(p.subtle || '#6B7280')
-            .text(firstText(qrProps.ctaLabel, 'Get Directions'), cardX + 28, y + 58, { width: 184, align: 'center' });
-        }
-        doc.image(qrBuffer, cardX + cardW - 18 - 84, y + 12, { width: 84, height: 84 });
-        if (inviteUrl) {
-          doc.font('Helvetica').fontSize(8.2).fillColor(p.link || '#1d4ed8').text(inviteUrl, cardX + 220, y + 81, { width: cardW - 250, align: 'left' });
+          doc.roundedRect(cardX + 18, y, cardW - 36, 70, 12).fill('#fffdf7');
+          doc.lineWidth(0.8).strokeColor(p.divider || '#D9C39A').roundedRect(cardX + 18, y, cardW - 36, 70, 12).stroke();
+          doc.font('Helvetica-Bold').fontSize(10).fillColor(p.subtitle || '#6B5A45')
+            .text(firstText(qrProps.ctaLabel, 'Scan for RSVP / Entry'), cardX + 28, y + 16, { width: cardW - 150, align: 'left' });
+          if (inviteUrl) {
+            doc.font('Helvetica').fontSize(8.2).fillColor(p.link || '#1d4ed8')
+              .text(inviteUrl, cardX + 28, y + 36, { width: cardW - 150, align: 'left' });
+          }
+          doc.image(qrBuffer, cardX + cardW - 18 - 52, y + 9, { width: 52, height: 52 });
         }
       }
 
