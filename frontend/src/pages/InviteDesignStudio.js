@@ -22,7 +22,6 @@ import {
   CopyOutlined,
   ExportOutlined,
   SaveOutlined,
-  SendOutlined,
   PlusOutlined,
   ReloadOutlined,
   CodeOutlined,
@@ -72,7 +71,6 @@ const InviteDesignStudio = () => {
   const [canvasLayout, setCanvasLayout] = useState({});
   const [editorMode, setEditorMode] = useState('canvas'); // 'canvas' or 'json'
 
-  const [sendVia, setSendVia] = useState('email');
   const [previewGuestId, setPreviewGuestId] = useState(null);
   const [customKey, setCustomKey] = useState('');
   const [customValue, setCustomValue] = useState('');
@@ -82,7 +80,7 @@ const InviteDesignStudio = () => {
   const [saving, setSaving] = useState(false);
   const [duplicating, setDuplicating] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
-  const [sending, setSending] = useState(false);
+  const [publishing, setPublishing] = useState(false);
   const [paymentReceiptVisible, setPaymentReceiptVisible] = useState(false);
   const [paymentReceipt, setPaymentReceipt] = useState(null);
   const [loadingReceipt] = useState(false);
@@ -799,25 +797,25 @@ const InviteDesignStudio = () => {
     }
   };
 
-  const handleGenerateAndSend = async () => {
+  const handlePublishDesign = async () => {
     if (!selectedDesignId) {
       message.warning('Select a design first.');
       return;
     }
 
-    setSending(true);
+    setPublishing(true);
     try {
-      const res = await inviteDesignService.generateAndSend(selectedDesignId, {
-        sendVia,
-        defaultLanguage: designLanguage,
-        defaultTemplateKey: selectedTemplate || undefined,
+      await inviteDesignService.updateDesign(selectedDesignId, {
+        name: designName.trim() || selectedDesign?.name,
+        language: designLanguage,
+        status: 'published',
       });
-      message.success(`Generated ${res.generated || 0} invites and sent ${res.sent || 0}`);
+      message.success('Design published');
       await loadDesignDetails(selectedDesignId);
     } catch (error) {
       message.error(getErrorMessage(error));
     } finally {
-      setSending(false);
+      setPublishing(false);
     }
   };
 
@@ -1189,24 +1187,13 @@ const InviteDesignStudio = () => {
                   <Button icon={<ExportOutlined />} onClick={handleExportPdf} loading={exportingPdf}>
                     Export PDF
                   </Button>
-                </Space>
-
-                <Divider />
-
-                <Space align="center" wrap size={[10, 10]}>
-                  <Text strong>Send via</Text>
-                  <Select
-                    value={sendVia}
-                    onChange={setSendVia}
-                    style={{ width: 160 }}
-                    options={[
-                      { value: 'email', label: 'Email' },
-                      { value: 'whatsapp', label: 'WhatsApp' },
-                      { value: 'both', label: 'Both' },
-                    ]}
-                  />
-                  <Button icon={<SendOutlined />} type="primary" onClick={handleGenerateAndSend} loading={sending}>
-                    Generate + Send Invites
+                  <Button
+                    type="primary"
+                    onClick={handlePublishDesign}
+                    loading={publishing}
+                    disabled={!selectedDesignId}
+                  >
+                    {designStatus === 'published' ? 'Republish Design' : 'Publish Design'}
                   </Button>
                 </Space>
 
