@@ -13,10 +13,8 @@ import { inviteDesignService } from '../services/inviteDesignService';
 import { getErrorMessage } from '../utils/helpers';
 import InviteDesignCanvas from './InviteDesignCanvas';
 import {
-  EVENT_TYPE_OPTIONS,
   buildDefaultMergeData,
   buildPreviewMergeContext,
-  getHostFieldConfig,
   getInvitePlaceholderGroups,
   getQuickTextBlocks,
   getSectionBlocks,
@@ -66,7 +64,6 @@ const InviteCanvasEditor = () => {
 
   const quickTextBlocks = useMemo(() => getQuickTextBlocks(inviteEventType), [inviteEventType]);
   const sectionBlocks = useMemo(() => getSectionBlocks(inviteEventType), [inviteEventType]);
-  const hostFieldConfig = useMemo(() => getHostFieldConfig(inviteEventType), [inviteEventType]);
 
   useEffect(() => {
     const load = async () => {
