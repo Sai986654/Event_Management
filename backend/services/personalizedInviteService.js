@@ -360,11 +360,13 @@ async function listInviteTemplates() {
     });
 
     const backgroundAssetRef = String(config?.canvas?.backgroundAssetRef || '').trim();
+    const firstAnyAssetUrl = Object.values(slotMap).find((value) => typeof value === 'string' && value.trim()) || null;
     const templateEnginePreviewAsset =
       (backgroundAssetRef && slotMap[backgroundAssetRef]) ||
       slotMap.backgroundTextureImage ||
       slotMap.backgroundImage ||
       String(config?.canvas?.backgroundImage || '').trim() ||
+      firstAnyAssetUrl ||
       null;
 
     const previewAssetResolved = templateEnginePreviewAsset || previewAsset;
@@ -908,6 +910,26 @@ function collectAssetSlotUrls(templateConfig) {
   return assets;
 }
 
+function collectTemplateAssetUrls(templateConfig) {
+  const normalizeAssetCollection = (value) => {
+    if (Array.isArray(value)) return value;
+    if (value && typeof value === 'object') return Object.values(value);
+    return [];
+  };
+
+  const pickAssetUrl = (entry) => {
+    if (!entry || typeof entry !== 'object') return '';
+    return String(entry.url || entry.assetUrl || entry.src || entry.assetPath || entry.publicId || '').trim();
+  };
+
+  const backgroundAssets = normalizeAssetCollection(templateConfig?.backgroundAssets);
+  const decorativeAssets = normalizeAssetCollection(templateConfig?.decorativeAssets);
+
+  return [...backgroundAssets, ...decorativeAssets]
+    .map((entry) => pickAssetUrl(entry))
+    .filter(Boolean);
+}
+
 function buildTemplateEnginePdfBuffer({ guest, event, inviteMessage, inviteUrl, qrBuffer, relationship, template }) {
   return new Promise(async (resolve, reject) => {
     try {
@@ -953,6 +975,7 @@ function buildTemplateEnginePdfBuffer({ guest, event, inviteMessage, inviteUrl, 
       const resolvedTemplateConfig = resolveTemplateTokens(template.configJson || {}, context);
       const sections = normalizeTemplateEngineSections(resolvedTemplateConfig, context);
       const assetSlotUrls = collectAssetSlotUrls(resolvedTemplateConfig);
+      const assetUrls = collectTemplateAssetUrls(resolvedTemplateConfig);
 
       const guestHeaderSection = getSectionByComponentType(sections, 'GuestHeader');
       const guestBadgeSection = getSectionByComponentType(sections, 'GuestBadge');
@@ -991,7 +1014,9 @@ function buildTemplateEnginePdfBuffer({ guest, event, inviteMessage, inviteUrl, 
         assetSlotUrls[backgroundAssetRef],
         assetSlotUrls.backgroundTextureImage,
         assetSlotUrls.backgroundImage,
-        resolvedTemplateConfig?.canvas?.backgroundImage
+        resolvedTemplateConfig?.canvas?.backgroundImage,
+        assetSlotUrls.decorativeImage,
+        assetUrls[0]
       );
       const backgroundImageBuffer = await loadR2AssetBuffer(backgroundImageUrl);
 
@@ -1580,6 +1605,7 @@ async function generatePersonalizedInvite({ guest, event, clientBaseUrl, payload
       : 'classic';
 
   const templateAssetSlots = hasTemplateEngineJson ? collectAssetSlotUrls(template.configJson || {}) : {};
+  const templateAssetUrls = hasTemplateEngineJson ? collectTemplateAssetUrls(template.configJson || {}) : [];
   const backgroundAssetRef = hasTemplateEngineJson
     ? String(template?.configJson?.canvas?.backgroundAssetRef || '').trim()
     : '';
@@ -1588,7 +1614,9 @@ async function generatePersonalizedInvite({ guest, event, clientBaseUrl, payload
       (backgroundAssetRef && templateAssetSlots[backgroundAssetRef]) ||
       templateAssetSlots.backgroundTextureImage ||
       templateAssetSlots.backgroundImage ||
-      (template?.configJson?.canvas?.backgroundImage && String(template.configJson.canvas.backgroundImage).trim())
+      templateAssetSlots.decorativeImage ||
+      (template?.configJson?.canvas?.backgroundImage && String(template.configJson.canvas.backgroundImage).trim()) ||
+      templateAssetUrls[0]
     )
   );
 
