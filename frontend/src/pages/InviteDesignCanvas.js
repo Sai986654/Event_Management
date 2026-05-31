@@ -211,9 +211,11 @@ const InviteDesignCanvas = ({
   const textAreaRef = useRef(null);
   const guideTimerRef = useRef(null);
   const canvasRef = useRef(null);
+  const viewportRef = useRef(null);
   const elementsRef = useRef(elements);
   const dragStateRef = useRef(null);
   const resizeStateRef = useRef(null);
+  const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
 
   const selectedElement = elements.find((el) => el.id === selectedElementId);
   const stickerCategoryCounts = useMemo(
@@ -235,9 +237,12 @@ const InviteDesignCanvas = ({
   const [canvasWidth, canvasHeight] = canvasSize.split('x').map(Number);
   const aspectRatio = canvasWidth / canvasHeight;
   const desktopWorkbench = Boolean(screens.xl);
-  const maxPreviewWidth = screens.xxl ? 420 : screens.xl ? 380 : screens.lg ? 330 : screens.md ? 300 : 250;
-  const previewWidth = maxPreviewWidth;
-  const previewHeight = maxPreviewWidth / aspectRatio;
+  const fallbackViewportWidth = screens.xxl ? 980 : screens.xl ? 860 : screens.lg ? 760 : screens.md ? 620 : 420;
+  const measuredViewportWidth = Number(viewportSize.width) || fallbackViewportWidth;
+  const usableViewportWidth = Math.max(260, measuredViewportWidth - 40);
+  const maxPreviewWidth = screens.xxl ? 760 : screens.xl ? 700 : screens.lg ? 640 : screens.md ? 560 : 420;
+  const previewWidth = Math.max(240, Math.min(maxPreviewWidth, usableViewportWidth));
+  const previewHeight = previewWidth / aspectRatio;
 
   useEffect(() => {
     setElements(layout.elements || []);
@@ -248,6 +253,27 @@ const InviteDesignCanvas = ({
   useEffect(() => {
     elementsRef.current = elements;
   }, [elements]);
+
+  useEffect(() => {
+    const node = viewportRef.current;
+    if (!node) return;
+
+    const updateBounds = () => {
+      const rect = node.getBoundingClientRect();
+      setViewportSize({ width: rect.width, height: rect.height });
+    };
+
+    updateBounds();
+
+    if (typeof ResizeObserver !== 'undefined') {
+      const observer = new ResizeObserver(() => updateBounds());
+      observer.observe(node);
+      return () => observer.disconnect();
+    }
+
+    window.addEventListener('resize', updateBounds);
+    return () => window.removeEventListener('resize', updateBounds);
+  }, []);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -1245,7 +1271,7 @@ const InviteDesignCanvas = ({
         >
           <Card title="Canvas Preview" size="small" className="invite-canvas-panel invite-canvas-panel--center">
             <div className="invite-canvas-center-body">
-              <div className="canvas-viewport">
+              <div className="canvas-viewport" ref={viewportRef}>
                 <div
                   ref={canvasRef}
                   className="invite-canvas"
