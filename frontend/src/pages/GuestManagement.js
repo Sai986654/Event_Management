@@ -140,6 +140,133 @@ const GuestManagement = () => {
   const templateEngineLabel = selectedTemplate?.templateEngine || 'classic';
   const templateDebug = selectedTemplate?.debug || {};
   const previewModeLabel = selectedDesign ? 'Invite Studio Design' : `Template Engine: ${templateEngineLabel}`;
+  const simpleTemplateModel =
+    selectedTemplateSections.length === 0 &&
+    (selectedTemplateConfig?.backgroundImage || selectedTemplateConfig?.contentArea || selectedTemplateConfig?.theme);
+
+  const sectionCards = selectedTemplateSections
+    .map((section) => {
+      const componentType = String(section?.componentType || '').toLowerCase();
+      const props = resolveTemplateTokens(coerceObject(section?.props), previewContext);
+
+      if (componentType === 'guestheader') {
+        const title = props.title || previewTitleFromTemplate;
+        const subtitle = props.subtitle || `${previewContext.event.brideName} & ${previewContext.event.groomName}`;
+        const meta = props.badgeText || previewContext.guest.guestCategory;
+        return {
+          key: section?.id || componentType,
+          type: 'header',
+          title,
+          subtitle,
+          meta,
+        };
+      }
+
+      if (componentType === 'personalmessage') {
+        return {
+          key: section?.id || componentType,
+          type: 'message',
+          title: props.salutation || previewSalutation,
+          body: props.message || previewBody,
+          footer: props.signature || previewContext.event.title,
+        };
+      }
+
+      if (componentType === 'familyconnection') {
+        return {
+          key: section?.id || componentType,
+          type: 'details',
+          title: 'Family Details',
+          rows: [
+            `Groom's Family: ${previewContext.event.groomFamily}`,
+            `Bride's Family: ${previewContext.event.brideFamily}`,
+          ],
+        };
+      }
+
+      if (componentType === 'rsvpsection') {
+        return {
+          key: section?.id || componentType,
+          type: 'actions',
+          title: props.title || 'RSVP',
+          rows: [props.primaryLabel || 'RSVP Now', props.secondaryLabel || 'Join Live Stream'],
+        };
+      }
+
+      if (componentType === 'qrpass') {
+        return {
+          key: section?.id || componentType,
+          type: 'details',
+          title: props.ctaLabel || 'QR & Directions',
+          rows: [props.helpText || 'Scan QR for map and RSVP confirmation'],
+        };
+      }
+
+      if (componentType === 'couplehero') {
+        return {
+          key: section?.id || componentType,
+          type: 'details',
+          title: props.title || 'Wedding Celebration',
+          rows: [
+            `${previewContext.event.brideName} & ${previewContext.event.groomName}`,
+            `${previewContext.event.dateText} • ${previewContext.event.timeText}`,
+          ],
+        };
+      }
+
+      if (componentType === 'smartrecommendations') {
+        return {
+          key: section?.id || componentType,
+          type: 'details',
+          title: props.title || 'Event Timeline',
+          rows: [
+            props.segment1Label || 'Welcome Ritual',
+            props.segment2Label || 'Muhurtam',
+            props.segment3Label || 'Reception',
+          ],
+        };
+      }
+
+      return null;
+    })
+    .filter(Boolean);
+
+  const simpleModelCards = [
+    {
+      key: 'simple-header',
+      type: 'header',
+      title: previewContext.event.title || previewTitleFromTemplate,
+      subtitle: `${previewContext.event.brideName} & ${previewContext.event.groomName}`,
+      meta: previewContext.guest.guestCategory,
+    },
+    {
+      key: 'simple-message',
+      type: 'message',
+      title: previewSalutation,
+      body: previewBody,
+      footer: `${previewContext.event.dateText} • ${previewContext.event.venue}`,
+    },
+    {
+      key: 'simple-rsvp',
+      type: 'actions',
+      title: 'RSVP',
+      rows: ['RSVP Now', 'Join Live Stream'],
+    },
+    {
+      key: 'simple-family',
+      type: 'details',
+      title: 'Family Details',
+      rows: [
+        `Groom's Family: ${previewContext.event.groomFamily}`,
+        `Bride's Family: ${previewContext.event.brideFamily}`,
+      ],
+    },
+  ];
+
+  const previewCards = selectedDesign
+    ? []
+    : (sectionCards.length > 0 ? sectionCards : (simpleTemplateModel ? simpleModelCards : []));
+
   const templateHealth = selectedDesign
     ? null
     : {
@@ -622,12 +749,33 @@ const GuestManagement = () => {
                       ? `Invite Studio Design • ${previewRelationship}`
                       : `${previewSubtitleFromTemplate || `${selectedLanguage === 'te' ? 'Telugu' : 'English'} • ${selectedTone}`} • ${previewRelationship}`}
                   </div>
-                  <div className="invite-live-preview-salutation">{previewSalutation}</div>
-                  <div className="invite-live-preview-body">
-                    {selectedDesign
-                      ? 'This mode renders the saved Invite Studio layout for each guest and fills placeholder tokens like guest name, event date, bride or groom names, and blessing lines.'
-                      : previewBody}
-                  </div>
+                  {selectedDesign ? (
+                    <div className="invite-live-preview-body">
+                      This mode renders the saved Invite Studio layout for each guest and fills placeholder tokens like guest name, event date, bride or groom names, and blessing lines.
+                    </div>
+                  ) : previewCards.length > 0 ? (
+                    <div className="invite-live-preview-cards">
+                      {previewCards.map((card) => (
+                        <div key={card.key} className={`invite-live-preview-card invite-live-preview-card-${card.type}`}>
+                          <div className="invite-live-preview-card-title">{card.title}</div>
+                          {card.subtitle ? <div className="invite-live-preview-card-subtitle">{card.subtitle}</div> : null}
+                          {card.meta ? <div className="invite-live-preview-card-meta">{card.meta}</div> : null}
+                          {card.body ? <div className="invite-live-preview-card-body">{card.body}</div> : null}
+                          {Array.isArray(card.rows)
+                            ? card.rows.map((row, idx) => (
+                                <div key={`${card.key}-${idx}`} className="invite-live-preview-card-row">{row}</div>
+                              ))
+                            : null}
+                          {card.footer ? <div className="invite-live-preview-card-footer">{card.footer}</div> : null}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <>
+                      <div className="invite-live-preview-salutation">{previewSalutation}</div>
+                      <div className="invite-live-preview-body">{previewBody}</div>
+                    </>
+                  )}
                   <div className="invite-live-preview-footer">
                     Preview guest: {previewGuestName}
                     {extraSelectedCount > 0 ? ` +${extraSelectedCount} more selected` : ''}

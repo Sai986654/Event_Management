@@ -100,6 +100,57 @@
   color: #374151;
 }
 
+.invite-live-preview-cards {
+  margin-top: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.invite-live-preview-card {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid #e7d6aa;
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+
+.invite-live-preview-card-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #2f2415;
+}
+
+.invite-live-preview-card-subtitle {
+  margin-top: 3px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #3f2f1b;
+}
+
+.invite-live-preview-card-meta {
+  margin-top: 3px;
+  font-size: 11px;
+  color: #6b7280;
+}
+
+.invite-live-preview-card-body {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #374151;
+}
+
+.invite-live-preview-card-row {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #374151;
+}
+
+.invite-live-preview-card-footer {
+  margin-top: 6px;
+  font-size: 11px;
+  color: #6b7280;
+}
+
 .invite-live-preview-footer {
   margin-top: 10px;
   font-size: 12px;
