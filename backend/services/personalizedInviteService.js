@@ -886,11 +886,6 @@ function buildTemplateEnginePdfBuffer({ guest, event, inviteMessage, inviteUrl, 
       const cardTop = pagePad;
       const cardBottom = H - pagePad;
 
-      doc.rect(0, 0, W, H).fill(p.background || '#F8F3E8');
-      doc.roundedRect(cardX, cardTop, cardW, cardBottom - cardTop, 24).fill('#fffdf7');
-      doc.lineWidth(1.6).strokeColor(p.frame || '#6D4C2F').roundedRect(cardX, cardTop, cardW, cardBottom - cardTop, 24).stroke();
-      _drawOrnateCorners(doc, cardX + 10, cardTop + 10, cardX + cardW - 10, cardBottom - 10, p.accent || '#C28A2E', 'traditional');
-
       const eventDate = event?.date ? new Date(event.date) : null;
       const dateText = eventDate ? eventDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : 'Date to be announced';
       const timeText = eventDate ? eventDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }) : '';
@@ -950,6 +945,27 @@ function buildTemplateEnginePdfBuffer({ guest, event, inviteMessage, inviteUrl, 
       const mapAssetRef = firstText(qrProps.mapPreviewAssetRef, 'mapPreviewImage');
       const mapPreviewUrl = firstText(qrProps.mapPreviewUrl, assetSlotUrls[mapAssetRef], assetSlotUrls.mapPreviewImage);
       const mapPreviewBuffer = await loadR2AssetBuffer(mapPreviewUrl);
+
+      const backgroundAssetRef = firstText(headerProps.backgroundAssetRef, 'backgroundTextureImage');
+      const backgroundImageUrl = firstText(
+        assetSlotUrls[backgroundAssetRef],
+        assetSlotUrls.backgroundTextureImage,
+        assetSlotUrls.backgroundImage,
+        resolvedTemplateConfig?.canvas?.backgroundImage
+      );
+      const backgroundImageBuffer = await loadR2AssetBuffer(backgroundImageUrl);
+
+      if (backgroundImageBuffer) {
+        doc.image(backgroundImageBuffer, 0, 0, { fit: [W, H], align: 'center', valign: 'center' });
+        doc.save().fillOpacity(0.1).rect(0, 0, W, H).fill('#fffaf0').restore();
+        doc.save().fillOpacity(0.82).roundedRect(cardX, cardTop, cardW, cardBottom - cardTop, 24).fill('#fffdf7').restore();
+      } else {
+        doc.rect(0, 0, W, H).fill(p.background || '#F8F3E8');
+        doc.roundedRect(cardX, cardTop, cardW, cardBottom - cardTop, 24).fill('#fffdf7');
+      }
+
+      doc.lineWidth(1.6).strokeColor(p.frame || '#6D4C2F').roundedRect(cardX, cardTop, cardW, cardBottom - cardTop, 24).stroke();
+      _drawOrnateCorners(doc, cardX + 10, cardTop + 10, cardX + cardW - 10, cardBottom - 10, p.accent || '#C28A2E', 'traditional');
 
       const badgeText = firstText(badgeProps.badge, badgeProps.label, context?.guest?.guestCategory, 'VIP');
       const headerTitle = firstText(headerProps.title, template?.name, event?.title, 'Wedding Invite');
