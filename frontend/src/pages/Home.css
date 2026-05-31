@@ -4,23 +4,65 @@
 }
 
 .hero {
-  background: linear-gradient(135deg, #0a5a8a 0%, #0e7490 60%, #d4a642 100%);
-  color: white;
-  padding: 80px 24px;
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(110% 120% at 100% -15%, rgba(245, 230, 179, 0.28), transparent 56%),
+    radial-gradient(120% 180% at 0% 100%, rgba(212, 175, 55, 0.24), transparent 60%),
+    linear-gradient(132deg, #0f172a 0%, #1e293b 62%, #2f3f5a 100%);
+  color: #fffdfa;
+  padding: 86px 24px;
   text-align: center;
   animation: sectionFadeUp 520ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+.hero-ornament {
+  position: absolute;
+  width: 180px;
+  height: 180px;
+  border: 1px solid rgba(232, 200, 107, 0.32);
+  border-radius: 44% 56% 52% 48% / 40% 52% 48% 60%;
+}
+
+.hero-ornament-left {
+  left: -42px;
+  top: -56px;
+}
+
+.hero-ornament-right {
+  right: -60px;
+  bottom: -86px;
+}
+
+.hero-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(232, 200, 107, 0.58);
+  background: rgba(245, 230, 179, 0.1);
+  color: #f5e6b3;
+  font-size: 12px;
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  margin-bottom: 16px;
+}
+
 .hero-content h1 {
-  font-size: 48px;
-  font-weight: bold;
+  font-size: clamp(42px, 8vw, 76px);
+  font-weight: 700;
   margin-bottom: 16px;
 }
 
 .hero-content p {
-  font-size: 20px;
+  max-width: 760px;
+  margin: 0 auto 32px;
+  font-size: clamp(17px, 2.8vw, 22px);
+  line-height: 1.6;
   margin-bottom: 32px;
-  opacity: 0.9;
+  color: rgba(248, 243, 231, 0.95);
 }
 
 .hero-buttons {
@@ -32,6 +74,9 @@
 
 .hero-buttons button {
   min-width: 150px;
+  min-height: 46px;
+  border-radius: 14px;
+  font-weight: 600;
   transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 220ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -41,7 +86,7 @@
 
 .features {
   padding: 80px 24px;
-  background: #f9f9f9;
+  background: linear-gradient(180deg, #fffef9, #faf5e9);
 }
 
 .section-header {
@@ -50,14 +95,15 @@
 }
 
 .section-header h2 {
-  font-size: 36px;
-  font-weight: bold;
+  font-size: clamp(30px, 4vw, 46px);
+  font-weight: 700;
   margin-bottom: 12px;
+  color: #1b2336;
 }
 
 .section-header p {
   font-size: 16px;
-  color: #666;
+  color: #6b7280;
 }
 
 .features-grid {
@@ -67,8 +113,10 @@
 
 .feature-card {
   text-align: center;
-  padding: 24px;
-  border-radius: 8px;
+  padding: 28px;
+  border-radius: 24px;
+  border: 1px solid #e6dbc0;
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.08);
   transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 260ms cubic-bezier(0.22, 1, 0.36, 1);
   height: 100%;
   animation: sectionFadeUp 560ms cubic-bezier(0.22, 1, 0.36, 1);
@@ -76,7 +124,7 @@
 
 .feature-card:hover {
   transform: translateY(-8px);
-  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 20px 38px rgba(15, 23, 42, 0.14);
 }
 
 .feature-icon {
@@ -84,38 +132,79 @@
 }
 
 .feature-card h3 {
-  font-size: 18px;
+  font-size: 24px;
   font-weight: 600;
   margin-bottom: 12px;
+  color: #1f2937;
 }
 
 .feature-card p {
-  color: #666;
+  color: #6b7280;
   line-height: 1.6;
 }
 
+.category-section {
+  padding: 14px 24px 78px;
+  background: linear-gradient(180deg, #faf5e9, #fffef9);
+}
+
+.category-grid {
+  max-width: 1120px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.category-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid #e8d9b4;
+  background: linear-gradient(180deg, #fffef8, #fff7e5);
+  color: #394150;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.category-chip-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #f5e6b3;
+  color: #6d5420;
+}
+
 .cta-section {
-  background: linear-gradient(135deg, #0a5a8a 0%, #0e7490 60%, #d4a642 100%);
-  color: white;
+  background:
+    radial-gradient(130% 120% at 100% -16%, rgba(245, 230, 179, 0.24), transparent 52%),
+    linear-gradient(120deg, #1a253c, #0f172a 62%, #172134);
+  color: #fffef9;
   padding: 80px 24px;
   text-align: center;
 }
 
 .cta-content h2 {
-  font-size: 36px;
-  font-weight: bold;
+  font-size: clamp(28px, 4vw, 44px);
+  font-weight: 700;
   margin-bottom: 12px;
 }
 
 .cta-content p {
-  font-size: 18px;
+  font-size: clamp(16px, 3vw, 20px);
   margin-bottom: 32px;
-  opacity: 0.9;
+  color: rgba(250, 244, 233, 0.86);
 }
 
 .how-it-works {
   padding: 80px 24px;
-  background: white;
+  background: linear-gradient(180deg, #fffef9, #fef8eb);
 }
 
 .steps-grid {
@@ -126,7 +215,8 @@
 .step-card {
   text-align: center;
   padding: 32px 24px;
-  border-radius: 8px;
+  border-radius: 24px;
+  border: 1px solid #ead8ad;
   transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 260ms cubic-bezier(0.22, 1, 0.36, 1);
   position: relative;
   animation: sectionFadeUp 620ms cubic-bezier(0.22, 1, 0.36, 1);
@@ -134,7 +224,7 @@
 
 .step-card:hover {
   transform: translateY(-4px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 16px 30px rgba(15, 23, 42, 0.12);
 }
 
 @keyframes sectionFadeUp {
@@ -151,9 +241,9 @@
 .step-number {
   width: 50px;
   height: 50px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #0a5a8a 0%, #0e7490 60%, #d4a642 100%);
-  color: white;
+  border-radius: 14px;
+  background: linear-gradient(130deg, #d4af37 0%, #f5e6b3 100%);
+  color: #2f2206;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -163,19 +253,20 @@
 }
 
 .step-card h3 {
-  font-size: 18px;
+  font-size: 23px;
   font-weight: 600;
   margin-bottom: 12px;
+  color: #1f2937;
 }
 
 .step-card p {
-  color: #666;
+  color: #6b7280;
   line-height: 1.6;
 }
 
 @media (max-width: 768px) {
   .hero-content h1 {
-    font-size: 32px;
+    font-size: 42px;
   }
 
   .hero-content p {
@@ -183,11 +274,11 @@
   }
 
   .section-header h2 {
-    font-size: 24px;
+    font-size: 30px;
   }
 
   .cta-content h2 {
-    font-size: 24px;
+    font-size: 30px;
   }
 
   .hero {
@@ -210,5 +301,19 @@
   .hero-buttons button {
     width: 100%;
     min-width: unset;
+  }
+
+  .category-section {
+    padding: 4px 16px 48px;
+  }
+
+  .category-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .category-chip {
+    font-size: 13px;
+    min-height: 48px;
+    padding: 10px;
   }
 }

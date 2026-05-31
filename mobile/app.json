@@ -28,10 +28,6 @@
         "backgroundColor": "#0a4f7a"
       },
       "googleServicesFile": "./google-services.json",
-      "notification": {
-        "icon": "./assets/notification-icon.png",
-        "color": "#0a4f7a"
-      },
       "package": "com.vedika360.myapp",
       "versionCode": 2,
       "permissions": [
@@ -65,8 +61,7 @@
           "photosPermission": "Allow Vedika 360 to access your photos to upload blessing images for events.",
           "cameraPermission": "Allow Vedika 360 to use the camera to capture blessing photos for events."
         }
-      ],
-      "@react-native-community/datetimepicker"
+      ]
     ],
     "extra": {
       "eas": {

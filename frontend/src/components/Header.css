@@ -1,13 +1,15 @@
 .header {
-  background: linear-gradient(110deg, rgba(12, 70, 108, 0.95) 0%, rgba(15, 118, 110, 0.92) 58%, rgba(249, 115, 22, 0.84) 100%);
+  background:
+    radial-gradient(circle at 14% -40%, rgba(245, 230, 179, 0.26), transparent 52%),
+    linear-gradient(112deg, rgba(15, 23, 42, 0.98) 0%, rgba(20, 31, 58, 0.96) 58%, rgba(30, 41, 59, 0.96) 100%);
   padding: 0 24px;
   position: sticky;
   top: 0;
   z-index: 1000;
-  box-shadow: 0 14px 28px rgba(10, 54, 77, 0.28);
+  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.34);
   -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.16);
+  border-bottom: 1px solid rgba(232, 200, 107, 0.22);
   animation: headerSlideDown 420ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -24,8 +26,10 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 25px;
-  font-weight: 800;
+  font-family: 'Playfair Display', 'Georgia', serif;
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
   color: white;
   text-decoration: none;
   cursor: pointer;
@@ -35,13 +39,13 @@
 .logo-icon {
   width: 36px;
   height: 36px;
-  border-radius: 50%;
+  border-radius: 10px;
   object-fit: cover;
-  box-shadow: 0 2px 8px rgba(212, 166, 66, 0.4);
+  box-shadow: 0 4px 14px rgba(212, 175, 55, 0.44);
 }
 
 .logo:hover {
-  color: #fff4e8;
+  color: #f5e6b3;
   transform: translateY(-1px);
 }
 
@@ -60,7 +64,7 @@
 .nav-menu a {
   color: white;
   text-decoration: none;
-  font-weight: 600;
+  font-weight: 500;
   font-size: 15px;
   transition: color 180ms ease;
   position: relative;
@@ -77,7 +81,7 @@
 }
 
 .nav-menu a:hover {
-  color: #fff4e8;
+  color: #f5e6b3;
 }
 
 .nav-menu a::after {
@@ -87,7 +91,7 @@
   bottom: -4px;
   width: 0;
   height: 2px;
-  background: #fff4e8;
+  background: linear-gradient(90deg, #d4af37, #f5e6b3);
   transition: width 0.25s ease;
 }
 
@@ -97,13 +101,23 @@
 
 .user-avatar {
   cursor: pointer;
-  background-color: rgba(255, 255, 255, 0.24);
+  background-color: rgba(245, 230, 179, 0.26);
+  color: #231903;
+  border: 1px solid rgba(232, 200, 107, 0.5);
   transition: background-color 180ms ease, transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .user-avatar:hover {
-  background-color: rgba(255, 255, 255, 0.5);
+  background-color: rgba(232, 200, 107, 0.6);
   transform: translateY(-1px) scale(1.03);
+}
+
+.header .ant-btn-text {
+  color: #f8f3e7;
+}
+
+.header .ant-btn-text:hover {
+  color: #f5e6b3;
 }
 
 @keyframes headerSlideDown {
@@ -120,7 +134,7 @@
 @media (max-width: 768px) {
   .header {
     padding: 0 12px;
-    box-shadow: 0 10px 22px rgba(10, 54, 77, 0.24);
+    box-shadow: 0 10px 22px rgba(15, 23, 42, 0.32);
   }
 
   .header-container {
@@ -136,8 +150,8 @@
   }
 
   .logo {
-    font-size: 18px;
-    font-weight: 700;
+    font-size: 22px;
+    font-weight: 600;
     letter-spacing: 0.01em;
   }
 

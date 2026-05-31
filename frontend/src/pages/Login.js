@@ -29,7 +29,7 @@ const Login = () => {
     <div className="auth-container">
       <Card className="auth-card">
         <h1 className="auth-title">Welcome Back</h1>
-        <p className="auth-subtitle">Sign in to your Vedika 360 account</p>
+        <p className="auth-subtitle">Sign in to continue planning your Telugu wedding with Vedika360</p>
 
         <Form form={form} layout="vertical" onFinish={onFinish}>
           <Form.Item

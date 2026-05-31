@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Input, Select, Card, Row, Col, Spin, message, Rate, Button, Empty, Tag, Modal, Pagination } from 'antd';
-import { SearchOutlined, ShopOutlined, CheckCircleOutlined, EnvironmentOutlined } from '@ant-design/icons';
+import { SearchOutlined, ShopOutlined, CheckCircleOutlined, EnvironmentOutlined, CalendarOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { vendorService } from '../services/vendorService';
 import { eventService } from '../services/eventService';
@@ -90,15 +90,17 @@ const VendorMarketplace = () => {
 
   const categories = [
     { label: 'All Categories', value: '' },
-    { label: 'Catering', value: 'catering' },
-    { label: 'Decor', value: 'decor' },
-    { label: 'Photography', value: 'photography' },
-    { label: 'Videography', value: 'videography' },
-    { label: 'Music', value: 'music' },
-    { label: 'Venue', value: 'venue' },
-    { label: 'Florist', value: 'florist' },
-    { label: 'Transportation', value: 'transportation' },
-    { label: 'Other', value: 'other' },
+    { label: 'Photographers', value: 'photography' },
+    { label: 'Videographers', value: 'videography' },
+    { label: 'Decorators', value: 'decor' },
+    { label: 'Caterers', value: 'catering' },
+    { label: 'Makeup Artists', value: 'other' },
+    { label: 'Event Anchors', value: 'music' },
+    { label: 'Bands', value: 'music' },
+    { label: 'Mandap Decorators', value: 'decor' },
+    { label: 'Wedding Venues', value: 'venue' },
+    { label: 'Priests', value: 'other' },
+    { label: 'Travel Services', value: 'transportation' },
   ];
 
   const stateOptions = [
@@ -122,6 +124,26 @@ const VendorMarketplace = () => {
     return { min: prices[0], max: prices[prices.length - 1], count: packages.length };
   };
 
+  const getVendorPhoto = (vendor) => {
+    const firstGalleryUrl = Array.isArray(vendor.gallery)
+      ? (vendor.gallery[0]?.url || vendor.gallery[0]?.imageUrl)
+      : undefined;
+
+    return vendor.coverImageUrl
+      || vendor.coverImage
+      || vendor.profileImage
+      || vendor.imageUrl
+      || firstGalleryUrl
+      || undefined;
+  };
+
+  const getAvailabilityLabel = (vendor) => {
+    if (vendor.availabilityStatus) return vendor.availabilityStatus;
+    if (typeof vendor.isAvailable === 'boolean') return vendor.isAvailable ? 'Open Dates' : 'Limited Availability';
+    if (vendor.availability) return String(vendor.availability);
+    return 'Open Dates';
+  };
+
   const recommendations = (() => {
     if (!eventId || !filteredVendors.length) return null;
 
@@ -141,8 +163,8 @@ const VendorMarketplace = () => {
   return (
     <div className="vendor-marketplace-container">
       <div className="marketplace-header">
-        <h1>Vendor Marketplace</h1>
-        <p>Browse trusted vendors, compare packages, and book the perfect team for your event</p>
+        <h1>Wedding Vendor Marketplace</h1>
+        <p>Curated Telugu wedding professionals for families, couples, and planners.</p>
       </div>
 
       <Card className="filters-card">
@@ -160,7 +182,7 @@ const VendorMarketplace = () => {
           </Col>
           <Col xs={24} sm={12} lg={8}>
             <Input
-              placeholder="Search vendors by name or description..."
+              placeholder="Search vendors by name, service, or specialization"
               prefix={<SearchOutlined />}
               size="large"
               onChange={(e) => handleSearch(e.target.value)}
@@ -169,7 +191,7 @@ const VendorMarketplace = () => {
           </Col>
           <Col xs={24} sm={12} lg={4}>
             <Select
-              placeholder="Filter by category"
+              placeholder="Category"
               size="large"
               style={{ width: '100%' }}
               onChange={setSelectedCategory}
@@ -248,6 +270,8 @@ const VendorMarketplace = () => {
             <Row gutter={[16, 16]} className="vendors-grid">
               {filteredVendors.map((vendor) => {
                 const pkgRange = getPackageRange(vendor);
+                  const vendorPhoto = getVendorPhoto(vendor);
+                  const availability = getAvailabilityLabel(vendor);
                 return (
                   <Col xs={24} sm={12} md={8} key={vendor.id}>
                   <Card
@@ -255,16 +279,30 @@ const VendorMarketplace = () => {
                     className="vendor-card"
                     onClick={() => navigate(`/vendors/${vendor.id}`)}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-                      <ShopOutlined style={{ fontSize: 28, color: '#667eea' }} />
+                    <div className="vendor-media-wrap">
+                      {vendorPhoto ? (
+                        <img className="vendor-media" src={vendorPhoto} alt={vendor.businessName} />
+                      ) : (
+                        <div className="vendor-media vendor-media-fallback">
+                          <ShopOutlined />
+                        </div>
+                      )}
+                      <div className="vendor-media-overlay">
+                        <Tag className="vendor-overlay-tag" icon={<CalendarOutlined />}>
+                          {availability}
+                        </Tag>
+                      </div>
+                    </div>
+
+                    <div className="vendor-card-header-row">
                       <div style={{ flex: 1 }}>
-                        <h3 style={{ margin: 0 }}>
+                        <h3 className="vendor-title" style={{ margin: 0 }}>
                           {vendor.businessName}
                           {vendor.isVerified && (
-                            <CheckCircleOutlined style={{ color: '#52c41a', marginLeft: 6, fontSize: 14 }} />
+                            <CheckCircleOutlined style={{ color: '#22c55e', marginLeft: 6, fontSize: 14 }} />
                           )}
                         </h3>
-                        <Tag color="blue" style={{ marginTop: 4 }}>{vendor.category}</Tag>
+                        <Tag color="gold" style={{ marginTop: 4 }}>{vendor.specialization || vendor.category || 'Wedding Service'}</Tag>
                         {fitMap[vendor.id] ? (
                           <Tag color={fitMap[vendor.id].fitScore >= 80 ? 'green' : fitMap[vendor.id].fitScore >= 60 ? 'gold' : 'default'} style={{ marginTop: 4 }}>
                             Fit {fitMap[vendor.id].fitScore}/100
@@ -273,31 +311,37 @@ const VendorMarketplace = () => {
                       </div>
                     </div>
 
-                    <p style={{ color: '#666', minHeight: 44, marginBottom: 12 }}>
+                    <p className="vendor-description" style={{ minHeight: 44, marginBottom: 12 }}>
                       {vendor.description?.substring(0, 100)}{vendor.description?.length > 100 ? '...' : ''}
                     </p>
 
                     <div className="vendor-rating" style={{ marginBottom: 8 }}>
                       <Rate disabled value={Number(vendor.averageRating) || 0} style={{ fontSize: 14 }} />
-                      <span style={{ marginLeft: 8, color: '#888' }}>({vendor.totalReviews || 0})</span>
+                      <span style={{ marginLeft: 8, color: '#78808d' }}>({vendor.totalReviews || 0})</span>
                     </div>
 
                     {vendor.city && (
-                      <p style={{ color: '#888', margin: '4px 0' }}>
+                      <p className="vendor-location" style={{ margin: '4px 0' }}>
                         <EnvironmentOutlined /> {vendor.city}{vendor.state ? `, ${vendor.state}` : ''}
                       </p>
                     )}
 
+                    {vendor.experienceYears ? (
+                      <p className="vendor-location" style={{ margin: '4px 0' }}>
+                        {vendor.experienceYears}+ years wedding experience
+                      </p>
+                    ) : null}
+
                     <div className="vendor-pricing" style={{ marginTop: 12, padding: '8px 0', borderTop: '1px solid #f0f0f0' }}>
                       {pkgRange ? (
                         <>
-                          <span style={{ fontSize: 18, fontWeight: 600, color: '#667eea' }}>
+                          <span style={{ fontSize: 18, fontWeight: 600, color: '#5e4716' }}>
                             {formatCurrency(pkgRange.min)} – {formatCurrency(pkgRange.max)}
                           </span>
                           <Tag style={{ marginLeft: 8 }}>{pkgRange.count} packages</Tag>
                         </>
                       ) : (
-                        <span style={{ fontSize: 18, fontWeight: 600, color: '#667eea' }}>
+                        <span style={{ fontSize: 18, fontWeight: 600, color: '#5e4716' }}>
                           From {formatCurrency(vendor.basePrice)}
                         </span>
                       )}
@@ -309,7 +353,7 @@ const VendorMarketplace = () => {
                       </p>
                     ) : null}
 
-                    <Button type="primary" block style={{ marginTop: 12 }}>
+                    <Button type="primary" block style={{ marginTop: 12 }} onClick={(e) => { e.stopPropagation(); navigate(`/vendors/${vendor.id}`); }}>
                       View Packages & Book
                     </Button>
                     {recommendations?.bestFit && recommendations.bestFit.id !== vendor.id ? (

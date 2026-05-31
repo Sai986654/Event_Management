@@ -243,12 +243,12 @@ const OrganizerDashboard = ({ user }) => {
     const stepX = points.length > 1 ? (width - pad * 2) / (points.length - 1) : 0;
 
     const colorMap = {
-      blue: { stroke: '#2563eb', fill: 'rgba(37,99,235,0.14)' },
-      cyan: { stroke: '#0891b2', fill: 'rgba(8,145,178,0.14)' },
-      purple: { stroke: '#7c3aed', fill: 'rgba(124,58,237,0.14)' },
-      green: { stroke: '#16a34a', fill: 'rgba(22,163,74,0.14)' },
+      gold: { stroke: '#d4af37', fill: 'rgba(212,175,55,0.2)' },
+      amber: { stroke: '#b28822', fill: 'rgba(178,136,34,0.16)' },
+      navy: { stroke: '#334155', fill: 'rgba(51,65,85,0.17)' },
+      sage: { stroke: '#6d7f4f', fill: 'rgba(109,127,79,0.16)' },
     };
-    const palette = colorMap[tone] || colorMap.blue;
+    const palette = colorMap[tone] || colorMap.gold;
 
     const xy = points.map((value, index) => {
       const x = pad + index * stepX;
@@ -315,25 +315,25 @@ const OrganizerDashboard = ({ user }) => {
       key: 'active',
       label: (
         <span>
-          Active Events <Badge count={activeEvents.length} style={{ backgroundColor: '#52c41a' }} showZero />
+          Live Celebrations <Badge count={activeEvents.length} style={{ backgroundColor: '#22c55e' }} showZero />
         </span>
       ),
-      children: renderEventPanelContent(activeEvents, 'No active events yet. Book a vendor to see events here!'),
+      children: renderEventPanelContent(activeEvents, 'No live celebrations yet. Start by adding your first wedding event.'),
     },
     {
       key: 'drafts',
       label: (
         <span>
-          Drafts <Badge count={draftEvents.length} style={{ backgroundColor: '#d9d9d9', color: '#666' }} showZero />
+          Planned <Badge count={draftEvents.length} style={{ backgroundColor: '#d9d9d9', color: '#666' }} showZero />
         </span>
       ),
-      children: renderEventPanelContent(draftEvents, 'No draft events.'),
+      children: renderEventPanelContent(draftEvents, 'No planned events in draft.'),
     },
     {
       key: 'completed',
       label: (
         <span>
-          Completed <Badge count={completedEvents.length} style={{ backgroundColor: '#1677ff' }} showZero />
+          Completed <Badge count={completedEvents.length} style={{ backgroundColor: '#1e293b' }} showZero />
         </span>
       ),
       children: renderEventPanelContent(completedEvents, 'No completed events yet.'),
@@ -347,10 +347,10 @@ const OrganizerDashboard = ({ user }) => {
         onChange={handleSortByChange}
         style={{ width: 150 }}
         options={[
-          { value: 'date', label: 'Event Date' },
+          { value: 'date', label: 'Ceremony Date' },
           { value: 'budget', label: 'Budget' },
-          { value: 'createdAt', label: 'Listed Date' },
-          { value: 'distance', label: 'Distance' },
+          { value: 'createdAt', label: 'Created' },
+          { value: 'distance', label: 'Nearest' },
         ]}
       />
       <Tooltip title={sortOrder === 'asc' ? 'Ascending' : 'Descending'}>
@@ -373,36 +373,36 @@ const OrganizerDashboard = ({ user }) => {
   );
 
   const quickActions = [
-    { key: 'vendors', label: 'Browse Vendors', to: '/vendors', kind: 'default' },
-    { key: 'bookings', label: 'My Bookings', to: '/bookings', kind: 'default' },
-    ...(user?.role === 'admin' ? [{ key: 'admin-control', label: 'Admin Control Center', to: '/admin/control-center', kind: 'primary' }] : []),
+    { key: 'vendors', label: 'Find Wedding Vendors', to: '/vendors', kind: 'default' },
+    { key: 'bookings', label: 'Track Confirmed Bookings', to: '/bookings', kind: 'default' },
+    ...(user?.role === 'admin' ? [{ key: 'admin-control', label: 'Operations Control Center', to: '/admin/control-center', kind: 'primary' }] : []),
     ...((user?.role === 'organizer' || user?.role === 'admin')
-      ? [{ key: 'activities', label: 'Activity Tracker', to: '/activities', kind: 'default' }]
+      ? [{ key: 'activities', label: 'Family Activity Timeline', to: '/activities', kind: 'default' }]
       : []),
     ...((user?.role === 'organizer' || user?.role === 'admin')
-      ? [{ key: 'invite-studio', label: 'Invite Studio', to: events.length > 0 ? `/events/${events[0].id}/invite-studio` : '#', kind: 'default', disabled: events.length === 0 }]
+      ? [{ key: 'invite-studio', label: 'Invitation Studio', to: events.length > 0 ? `/events/${events[0].id}/invite-studio` : '#', kind: 'default', disabled: events.length === 0 }]
       : []),
-    ...(user?.role === 'organizer' ? [{ key: 'planner', label: 'Event Planner', to: '/planner', kind: 'default' }] : []),
+    ...(user?.role === 'organizer' ? [{ key: 'planner', label: 'Wedding Planner', to: '/planner', kind: 'default' }] : []),
   ];
 
   return (
     <Spin spinning={loading}>
       <div className="dashboard-header dashboard-header--hero">
         <div className="dashboard-header-content">
-          <h1>Welcome, {user?.name}! 👋</h1>
+          <h1>Namaskaram, {user?.name}</h1>
           <p className="dashboard-subtitle">
-            Track active events, budgets, and vendor progress from one premium workspace.
+            Your Telugu wedding command center for family coordination, vendors, budget, and celebration progress.
           </p>
         </div>
         <div className="dashboard-hero-actions">
           <Link to="/events/create">
-            <Button type="primary" size="large" icon={<PlusOutlined />}>Create New Event</Button>
+            <Button type="primary" size="large" icon={<PlusOutlined />}>Create Wedding Event</Button>
           </Link>
         </div>
       </div>
 
       <Card className="dashboard-action-rail" bordered={false}>
-        <div className="dashboard-action-rail-header">Quick Actions</div>
+        <div className="dashboard-action-rail-header">Family Quick Actions</div>
         <Space wrap size={[10, 10]}>
           {quickActions.map((item) => (
             <Link key={item.key} to={item.disabled ? '#' : item.to} onClick={(e) => item.disabled && e.preventDefault()}>
@@ -413,18 +413,18 @@ const OrganizerDashboard = ({ user }) => {
       </Card>
 
       <Row gutter={[16, 16]} className="stats-grid">
-        <Col xs={24} sm={12} lg={6}><Card className="dashboard-stat-card"><Statistic title="Total Events" value={stats.totalEvents} prefix={<CalendarOutlined />} />{renderSparkline(kpiSparklineSeries.totalEvents, 'blue')}{renderTrendChip(trendStats.totalEvents)}</Card></Col>
-        <Col xs={24} sm={12} lg={6}><Card className="dashboard-stat-card"><Statistic title="Upcoming Events" value={stats.upcomingEvents} valueStyle={{ color: '#0ea5e9' }} />{renderSparkline(kpiSparklineSeries.upcomingEvents, 'cyan')}{renderTrendChip(trendStats.upcomingEvents)}</Card></Col>
-        <Col xs={24} sm={12} lg={6}><Card className="dashboard-stat-card"><Statistic title="Total Guests" value={stats.totalGuests} prefix={<TeamOutlined />} />{renderSparkline(kpiSparklineSeries.totalGuests, 'purple')}{renderTrendChip(trendStats.totalGuests)}</Card></Col>
+        <Col xs={24} sm={12} lg={6}><Card className="dashboard-stat-card"><Statistic title="Wedding Events" value={stats.totalEvents} prefix={<CalendarOutlined />} />{renderSparkline(kpiSparklineSeries.totalEvents, 'gold')}{renderTrendChip(trendStats.totalEvents)}</Card></Col>
+        <Col xs={24} sm={12} lg={6}><Card className="dashboard-stat-card"><Statistic title="Upcoming Functions" value={stats.upcomingEvents} valueStyle={{ color: '#b28822' }} />{renderSparkline(kpiSparklineSeries.upcomingEvents, 'amber')}{renderTrendChip(trendStats.upcomingEvents)}</Card></Col>
+        <Col xs={24} sm={12} lg={6}><Card className="dashboard-stat-card"><Statistic title="Guest Families" value={stats.totalGuests} prefix={<TeamOutlined />} />{renderSparkline(kpiSparklineSeries.totalGuests, 'navy')}{renderTrendChip(trendStats.totalGuests)}</Card></Col>
         <Col xs={24} sm={12} lg={6}>
           <Card className="dashboard-stat-card">
             <Statistic
-              title="Total Budget"
+              title="Budget Planned"
               value={stats.totalBudget}
               formatter={(v) => formatCurrency(v)}
-              valueStyle={{ color: '#52c41a' }}
+              valueStyle={{ color: '#1f2937' }}
             />
-            {renderSparkline(kpiSparklineSeries.totalBudget, 'green')}
+            {renderSparkline(kpiSparklineSeries.totalBudget, 'sage')}
             {renderTrendChip(trendStats.totalBudget)}
           </Card>
         </Col>
@@ -440,7 +440,7 @@ const OrganizerDashboard = ({ user }) => {
             value={eventViewMode}
             onChange={setEventViewMode}
             options={[
-              { label: 'Table', value: 'table' },
+              { label: 'Detailed', value: 'table' },
               { label: 'Compact', value: 'compact' },
             ]}
           />
@@ -492,32 +492,32 @@ const VendorDashboard = ({ user }) => {
   return (
     <Spin spinning={loading}>
       <div className="dashboard-header">
-        <h1>Welcome, {user?.name}! 👋</h1>
+        <h1>Vendor Console: {user?.name}</h1>
       </div>
 
       <Row gutter={[16, 16]} className="stats-grid">
-        <Col xs={24} sm={12} md={6}><Card><Statistic title="Total Bookings" value={stats.total} prefix={<ShopOutlined />} /></Card></Col>
-        <Col xs={24} sm={12} md={6}><Card><Statistic title="Pending" value={stats.pending} valueStyle={{ color: '#fa8c16' }} /></Card></Col>
-        <Col xs={24} sm={12} md={6}><Card><Statistic title="Confirmed" value={stats.confirmed} prefix={<CheckCircleOutlined />} valueStyle={{ color: '#52c41a' }} /></Card></Col>
+        <Col xs={24} sm={12} md={6}><Card><Statistic title="Wedding Bookings" value={stats.total} prefix={<ShopOutlined />} /></Card></Col>
+        <Col xs={24} sm={12} md={6}><Card><Statistic title="Pending Replies" value={stats.pending} valueStyle={{ color: '#fa8c16' }} /></Card></Col>
+        <Col xs={24} sm={12} md={6}><Card><Statistic title="Confirmed" value={stats.confirmed} prefix={<CheckCircleOutlined />} valueStyle={{ color: '#22c55e' }} /></Card></Col>
         <Col xs={24} sm={12} md={6}>
           <Card>
             <Statistic
-              title="Revenue"
+              title="Confirmed Revenue"
               value={stats.revenue}
               formatter={(v) => formatCurrency(v)}
-              valueStyle={{ color: '#52c41a' }}
+              valueStyle={{ color: '#1f2937' }}
             />
           </Card>
         </Col>
       </Row>
 
-      <Card title="Recent Bookings" style={{ marginTop: 24 }}>
+      <Card title="Recent Booking Requests" style={{ marginTop: 24 }}>
         {bookings.length === 0
           ? <Empty description="No bookings yet. Customers will book you from the marketplace!" />
           : <Table dataSource={bookings} columns={columns} pagination={false} rowKey="id" scroll={{ x: 760 }} />}
       </Card>
       <Card style={{ marginTop: 24 }}>
-        <Link to="/vendor/workspace"><Button type="primary">Manage Services, Packages & Testimonials</Button></Link>
+        <Link to="/vendor/workspace"><Button type="primary">Manage Services, Packages, and Portfolio</Button></Link>
       </Card>
     </Spin>
   );
@@ -573,34 +573,34 @@ const CustomerDashboard = ({ user }) => {
   return (
     <Spin spinning={loading}>
       <div className="dashboard-header">
-        <h1>Welcome, {user?.name}! 👋</h1>
+        <h1>Family Dashboard: {user?.name}</h1>
         <Link to="/planner">
-          <Button type="primary" size="large" icon={<PlusOutlined />}>Plan Event End-to-End</Button>
+          <Button type="primary" size="large" icon={<PlusOutlined />}>Plan Wedding End-to-End</Button>
         </Link>
       </div>
 
       <Row gutter={[16, 16]} className="stats-grid">
-        <Col xs={24} sm={8}><Card><Statistic title="My Events" value={events.length} prefix={<CalendarOutlined />} /></Card></Col>
-        <Col xs={24} sm={8}><Card><Statistic title="Active Bookings" value={bookings.filter(b => b.status === 'confirmed').length} prefix={<CheckCircleOutlined />} valueStyle={{ color: '#52c41a' }} /></Card></Col>
+        <Col xs={24} sm={8}><Card><Statistic title="My Functions" value={events.length} prefix={<CalendarOutlined />} /></Card></Col>
+        <Col xs={24} sm={8}><Card><Statistic title="Active Bookings" value={bookings.filter(b => b.status === 'confirmed').length} prefix={<CheckCircleOutlined />} valueStyle={{ color: '#22c55e' }} /></Card></Col>
         <Col xs={24} sm={8}>
           <Card>
             <Statistic
-              title="Total Spent"
+              title="Total Wedding Spend"
               value={totalSpentInr}
               formatter={(v) => formatCurrency(v)}
-              valueStyle={{ color: '#667eea' }}
+              valueStyle={{ color: '#1f2937' }}
             />
           </Card>
         </Col>
       </Row>
 
-      <Card title="My Events" style={{ marginTop: 24 }}>
+      <Card title="My Wedding Events" style={{ marginTop: 24 }}>
         {events.length === 0
           ? <Empty description="No events yet. Create one to get started!" />
           : <Table dataSource={events} columns={eventCols} pagination={false} rowKey="id" scroll={{ x: 700 }} />}
       </Card>
 
-      <Card title="My Bookings" style={{ marginTop: 24 }}>
+      <Card title="My Vendor Bookings" style={{ marginTop: 24 }}>
         {bookings.length === 0
           ? <Empty description={<>No bookings yet. <Link to="/vendors">Browse vendors</Link> to find the perfect match!</>} />
           : <Table dataSource={bookings} columns={bookingCols} pagination={false} rowKey="id" scroll={{ x: 760 }} />}
@@ -608,8 +608,8 @@ const CustomerDashboard = ({ user }) => {
 
       <Card style={{ marginTop: 24 }}>
         <Row gutter={[16, 16]}>
-          <Col xs={24} sm={12}><Link to="/vendors"><Button block size="large">Browse Vendors</Button></Link></Col>
-          <Col xs={24} sm={12}><Link to="/bookings"><Button block size="large">All Bookings</Button></Link></Col>
+          <Col xs={24} sm={12}><Link to="/vendors"><Button block size="large">Find Wedding Vendors</Button></Link></Col>
+          <Col xs={24} sm={12}><Link to="/bookings"><Button block size="large">Open All Bookings</Button></Link></Col>
           <Col xs={24} sm={12}><Link to="/planner"><Button block size="large">Build Final Quotation</Button></Link></Col>
         </Row>
       </Card>
@@ -621,11 +621,11 @@ const CustomerDashboard = ({ user }) => {
 const GuestDashboard = ({ user }) => (
   <>
     <div className="dashboard-header">
-      <h1>Welcome, {user?.name}! 👋</h1>
+      <h1>Welcome, {user?.name}</h1>
     </div>
     <Card style={{ marginTop: 24 }}>
       <Row gutter={[16, 16]}>
-        <Col xs={24} sm={12}><Link to="/vendors"><Button block size="large">Browse Vendors</Button></Link></Col>
+        <Col xs={24} sm={12}><Link to="/vendors"><Button block size="large">Browse Wedding Vendors</Button></Link></Col>
       </Row>
     </Card>
   </>

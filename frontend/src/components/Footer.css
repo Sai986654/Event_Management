@@ -1,11 +1,12 @@
 .footer {
   background:
-    radial-gradient(120% 200% at 10% -20%, rgba(45, 145, 130, 0.28), transparent 46%),
-    linear-gradient(180deg, rgba(12, 40, 63, 0.98), rgba(9, 29, 46, 1));
-  color: #f0f0f0;
+    radial-gradient(100% 180% at 12% -20%, rgba(212, 175, 55, 0.32), transparent 50%),
+    radial-gradient(100% 180% at 95% -30%, rgba(245, 230, 179, 0.2), transparent 50%),
+    linear-gradient(180deg, rgba(15, 23, 42, 0.98), rgba(22, 31, 50, 1));
+  color: #ece6d8;
   padding: 48px 24px 24px;
   margin-top: 48px;
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  border-top: 1px solid rgba(232, 200, 107, 0.24);
 }
 
 .footer-content {
@@ -18,22 +19,24 @@
 }
 
 .footer-section h3 {
-  font-size: 22px;
-  font-weight: 800;
+  font-family: 'Playfair Display', 'Georgia', serif;
+  font-size: 30px;
+  font-weight: 600;
   margin-bottom: 12px;
-  color: white;
+  color: #f5e6b3;
 }
 
 .footer-section h4 {
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 700;
   margin-bottom: 12px;
   text-transform: uppercase;
-  color: #f0f0f0;
+  letter-spacing: 0.08em;
+  color: #f5e6b3;
 }
 
 .footer-section p {
-  color: #b0b0b0;
+  color: #d2c9b4;
   line-height: 1.6;
 }
 
@@ -48,22 +51,22 @@
 }
 
 .footer-section ul li a {
-  color: #b0b0b0;
+  color: #d2c9b4;
   text-decoration: none;
   transition: color 0.3s;
 }
 
 .footer-section ul li a:hover {
-  color: #ffd2ae;
+  color: #f5e6b3;
 }
 
 .footer-bottom {
   max-width: 1400px;
   margin: 0 auto;
   padding-top: 24px;
-  border-top: 1px solid #333;
+  border-top: 1px solid rgba(245, 230, 179, 0.2);
   text-align: center;
-  color: #909090;
+  color: #baa77f;
 }
 
 @media (max-width: 768px) {

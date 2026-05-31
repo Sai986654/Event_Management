@@ -43,7 +43,7 @@ const Header = () => {
   const userMenuItems = [
     {
       key: 'role',
-      label: <Tag color="blue">{user?.role}</Tag>,
+      label: <Tag color="gold">{user?.role}</Tag>,
       disabled: true,
     },
     { type: 'divider' },
@@ -106,7 +106,7 @@ const Header = () => {
       <div className="header-container">
         <Link to="/" className="logo">
           <img src="/icon.jpeg" alt="Vedika 360" className="logo-icon" />
-          Vedika 360
+          Vedika360
         </Link>
 
         {user ? (

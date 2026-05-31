@@ -33,8 +33,8 @@ const Register = () => {
   return (
     <div className="auth-container">
       <Card className="auth-card">
-        <h1 className="auth-title">Create Your Account</h1>
-        <p className="auth-subtitle">Join Vedika 360 — rely on us for everything</p>
+        <h1 className="auth-title">Create Your Vedika360 Account</h1>
+        <p className="auth-subtitle">Join the premium Telugu wedding ecosystem for families and planners</p>
 
         <Form form={form} layout="vertical" onFinish={onFinish}>
           <Form.Item
@@ -62,8 +62,8 @@ const Register = () => {
             rules={[{ required: true, message: 'Please select a role!' }]}
           >
             <Select placeholder="I am a..." size="large">
-              <Select.Option value="customer">Customer</Select.Option>
-              <Select.Option value="organizer">Event Organizer / Planner</Select.Option>
+              <Select.Option value="customer">Bride / Groom / Family Member</Select.Option>
+              <Select.Option value="organizer">Wedding Organizer / Planner</Select.Option>
               <Select.Option value="vendor">Vendor / Service Provider</Select.Option>
             </Select>
           </Form.Item>

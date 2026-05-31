@@ -10,7 +10,7 @@ const Footer = () => {
       <div className="footer-content">
         <div className="footer-section">
           <h3>Vedika 360</h3>
-          <p>Rely on us for everything</p>
+          <p>Premium Telugu wedding planning, vendor booking, and family coordination in one place.</p>
         </div>
 
         <div className="footer-section">
