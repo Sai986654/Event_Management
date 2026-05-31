@@ -1163,6 +1163,18 @@ function buildTemplateEnginePdfBuffer({ guest, event, inviteMessage, inviteUrl, 
         const defaultContentRect = { x: W * 0.14, y: H * 0.20, w: W * 0.72, h: H * 0.70 };
         const contentRect = resolveRect(contentAreaRaw, defaultContentRect);
 
+        // Guard against undersized content areas from template JSON that leave large blank space.
+        const minContentHeight = H * 0.64;
+        if (contentRect.h < minContentHeight) {
+          contentRect.h = minContentHeight;
+        }
+        const maxBottom = H - pagePad;
+        const maxRight = W - pagePad;
+        contentRect.x = Math.max(pagePad, contentRect.x);
+        contentRect.y = Math.max(pagePad, contentRect.y);
+        contentRect.w = Math.min(contentRect.w, maxRight - contentRect.x);
+        contentRect.h = Math.min(contentRect.h, maxBottom - contentRect.y);
+
         const inviteLines = String(inviteMessage || '').split('\n').map((line) => line.trim()).filter(Boolean);
         const bodyMessage = inviteLines.slice(1, -1).join(' ') || inviteLines.slice(1).join(' ') || inviteLines[0] || '';
         const guestLine = firstText(`Guest: ${context.guest.name}`, openingLine);
@@ -1200,6 +1212,13 @@ function buildTemplateEnginePdfBuffer({ guest, event, inviteMessage, inviteUrl, 
           pad: 12 * scale,
           radius: 14 * scale,
         };
+
+        const usedStackHeight = dim.header + dim.message + dim.rsvp + dim.timeline + dim.family + dim.qr + dim.footer + dim.gap * 6;
+        const spareVertical = Math.max(0, contentRect.h - usedStackHeight);
+        if (spareVertical > 0) {
+          // Spread spare height between cards so content reaches lower page area naturally.
+          dim.gap += spareVertical / 6;
+        }
 
         const drawCard = (xPos, yPos, width, height) => {
           doc.save().fillOpacity(0.88).roundedRect(xPos, yPos + 1.4, width, height, dim.radius).fill('#000000').restore();
@@ -1268,7 +1287,9 @@ function buildTemplateEnginePdfBuffer({ guest, event, inviteMessage, inviteUrl, 
         const drawButton = (xPos, label) => {
           doc.save().fillOpacity(0.98).roundedRect(xPos, rsvpRect.y, btnW, rsvpRect.h, rsvpRect.h / 2).fill(theme.accent).restore();
           doc.lineWidth(0.8).strokeColor(theme.border).roundedRect(xPos, rsvpRect.y, btnW, rsvpRect.h, rsvpRect.h / 2).stroke();
-          doc.font('Helvetica-Bold').fontSize(10.5 * scale).fillColor('#ffffff').text(label, xPos, rsvpRect.y + rsvpRect.h / 2 - 4.8 * scale, { width: btnW, align: 'center' });
+          doc.font('Helvetica-Bold').fontSize(10.5 * scale).fillColor('#ffffff');
+          const buttonTextY = rsvpRect.y + (rsvpRect.h - doc.currentLineHeight()) / 2 - 0.4 * scale;
+          doc.text(label, xPos, buttonTextY, { width: btnW, align: 'center' });
         };
         drawButton(rsvpRect.x, firstText(rsvpPrimary, 'RSVP Now'));
         drawButton(rsvpRect.x + btnW + btnGap, firstText(rsvpSecondary, 'Join Live Stream'));
