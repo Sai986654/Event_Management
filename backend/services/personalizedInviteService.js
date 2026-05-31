@@ -977,6 +977,29 @@ function buildTemplateEnginePdfBuffer({ guest, event, inviteMessage, inviteUrl, 
       const assetSlotUrls = collectAssetSlotUrls(resolvedTemplateConfig);
       const assetUrls = collectTemplateAssetUrls(resolvedTemplateConfig);
 
+      const rawPlacements =
+        (resolvedTemplateConfig?.layout?.componentPlacements && typeof resolvedTemplateConfig.layout.componentPlacements === 'object')
+          ? resolvedTemplateConfig.layout.componentPlacements
+          : (resolvedTemplateConfig?.layout?.placements && typeof resolvedTemplateConfig.layout.placements === 'object')
+            ? resolvedTemplateConfig.layout.placements
+            : (resolvedTemplateConfig?.canvas?.componentPlacements && typeof resolvedTemplateConfig.canvas.componentPlacements === 'object')
+              ? resolvedTemplateConfig.canvas.componentPlacements
+              : {};
+
+      const absoluteMode = String(resolvedTemplateConfig?.layout?.mode || '').toLowerCase() === 'absolute';
+      const useAbsoluteLayout = absoluteMode || Object.keys(rawPlacements).length > 0;
+      const canvasConfig = (resolvedTemplateConfig?.canvas && typeof resolvedTemplateConfig.canvas === 'object')
+        ? resolvedTemplateConfig.canvas
+        : {};
+      const cardOverlaySetting = canvasConfig.cardOverlay;
+      const cardFrameSetting = canvasConfig.cardFrame;
+      const parsedCardOverlayOpacity = Number(canvasConfig.cardOverlayOpacity);
+      const cardOverlayOpacity = Number.isFinite(parsedCardOverlayOpacity)
+        ? Math.max(0, Math.min(1, parsedCardOverlayOpacity))
+        : 0.68;
+      const cardOverlayEnabled = typeof cardOverlaySetting === 'boolean' ? cardOverlaySetting : !useAbsoluteLayout;
+      const cardFrameEnabled = typeof cardFrameSetting === 'boolean' ? cardFrameSetting : !useAbsoluteLayout;
+
       const guestHeaderSection = getSectionByComponentType(sections, 'GuestHeader');
       const guestBadgeSection = getSectionByComponentType(sections, 'GuestBadge');
       const messageSection = getSectionByComponentType(sections, 'PersonalMessage');
@@ -1023,14 +1046,20 @@ function buildTemplateEnginePdfBuffer({ guest, event, inviteMessage, inviteUrl, 
       if (backgroundImageBuffer) {
         doc.image(backgroundImageBuffer, 0, 0, { fit: [W, H], align: 'center', valign: 'center' });
         doc.save().fillOpacity(0.06).rect(0, 0, W, H).fill('#fffaf0').restore();
-        doc.save().fillOpacity(0.68).roundedRect(cardX, cardTop, cardW, cardBottom - cardTop, 24).fill('#fffdf7').restore();
+        if (cardOverlayEnabled) {
+          doc.save().fillOpacity(cardOverlayOpacity).roundedRect(cardX, cardTop, cardW, cardBottom - cardTop, 24).fill('#fffdf7').restore();
+        }
       } else {
         doc.rect(0, 0, W, H).fill(p.background || '#F8F3E8');
-        doc.roundedRect(cardX, cardTop, cardW, cardBottom - cardTop, 24).fill('#fffdf7');
+        if (cardOverlayEnabled) {
+          doc.roundedRect(cardX, cardTop, cardW, cardBottom - cardTop, 24).fill('#fffdf7');
+        }
       }
 
-      doc.lineWidth(1.6).strokeColor(p.frame || '#6D4C2F').roundedRect(cardX, cardTop, cardW, cardBottom - cardTop, 24).stroke();
-      _drawOrnateCorners(doc, cardX + 10, cardTop + 10, cardX + cardW - 10, cardBottom - 10, p.accent || '#C28A2E', 'traditional');
+      if (cardFrameEnabled) {
+        doc.lineWidth(1.6).strokeColor(p.frame || '#6D4C2F').roundedRect(cardX, cardTop, cardW, cardBottom - cardTop, 24).stroke();
+        _drawOrnateCorners(doc, cardX + 10, cardTop + 10, cardX + cardW - 10, cardBottom - 10, p.accent || '#C28A2E', 'traditional');
+      }
 
       const badgeText = firstText(badgeProps.badge, badgeProps.label, context?.guest?.guestCategory, 'VIP');
       const headerTitle = firstText(headerProps.title, template?.name, event?.title, 'Wedding Invite');
@@ -1061,18 +1090,6 @@ function buildTemplateEnginePdfBuffer({ guest, event, inviteMessage, inviteUrl, 
 
       const rsvpPrimary = firstText(rsvpProps?.actions?.[0]?.label, rsvpProps.primaryAction, 'RSVP Now');
       const rsvpSecondary = firstText(rsvpProps?.actions?.[1]?.label, rsvpProps.secondaryAction, 'Join Live Stream');
-
-      const rawPlacements =
-        (resolvedTemplateConfig?.layout?.componentPlacements && typeof resolvedTemplateConfig.layout.componentPlacements === 'object')
-          ? resolvedTemplateConfig.layout.componentPlacements
-          : (resolvedTemplateConfig?.layout?.placements && typeof resolvedTemplateConfig.layout.placements === 'object')
-            ? resolvedTemplateConfig.layout.placements
-            : (resolvedTemplateConfig?.canvas?.componentPlacements && typeof resolvedTemplateConfig.canvas.componentPlacements === 'object')
-              ? resolvedTemplateConfig.canvas.componentPlacements
-              : {};
-
-      const absoluteMode = String(resolvedTemplateConfig?.layout?.mode || '').toLowerCase() === 'absolute';
-      const useAbsoluteLayout = absoluteMode || Object.keys(rawPlacements).length > 0;
 
       if (useAbsoluteLayout) {
         const toNumber = (value) => {
