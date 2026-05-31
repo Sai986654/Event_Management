@@ -238,29 +238,42 @@ function normalizeTemplateConfig(raw, fallback) {
   const f = fallback.palette || {};
   const templateEngine = raw?.__templateEngine || r.__templateEngine || null;
   const adobeExpress = raw?.__adobeExpress || r.__adobeExpress || null;
+  const hasTemplateEngineConfig = Boolean(raw?.configJson && typeof raw.configJson === 'object');
+
+  const primary = r.primary || f.frame;
+  const secondary = r.secondary || f.header;
+  const accent = r.accent || f.accent;
+  const background = r.background || f.background;
+  const surface = r.surface || r.card || r.badge || f.badge;
+  const border = r.border || f.innerBorder || primary;
+  const textPrimary = r.textPrimary || r.title || f.title;
+  const textSecondary = r.textSecondary || r.subtitle || f.subtitle;
 
   return {
     key,
     name: String(raw?.name || fallback.name || key).trim(),
     description: String(raw?.description || fallback.description || '').trim(),
     ornamentStyle: String(raw?.ornamentStyle || fallback.ornamentStyle || 'traditional').trim(),
-    templateEngine: templateEngine ? String(templateEngine).trim().toLowerCase() : null,
+    templateEngine: templateEngine
+      ? String(templateEngine).trim().toLowerCase()
+      : (hasTemplateEngineConfig ? 'template-engine' : null),
     adobeExpress: adobeExpress && typeof adobeExpress === 'object' ? adobeExpress : null,
+    configJson: hasTemplateEngineConfig ? raw.configJson : null,
     palette: {
-      background:  String(r.background  || f.background  || '#ffffff'),
-      frame:       String(r.frame       || f.frame       || '#333333'),
-      innerBorder: String(r.innerBorder || r.frame       || f.innerBorder || f.frame  || '#555555'),
-      header:      String(r.header      || r.frame       || f.header      || f.frame  || '#333333'),
+      background:  String(background || '#ffffff'),
+      frame:       String(r.frame       || primary || '#333333'),
+      innerBorder: String(r.innerBorder || border || '#555555'),
+      header:      String(r.header      || secondary || primary || '#333333'),
       headerText:  String(r.headerText  || f.headerText  || '#ffffff'),
-      accent:      String(r.accent      || f.accent      || '#666666'),
-      title:       String(r.title       || f.title       || '#111111'),
-      subtitle:    String(r.subtitle    || r.title       || f.subtitle    || f.title  || '#333333'),
-      body:        String(r.body        || f.body        || '#1f2937'),
-      subtle:      String(r.subtle      || f.subtle      || '#6b7280'),
-      divider:     String(r.divider     || r.accent      || f.divider     || f.accent || '#888888'),
+      accent:      String(accent || '#666666'),
+      title:       String(textPrimary || '#111111'),
+      subtitle:    String(textSecondary || textPrimary || '#333333'),
+      body:        String(r.body || textPrimary || '#1f2937'),
+      subtle:      String(r.subtle || textSecondary || '#6b7280'),
+      divider:     String(r.divider || border || accent || '#888888'),
       link:        String(r.link        || f.link        || '#1d4ed8'),
-      badge:       String(r.badge       || f.badge       || '#f9fafb'),
-      badgeText:   String(r.badgeText   || r.title       || f.badgeText   || f.title  || '#111111'),
+      badge:       String(r.badge || surface || '#f9fafb'),
+      badgeText:   String(r.badgeText || textPrimary || '#111111'),
     },
   };
 }
@@ -294,6 +307,7 @@ function normalizeDbTemplate(template, index = 0) {
       name: template.name,
       description: template.description,
       palette: template.palette || {},
+      configJson: template.configJson || null,
     },
     fallback
   );
@@ -796,6 +810,293 @@ function buildPdfBuffer({ guest, event, inviteMessage, inviteUrl, qrBuffer, lang
   });
 }
 
+function resolveTemplateTokens(value, context) {
+  if (typeof value === 'string') {
+    return value.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (_match, token) => {
+      const resolved = String(token)
+        .split('.')
+        .reduce((acc, key) => (acc && acc[key] !== undefined ? acc[key] : undefined), context);
+      return resolved === undefined || resolved === null ? '' : String(resolved);
+    });
+  }
+  if (Array.isArray(value)) return value.map((entry) => resolveTemplateTokens(entry, context));
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, resolveTemplateTokens(v, context)]));
+  }
+  return value;
+}
+
+function firstText(...values) {
+  return values.find((value) => typeof value === 'string' && value.trim()) || '';
+}
+
+function normalizeTemplateEngineSections(templateConfig, context) {
+  if (!templateConfig || typeof templateConfig !== 'object') return [];
+  const layoutSections = Array.isArray(templateConfig?.layout?.sections) ? templateConfig.layout.sections : [];
+  const componentSections = Array.isArray(templateConfig?.components) ? templateConfig.components : [];
+  const sections = layoutSections.length ? layoutSections : componentSections;
+
+  return sections
+    .filter((section) => section && section.visible !== false)
+    .sort((a, b) => Number(a?.order || 0) - Number(b?.order || 0))
+    .map((section) => ({
+      ...section,
+      props: resolveTemplateTokens(section?.props || {}, context),
+      bindings: resolveTemplateTokens(section?.bindings || {}, context),
+      style: resolveTemplateTokens(section?.style || {}, context),
+    }));
+}
+
+function getSectionByComponentType(sections, typeName) {
+  const normalized = String(typeName || '').toLowerCase();
+  return (sections || []).find((section) => String(section?.componentType || '').toLowerCase() === normalized) || null;
+}
+
+function collectAssetSlotUrls(templateConfig) {
+  const assets = {};
+  const collect = (entry) => {
+    if (!entry || typeof entry !== 'object') return;
+    const slot = String(entry.assetSlot || '').trim();
+    const url = String(entry.url || '').trim();
+    if (slot && url) assets[slot] = url;
+  };
+
+  const backgroundAssets = Array.isArray(templateConfig?.backgroundAssets) ? templateConfig.backgroundAssets : [];
+  const decorativeAssets = Array.isArray(templateConfig?.decorativeAssets) ? templateConfig.decorativeAssets : [];
+  backgroundAssets.forEach(collect);
+  decorativeAssets.forEach(collect);
+  return assets;
+}
+
+function buildTemplateEnginePdfBuffer({ guest, event, inviteMessage, inviteUrl, qrBuffer, relationship, template }) {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const chunks = [];
+      const doc = new PDFDocument({ size: 'A4', margin: 0 });
+      doc.on('data', (chunk) => chunks.push(chunk));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+
+      const p = template.palette || {};
+      const W = doc.page.width;
+      const H = doc.page.height;
+      const pagePad = 26;
+      const cardX = pagePad;
+      const cardW = W - pagePad * 2;
+      const cardTop = pagePad;
+      const cardBottom = H - pagePad;
+
+      doc.rect(0, 0, W, H).fill(p.background || '#F8F3E8');
+      doc.roundedRect(cardX, cardTop, cardW, cardBottom - cardTop, 24).fill('#fffdf7');
+      doc.lineWidth(1.6).strokeColor(p.frame || '#6D4C2F').roundedRect(cardX, cardTop, cardW, cardBottom - cardTop, 24).stroke();
+      _drawOrnateCorners(doc, cardX + 10, cardTop + 10, cardX + cardW - 10, cardBottom - 10, p.accent || '#C28A2E', 'traditional');
+
+      const eventDate = event?.date ? new Date(event.date) : null;
+      const dateText = eventDate ? eventDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : 'Date to be announced';
+      const timeText = eventDate ? eventDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }) : '';
+      const context = {
+        guest: {
+          name: guest?.name || 'Guest',
+          guestCategory: guest?.guestCategory || 'VIP',
+          relationship: relationship || guest?.relationship || 'Guest',
+          qrData: inviteUrl || '',
+          invitationMessage: inviteMessage,
+        },
+        event: {
+          title: event?.title || 'Wedding Celebration',
+          brideName: event?.brideName || 'Bride',
+          groomName: event?.groomName || 'Groom',
+          dateText,
+          timeText,
+          venue: event?.venue || 'Venue to be announced',
+          city: event?.city || '',
+          groomFamily: event?.groomFamily || '',
+          brideFamily: event?.brideFamily || '',
+        },
+      };
+
+      const resolvedTemplateConfig = resolveTemplateTokens(template.configJson || {}, context);
+      const sections = normalizeTemplateEngineSections(resolvedTemplateConfig, context);
+      const assetSlotUrls = collectAssetSlotUrls(resolvedTemplateConfig);
+
+      const guestHeaderSection = getSectionByComponentType(sections, 'GuestHeader');
+      const guestBadgeSection = getSectionByComponentType(sections, 'GuestBadge');
+      const messageSection = getSectionByComponentType(sections, 'PersonalMessage');
+      const heroSection = getSectionByComponentType(sections, 'CoupleHero');
+      const smartSection = getSectionByComponentType(sections, 'SmartRecommendations');
+      const familySection = getSectionByComponentType(sections, 'FamilyConnection');
+      const rsvpSection = getSectionByComponentType(sections, 'RSVPSection');
+      const qrSection = getSectionByComponentType(sections, 'QRPass');
+
+      let y = cardTop + 18;
+
+      const heroProps = heroSection?.props || {};
+      const headerProps = guestHeaderSection?.props || {};
+      const badgeProps = guestBadgeSection?.props || {};
+      const msgProps = messageSection?.props || {};
+      const smartProps = smartSection?.props || {};
+      const familyProps = familySection?.props || {};
+      const rsvpProps = rsvpSection?.props || {};
+      const qrProps = qrSection?.props || {};
+
+      const topDecorAssetRef = firstText(headerProps.topDecorAssetRef, 'topGarlandImage');
+      const topDecorUrl = firstText(assetSlotUrls[topDecorAssetRef], assetSlotUrls.topGarlandImage, headerProps.topDecorUrl);
+      const topDecorBuffer = await loadR2AssetBuffer(topDecorUrl);
+
+      const heroImageAssetRef = firstText(heroProps.heroImageAssetRef, 'heroBrideGroomImage');
+      const heroImageUrl = firstText(heroProps.heroImageUrl, heroSection?.bindings?.heroImageUrl, assetSlotUrls[heroImageAssetRef], assetSlotUrls.heroBrideGroomImage);
+      const heroImageBuffer = await loadR2AssetBuffer(heroImageUrl);
+
+      const mapAssetRef = firstText(qrProps.mapPreviewAssetRef, 'mapPreviewImage');
+      const mapPreviewUrl = firstText(qrProps.mapPreviewUrl, assetSlotUrls[mapAssetRef], assetSlotUrls.mapPreviewImage);
+      const mapPreviewBuffer = await loadR2AssetBuffer(mapPreviewUrl);
+
+      const badgeText = firstText(badgeProps.badge, badgeProps.label, context?.guest?.guestCategory, 'VIP');
+      const headerTitle = firstText(headerProps.title, template?.name, event?.title, 'Wedding Invite');
+      const namesLine = firstText(headerProps.subtitle, `${context.event.brideName} ❤ ${context.event.groomName}`);
+      const openingLine = firstText(headerProps.themeLine, `With divine blessings, we invite ${context.guest.name}`);
+
+      const salutation = firstText(msgProps.salutation, `Priyamaina ${guest?.name || 'Guest'} garu`);
+      const body = firstText(msgProps.message, inviteMessage.split('\n').filter(Boolean).slice(1).join(' '), inviteMessage);
+      const dateLine = firstText(msgProps.dateLine, `Date: ${dateText}${timeText ? ` | Time: ${timeText}` : ''}`);
+      const venueLine = firstText(msgProps.venueLine, `Venue: ${event?.venue || ''}${event?.city ? `, ${event.city}` : ''}`);
+
+      const scheduleItems = Array.isArray(smartProps.items) && smartProps.items.length
+        ? smartProps.items
+        : [
+            { time: firstText(context.event.segment1Time, '9:00 AM'), label: firstText(context.event.segment1Label, 'Gauri Puja') },
+            { time: firstText(context.event.segment2Time, timeText || '10:30 AM'), label: firstText(context.event.segment2Label, 'Muhurtham') },
+            { time: firstText(context.event.segment3Time, '12:00 PM'), label: firstText(context.event.segment3Label, 'Lunch Reception') },
+          ];
+
+      const groomFamilyLine = firstText(
+        familyProps.groomFamily,
+        `Groom's Family: ${event?.groomFamily || 'To be announced'}`
+      );
+      const brideFamilyLine = firstText(
+        familyProps.brideFamily,
+        `Bride's Family: ${event?.brideFamily || 'To be announced'}`
+      );
+
+      const rsvpPrimary = firstText(rsvpProps?.actions?.[0]?.label, rsvpProps.primaryAction, 'RSVP Now');
+      const rsvpSecondary = firstText(rsvpProps?.actions?.[1]?.label, rsvpProps.secondaryAction, 'Join Live Stream');
+
+      // Header strip
+      doc.save().roundedRect(cardX + 8, y, cardW - 16, 48, 14).fill(p.header || '#6D4C2F').restore();
+      doc.font('Helvetica-Bold').fontSize(19).fillColor(p.headerText || '#fffdf7')
+        .text(headerTitle, cardX + 20, y + 14, { width: cardW - 40, align: 'center' });
+      y += 64;
+
+      _drawOrnateDivider(doc, y - 8, cardX + 34, cardX + cardW - 34, p.divider || p.accent || '#C28A2E');
+
+      if (topDecorBuffer) {
+        doc.image(topDecorBuffer, cardX + 24, y - 14, { fit: [cardW - 48, 50], align: 'center', valign: 'center' });
+        y += 34;
+      }
+
+      doc.font('Helvetica-Bold').fontSize(22).fillColor(p.title || '#4B3621')
+        .text(namesLine, cardX + 22, y, { width: cardW - 44, align: 'center' });
+      y = doc.y + 2;
+      doc.font('Helvetica').fontSize(9.5).fillColor(p.subtitle || '#6B5A45')
+        .text(openingLine, cardX + 22, y, { width: cardW - 44, align: 'center' });
+      y = doc.y + 10;
+
+      // Guest category badge
+      doc.roundedRect(cardX + (cardW - 120) / 2, y, 120, 22, 11).fill(p.badge || '#fff6dc');
+      doc.lineWidth(0.8).strokeColor(p.divider || '#D9C39A').roundedRect(cardX + (cardW - 120) / 2, y, 120, 22, 11).stroke();
+      doc.font('Helvetica-Bold').fontSize(10).fillColor(p.badgeText || p.title || '#4B3621')
+        .text(badgeText, cardX + (cardW - 120) / 2, y + 7, { width: 120, align: 'center' });
+      y += 30;
+
+      if (heroImageBuffer) {
+        const heroH = 232;
+        doc.roundedRect(cardX + 18, y, cardW - 36, heroH, 20).fill('#f8f3e8');
+        doc.image(heroImageBuffer, cardX + 18, y, { fit: [cardW - 36, heroH], align: 'center', valign: 'center' });
+        doc.lineWidth(1).strokeColor(p.divider || '#D9C39A').roundedRect(cardX + 18, y, cardW - 36, heroH, 20).stroke();
+        y += heroH + 12;
+      } else {
+        const heroH = 152;
+        doc.roundedRect(cardX + 18, y, cardW - 36, heroH, 20).fill('#f8f3e8');
+        doc.lineWidth(1).strokeColor(p.divider || '#D9C39A').roundedRect(cardX + 18, y, cardW - 36, heroH, 20).stroke();
+        doc.font('Helvetica-Bold').fontSize(20).fillColor(p.title || '#4B3621')
+          .text(namesLine, cardX + 34, y + 58, { width: cardW - 68, align: 'center' });
+        y += heroH + 12;
+      }
+
+      doc.roundedRect(cardX + 18, y, cardW - 36, 122, 14).fill(p.badge || '#fff9ee');
+      doc.lineWidth(0.8).strokeColor(p.divider || '#D9C39A').roundedRect(cardX + 18, y, cardW - 36, 122, 14).stroke();
+      doc.font('Helvetica-Bold').fontSize(14).fillColor(p.title || '#4B3621').text(salutation, cardX + 30, y + 14, { width: cardW - 60, align: 'left' });
+      doc.font('Helvetica').fontSize(10.5).fillColor(p.body || '#1f2937').text(body, cardX + 30, y + 36, { width: cardW - 60, align: 'left', lineGap: 2 });
+      doc.font('Helvetica-Bold').fontSize(9.5).fillColor(p.subtitle || '#6B5A45').text(dateLine, cardX + 30, y + 84, { width: cardW - 60, align: 'left' });
+      doc.font('Helvetica').fontSize(9.5).fillColor(p.subtle || '#6B7280').text(venueLine, cardX + 30, y + 100, { width: cardW - 60, align: 'left' });
+      y += 138;
+
+      // RSVP action row
+      const btnW = (cardW - 52) / 2;
+      doc.roundedRect(cardX + 18, y, btnW, 34, 17).fill('#fff6dc');
+      doc.roundedRect(cardX + 18 + btnW + 16, y, btnW, 34, 17).fill('#fff6dc');
+      doc.lineWidth(0.8).strokeColor(p.divider || '#D9C39A').roundedRect(cardX + 18, y, btnW, 34, 17).stroke();
+      doc.lineWidth(0.8).strokeColor(p.divider || '#D9C39A').roundedRect(cardX + 18 + btnW + 16, y, btnW, 34, 17).stroke();
+      doc.font('Helvetica-Bold').fontSize(11).fillColor(p.title || '#4B3621').text(rsvpPrimary, cardX + 18, y + 11, { width: btnW, align: 'center' });
+      doc.font('Helvetica-Bold').fontSize(11).fillColor(p.title || '#4B3621').text(rsvpSecondary, cardX + 18 + btnW + 16, y + 11, { width: btnW, align: 'center' });
+      y += 50;
+
+      // Timeline strip
+      const timelineY = y;
+      const timelineH = 72;
+      doc.roundedRect(cardX + 18, timelineY, cardW - 36, timelineH, 12).fill('#fffdf7');
+      doc.lineWidth(0.8).strokeColor(p.divider || '#D9C39A').roundedRect(cardX + 18, timelineY, cardW - 36, timelineH, 12).stroke();
+      const columnW = (cardW - 36) / 3;
+      scheduleItems.slice(0, 3).forEach((item, idx) => {
+        const colX = cardX + 18 + idx * columnW;
+        const cx = colX + columnW / 2;
+        doc.circle(cx, timelineY + 12, 5).fill(p.accent || '#C28A2E');
+        doc.circle(cx, timelineY + 12, 2).fill('#fffdf7');
+        doc.font('Helvetica-Bold').fontSize(8.5).fillColor(p.subtitle || '#6B5A45')
+          .text(firstText(item?.time, '--'), colX, timelineY + 22, { width: columnW, align: 'center' });
+        doc.font('Helvetica').fontSize(8.2).fillColor(p.body || '#1f2937')
+          .text(firstText(item?.label, 'Program'), colX + 6, timelineY + 40, { width: columnW - 12, align: 'center' });
+      });
+      y += timelineH + 10;
+
+      // Family card
+      doc.roundedRect(cardX + 18, y, cardW - 36, 62, 12).fill('#fffdf7');
+      doc.lineWidth(0.8).strokeColor(p.divider || '#D9C39A').roundedRect(cardX + 18, y, cardW - 36, 62, 12).stroke();
+      doc.font('Helvetica-Bold').fontSize(10.5).fillColor(p.title || '#4B3621')
+        .text(groomFamilyLine, cardX + 30, y + 16, { width: cardW - 60, align: 'left' });
+      doc.font('Helvetica-Bold').fontSize(10.5).fillColor(p.title || '#4B3621')
+        .text(brideFamilyLine, cardX + 30, y + 34, { width: cardW - 60, align: 'left' });
+      y += 78;
+
+      // Map + QR card
+      if (qrBuffer && y + 120 < cardBottom - 20) {
+        doc.roundedRect(cardX + 18, y, cardW - 36, 108, 12).fill('#fffdf7');
+        doc.lineWidth(0.8).strokeColor(p.divider || '#D9C39A').roundedRect(cardX + 18, y, cardW - 36, 108, 12).stroke();
+        doc.font('Helvetica-Bold').fontSize(10).fillColor(p.subtitle || '#6B5A45').text('Get Directions / RSVP', cardX + 28, y + 12, { width: 210, align: 'left' });
+        if (mapPreviewBuffer) {
+          doc.image(mapPreviewBuffer, cardX + 28, y + 32, { fit: [184, 66], align: 'center', valign: 'center' });
+          doc.lineWidth(0.5).strokeColor('#d4c9a8').roundedRect(cardX + 28, y + 32, 184, 66, 8).stroke();
+        } else {
+          doc.roundedRect(cardX + 28, y + 32, 184, 66, 8).fill('#f6f1e2');
+          doc.lineWidth(0.5).strokeColor('#d4c9a8').roundedRect(cardX + 28, y + 32, 184, 66, 8).stroke();
+          doc.font('Helvetica').fontSize(9).fillColor(p.subtle || '#6B7280')
+            .text(firstText(qrProps.ctaLabel, 'Get Directions'), cardX + 28, y + 58, { width: 184, align: 'center' });
+        }
+        doc.image(qrBuffer, cardX + cardW - 18 - 84, y + 12, { width: 84, height: 84 });
+        if (inviteUrl) {
+          doc.font('Helvetica').fontSize(8.2).fillColor(p.link || '#1d4ed8').text(inviteUrl, cardX + 220, y + 81, { width: cardW - 250, align: 'left' });
+        }
+      }
+
+      _drawOrnateDivider(doc, cardBottom - 20, cardX + 40, cardX + cardW - 40, p.divider || p.accent || '#C28A2E');
+
+      doc.end();
+    } catch (error) {
+      reject(error);
+    }
+  });
+}
+
 function resolveR2ObjectKey(assetPath) {
   if (!assetPath) return null;
   const raw = String(assetPath).trim();
@@ -1215,6 +1516,7 @@ async function generatePersonalizedInvite({ guest, event, clientBaseUrl, payload
   });
 
   const hasAdobeTemplate = template?.templateEngine === 'adobe-express' && Array.isArray(template?.adobeExpress?.timeline) && template.adobeExpress.timeline.length > 0;
+  const hasTemplateEngineJson = template?.templateEngine === 'template-engine' && template?.configJson && typeof template.configJson === 'object';
   const pdfBuffer = hasAdobeTemplate
     ? await buildAdobeExpressPdfBuffer({
         guest,
@@ -1226,6 +1528,16 @@ async function generatePersonalizedInvite({ guest, event, clientBaseUrl, payload
         relationship,
         customMessage,
       })
+    : hasTemplateEngineJson
+      ? await buildTemplateEnginePdfBuffer({
+          guest,
+          event,
+          template,
+          inviteMessage,
+          inviteUrl,
+          qrBuffer,
+          relationship,
+        })
     : await buildPdfBuffer({
         guest,
         event,
