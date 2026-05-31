@@ -1098,9 +1098,32 @@ function buildTemplateEnginePdfBuffer({ guest, event, inviteMessage, inviteUrl, 
       const rsvpSecondary = firstText(rsvpProps?.actions?.[1]?.label, rsvpProps.secondaryAction, 'Join Live Stream');
 
       if (useAbsoluteLayout) {
+        const typography = (resolvedTemplateConfig?.typography && typeof resolvedTemplateConfig.typography === 'object')
+          ? resolvedTemplateConfig.typography
+          : {};
+        const autoFlow = Boolean(canvasConfig.autoFlow);
+
         const toNumber = (value) => {
           const n = Number(value);
           return Number.isFinite(n) ? n : null;
+        };
+
+        const styleNumber = (style, keys, fallback) => {
+          const keyList = Array.isArray(keys) ? keys : [keys];
+          for (const key of keyList) {
+            const n = Number(style?.[key]);
+            if (Number.isFinite(n)) return n;
+          }
+          return fallback;
+        };
+
+        const styleText = (style, keys, fallback) => {
+          const keyList = Array.isArray(keys) ? keys : [keys];
+          for (const key of keyList) {
+            const value = style?.[key];
+            if (typeof value === 'string' && value.trim()) return value.trim();
+          }
+          return fallback;
         };
 
         const resolveRect = (rect, container) => {
@@ -1191,33 +1214,41 @@ function buildTemplateEnginePdfBuffer({ guest, event, inviteMessage, inviteUrl, 
           .filter(Boolean)
           .sort((a, b) => a.rect.y - b.rect.y);
 
-        const minGap = 6;
-        let cursorY = contentRect.y;
-        sectionsWithRects.forEach((entry) => {
-          const r = entry.rect;
-          if (r.y < cursorY) r.y = cursorY;
-          const maxY = contentRect.y + contentRect.h;
-          if (r.y + r.h > maxY) {
-            r.h = Math.max(18, maxY - r.y);
-          }
-          cursorY = r.y + r.h + minGap;
-        });
+        if (autoFlow) {
+          const minGap = 6;
+          let cursorY = contentRect.y;
+          sectionsWithRects.forEach((entry) => {
+            const r = entry.rect;
+            if (r.y < cursorY) r.y = cursorY;
+            const maxY = contentRect.y + contentRect.h;
+            if (r.y + r.h > maxY) {
+              r.h = Math.max(18, maxY - r.y);
+            }
+            cursorY = r.y + r.h + minGap;
+          });
+        }
 
         const rectBySectionId = new Map(
           sectionsWithRects.map(({ section, rect }) => [section?.id || `${section?.componentType || 'section'}-${section?.order || 0}`, rect])
         );
 
-        const drawContainer = (rect, radius = 14, fill = 'rgba(255,253,247,0.86)') => {
+        const drawContainer = (rect, options = {}) => {
+          const radius = Number.isFinite(Number(options.radius)) ? Number(options.radius) : 14;
+          const fill = options.fill || '#fffdf7';
+          const borderColor = options.borderColor || p.divider || '#D9C39A';
+          const borderWidth = Number.isFinite(Number(options.borderWidth)) ? Number(options.borderWidth) : 0.8;
           doc.save();
           doc.fillOpacity(1);
           doc.roundedRect(rect.x, rect.y, rect.w, rect.h, radius).fill(fill);
           doc.restore();
-          doc.lineWidth(0.8).strokeColor(p.divider || '#D9C39A').roundedRect(rect.x, rect.y, rect.w, rect.h, radius).stroke();
+          if (borderWidth > 0) {
+            doc.lineWidth(borderWidth).strokeColor(borderColor).roundedRect(rect.x, rect.y, rect.w, rect.h, radius).stroke();
+          }
         };
 
         const drawText = (text, xPos, yPos, options = {}) => {
           doc.font(options.bold ? 'Helvetica-Bold' : 'Helvetica')
-            .fontSize(options.size || 11)
+            .fontSize(options.size || Number(typography.bodySize) || Number(typography.fontSize) || 11)
             .fillColor(options.color || p.body || '#1f2937')
             .text(firstText(text, options.fallback || ''), xPos, yPos, {
               width: options.width,
@@ -1231,36 +1262,48 @@ function buildTemplateEnginePdfBuffer({ guest, event, inviteMessage, inviteUrl, 
           const rect = rectBySectionId.get(rectKey);
           if (!rect) return;
           const type = String(section?.componentType || '').toLowerCase();
+          const sectionStyle = (section?.style && typeof section.style === 'object') ? section.style : {};
+          const containerFill = styleText(sectionStyle, ['backgroundColor', 'cardBackground', 'fillColor'], p.surface || '#fffdf7');
+          const containerBorder = styleText(sectionStyle, ['borderColor', 'strokeColor'], p.border || p.divider || '#D9C39A');
+          const containerBorderWidth = styleNumber(sectionStyle, ['borderWidth', 'strokeWidth'], 0.8);
+          const containerRadius = styleNumber(sectionStyle, ['radius', 'borderRadius'], 12);
+          const titleColor = styleText(sectionStyle, ['titleColor', 'headingColor', 'color'], p.title || p.textPrimary || '#4B3621');
+          const subtitleColor = styleText(sectionStyle, ['subtitleColor', 'metaColor'], p.subtitle || p.textSecondary || '#6B5A45');
+          const bodyColor = styleText(sectionStyle, ['bodyColor', 'textColor', 'color'], p.body || p.textPrimary || '#1f2937');
+          const titleSize = styleNumber(sectionStyle, ['titleSize', 'headingSize', 'fontSize'], Number(typography.titleSize) || 14);
+          const subtitleSize = styleNumber(sectionStyle, ['subtitleSize', 'metaSize'], Number(typography.subtitleSize) || 10);
+          const bodySize = styleNumber(sectionStyle, ['bodySize', 'textSize', 'fontSize'], Number(typography.bodySize) || 9.8);
+          const contentAlign = styleText(sectionStyle, ['align', 'textAlign'], 'left');
 
           if (type === 'guestheader') {
             const heading = firstText(section?.props?.title, headerTitle);
             const subtitle = firstText(section?.props?.subtitle, namesLine);
-            drawText(heading, rect.x + 10, rect.y + 8, { width: rect.w - 20, align: 'center', size: 14, bold: true, color: p.title || '#4B3621' });
-            drawText(subtitle, rect.x + 10, rect.y + 32, { width: rect.w - 20, align: 'center', size: 11, color: p.subtitle || '#6B5A45' });
-            drawText(openingLine, rect.x + 10, rect.y + 48, { width: rect.w - 20, align: 'center', size: 9.2, color: p.subtle || '#6B7280' });
+            drawText(heading, rect.x + 10, rect.y + 8, { width: rect.w - 20, align: 'center', size: titleSize, bold: true, color: titleColor });
+            drawText(subtitle, rect.x + 10, rect.y + 32, { width: rect.w - 20, align: 'center', size: subtitleSize + 1, color: subtitleColor });
+            drawText(openingLine, rect.x + 10, rect.y + 48, { width: rect.w - 20, align: 'center', size: subtitleSize - 0.6, color: p.subtle || subtitleColor });
             return;
           }
 
           if (type === 'guestbadge') {
-            drawContainer(rect, 12, '#fff6dc');
-            drawText(badgeText, rect.x + 4, rect.y + Math.max(6, rect.h / 2 - 5), { width: rect.w - 8, align: 'center', size: 10, bold: true, color: p.badgeText || p.title || '#4B3621' });
+            drawContainer(rect, { radius: containerRadius, fill: styleText(sectionStyle, ['backgroundColor', 'cardBackground'], p.badge || '#fff6dc'), borderColor: containerBorder, borderWidth: containerBorderWidth });
+            drawText(badgeText, rect.x + 4, rect.y + Math.max(6, rect.h / 2 - 5), { width: rect.w - 8, align: 'center', size: styleNumber(sectionStyle, ['fontSize', 'textSize'], 10), bold: true, color: p.badgeText || titleColor });
             return;
           }
 
           if (type === 'couplehero') {
-            drawContainer(rect, 18, '#f8f3e8');
+            drawContainer(rect, { radius: styleNumber(sectionStyle, ['radius', 'borderRadius'], 18), fill: containerFill, borderColor: containerBorder, borderWidth: containerBorderWidth });
             if (heroImageBuffer) {
               doc.image(heroImageBuffer, rect.x, rect.y, { fit: [rect.w, rect.h], align: 'center', valign: 'center' });
               doc.lineWidth(0.8).strokeColor(p.divider || '#D9C39A').roundedRect(rect.x, rect.y, rect.w, rect.h, 18).stroke();
             } else {
-              drawText(firstText(section?.props?.title, namesLine), rect.x + 12, rect.y + rect.h / 2 - 8, { width: rect.w - 24, align: 'center', size: 15, bold: true, color: p.title || '#4B3621' });
+              drawText(firstText(section?.props?.title, namesLine), rect.x + 12, rect.y + rect.h / 2 - 8, { width: rect.w - 24, align: 'center', size: titleSize + 1, bold: true, color: titleColor });
             }
             return;
           }
 
           if (type === 'personalmessage') {
-            drawContainer(rect, 12, '#fffdf7');
-            drawText(salutation, rect.x + 12, rect.y + 12, { width: rect.w - 24, size: 12.5, bold: true, color: p.title || '#4B3621' });
+            drawContainer(rect, { radius: containerRadius, fill: containerFill, borderColor: containerBorder, borderWidth: containerBorderWidth });
+            drawText(salutation, rect.x + 12, rect.y + 12, { width: rect.w - 24, size: styleNumber(sectionStyle, ['salutationSize', 'titleSize'], titleSize - 1), bold: true, color: titleColor, align: contentAlign });
             const messageY = rect.y + 34;
             const tailHeight = 32;
             const messageMaxHeight = Math.max(14, rect.h - (messageY - rect.y) - tailHeight);
@@ -1268,12 +1311,12 @@ function buildTemplateEnginePdfBuffer({ guest, event, inviteMessage, inviteUrl, 
               width: rect.w - 24,
               maxHeight: messageMaxHeight,
               fontName: 'Helvetica',
-              fontSize: 9.8,
-              lineGap: 2,
+              fontSize: bodySize,
+              lineGap: styleNumber(sectionStyle, ['lineGap'], 2),
             });
-            drawText(fittedBody, rect.x + 12, messageY, { width: rect.w - 24, size: 9.8, color: p.body || '#1f2937', lineGap: 2 });
-            drawText(dateLine, rect.x + 12, rect.y + rect.h - 30, { width: rect.w - 24, size: 8.8, bold: true, color: p.subtitle || '#6B5A45' });
-            drawText(venueLine, rect.x + 12, rect.y + rect.h - 16, { width: rect.w - 24, size: 8.8, color: p.subtle || '#6B7280' });
+            drawText(fittedBody, rect.x + 12, messageY, { width: rect.w - 24, size: bodySize, color: bodyColor, lineGap: styleNumber(sectionStyle, ['lineGap'], 2), align: contentAlign });
+            drawText(dateLine, rect.x + 12, rect.y + rect.h - 30, { width: rect.w - 24, size: Math.max(8, bodySize - 1), bold: true, color: subtitleColor, align: contentAlign });
+            drawText(venueLine, rect.x + 12, rect.y + rect.h - 16, { width: rect.w - 24, size: Math.max(8, bodySize - 1), color: p.subtle || subtitleColor, align: contentAlign });
             return;
           }
 
@@ -1281,44 +1324,45 @@ function buildTemplateEnginePdfBuffer({ guest, event, inviteMessage, inviteUrl, 
             const halfW = (rect.w - 12) / 2;
             const left = { x: rect.x, y: rect.y, w: halfW, h: rect.h };
             const right = { x: rect.x + halfW + 12, y: rect.y, w: halfW, h: rect.h };
-            drawContainer(left, 14, '#fff6dc');
-            drawContainer(right, 14, '#fff6dc');
-            drawText(rsvpPrimary, left.x + 6, left.y + left.h / 2 - 5, { width: left.w - 12, align: 'center', size: 10.5, bold: true, color: p.title || '#4B3621' });
-            drawText(rsvpSecondary, right.x + 6, right.y + right.h / 2 - 5, { width: right.w - 12, align: 'center', size: 10.5, bold: true, color: p.title || '#4B3621' });
+            const rsvpFill = styleText(sectionStyle, ['buttonBackground', 'backgroundColor'], p.badge || '#fff6dc');
+            drawContainer(left, { radius: styleNumber(sectionStyle, ['buttonRadius', 'radius'], 14), fill: rsvpFill, borderColor: containerBorder, borderWidth: containerBorderWidth });
+            drawContainer(right, { radius: styleNumber(sectionStyle, ['buttonRadius', 'radius'], 14), fill: rsvpFill, borderColor: containerBorder, borderWidth: containerBorderWidth });
+            drawText(rsvpPrimary, left.x + 6, left.y + left.h / 2 - 5, { width: left.w - 12, align: 'center', size: styleNumber(sectionStyle, ['fontSize', 'textSize'], 10.5), bold: true, color: titleColor });
+            drawText(rsvpSecondary, right.x + 6, right.y + right.h / 2 - 5, { width: right.w - 12, align: 'center', size: styleNumber(sectionStyle, ['fontSize', 'textSize'], 10.5), bold: true, color: titleColor });
             return;
           }
 
           if (type === 'smartrecommendations') {
-            drawContainer(rect, 12, '#fffdf7');
+            drawContainer(rect, { radius: containerRadius, fill: containerFill, borderColor: containerBorder, borderWidth: containerBorderWidth });
             const itemW = rect.w / 3;
             scheduleItems.slice(0, 3).forEach((item, idx) => {
               const colX = rect.x + idx * itemW;
               const cx = colX + itemW / 2;
               doc.circle(cx, rect.y + 10, 4).fill(p.accent || '#C28A2E');
               doc.circle(cx, rect.y + 10, 1.6).fill('#fffdf7');
-              drawText(firstText(item?.time, '--'), colX, rect.y + 18, { width: itemW, align: 'center', size: 8.2, bold: true, color: p.subtitle || '#6B5A45' });
-              drawText(firstText(item?.label, 'Program'), colX + 4, rect.y + 34, { width: itemW - 8, align: 'center', size: 8.2, color: p.body || '#1f2937' });
+              drawText(firstText(item?.time, '--'), colX, rect.y + 18, { width: itemW, align: 'center', size: Math.max(7.8, bodySize - 1.4), bold: true, color: subtitleColor });
+              drawText(firstText(item?.label, 'Program'), colX + 4, rect.y + 34, { width: itemW - 8, align: 'center', size: Math.max(7.8, bodySize - 1.4), color: bodyColor });
             });
             return;
           }
 
           if (type === 'familyconnection') {
-            drawContainer(rect, 12, '#fffdf7');
-            drawText(groomFamilyLine, rect.x + 12, rect.y + 12, { width: rect.w - 24, size: 10, bold: true, color: p.title || '#4B3621' });
-            drawText(brideFamilyLine, rect.x + 12, rect.y + Math.min(rect.h - 18, 30), { width: rect.w - 24, size: 10, bold: true, color: p.title || '#4B3621' });
+            drawContainer(rect, { radius: containerRadius, fill: containerFill, borderColor: containerBorder, borderWidth: containerBorderWidth });
+            drawText(groomFamilyLine, rect.x + 12, rect.y + 12, { width: rect.w - 24, size: styleNumber(sectionStyle, ['fontSize', 'textSize'], 10), bold: true, color: titleColor, align: contentAlign });
+            drawText(brideFamilyLine, rect.x + 12, rect.y + Math.min(rect.h - 18, 30), { width: rect.w - 24, size: styleNumber(sectionStyle, ['fontSize', 'textSize'], 10), bold: true, color: titleColor, align: contentAlign });
             return;
           }
 
           if (type === 'qrpass' && qrBuffer) {
-            drawContainer(rect, 12, '#fffdf7');
+            drawContainer(rect, { radius: containerRadius, fill: containerFill, borderColor: containerBorder, borderWidth: containerBorderWidth });
             if (mapPreviewBuffer && rect.w > 200) {
               const mapW = Math.max(100, rect.w - 90);
               doc.image(mapPreviewBuffer, rect.x + 10, rect.y + 8, { fit: [mapW, rect.h - 16], align: 'center', valign: 'center' });
               doc.lineWidth(0.5).strokeColor('#d4c9a8').roundedRect(rect.x + 10, rect.y + 8, mapW, rect.h - 16, 8).stroke();
             } else {
-              drawText(firstText(qrProps.ctaLabel, 'Scan for RSVP / Entry'), rect.x + 12, rect.y + 12, { width: rect.w - 80, size: 10, bold: true, color: p.subtitle || '#6B5A45' });
+              drawText(firstText(qrProps.ctaLabel, 'Scan for RSVP / Entry'), rect.x + 12, rect.y + 12, { width: rect.w - 80, size: styleNumber(sectionStyle, ['fontSize', 'textSize'], 10), bold: true, color: subtitleColor });
               if (inviteUrl) {
-                drawText(inviteUrl, rect.x + 12, rect.y + 30, { width: rect.w - 80, size: 8, color: p.link || '#1d4ed8' });
+                drawText(inviteUrl, rect.x + 12, rect.y + 30, { width: rect.w - 80, size: Math.max(7.5, bodySize - 2), color: p.link || '#1d4ed8' });
               }
             }
             const qrSize = Math.min(64, rect.h - 14);
