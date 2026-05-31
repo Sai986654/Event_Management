@@ -342,12 +342,41 @@ async function listInviteTemplates() {
   return templates.map((t) => {
     const firstScene = Array.isArray(t?.adobeExpress?.timeline) ? t.adobeExpress.timeline[0] : null;
     const previewAsset = firstScene?.baseVideo || firstScene?.asset || null;
-    const previewAssetKey = resolveR2ObjectKey(previewAsset);
-    const previewImageUrl = /^https?:\/\//i.test(String(previewAsset || ''))
-      ? String(previewAsset)
+    const config = t?.configJson && typeof t.configJson === 'object' ? t.configJson : {};
+    const backgroundAssets = Array.isArray(config?.backgroundAssets)
+      ? config.backgroundAssets
+      : (config?.backgroundAssets && typeof config.backgroundAssets === 'object' ? Object.values(config.backgroundAssets) : []);
+    const decorativeAssets = Array.isArray(config?.decorativeAssets)
+      ? config.decorativeAssets
+      : (config?.decorativeAssets && typeof config.decorativeAssets === 'object' ? Object.values(config.decorativeAssets) : []);
+
+    const allAssets = [...backgroundAssets, ...decorativeAssets];
+    const slotMap = {};
+    allAssets.forEach((asset) => {
+      if (!asset || typeof asset !== 'object') return;
+      const slot = String(asset.assetSlot || asset.slot || asset.id || asset.key || '').trim();
+      const url = String(asset.url || asset.assetUrl || asset.src || asset.assetPath || asset.publicId || '').trim();
+      if (slot && url) slotMap[slot] = url;
+    });
+
+    const backgroundAssetRef = String(config?.canvas?.backgroundAssetRef || '').trim();
+    const templateEnginePreviewAsset =
+      (backgroundAssetRef && slotMap[backgroundAssetRef]) ||
+      slotMap.backgroundTextureImage ||
+      slotMap.backgroundImage ||
+      String(config?.canvas?.backgroundImage || '').trim() ||
+      null;
+
+    const previewAssetResolved = templateEnginePreviewAsset || previewAsset;
+    const previewAssetKey = resolveR2ObjectKey(previewAssetResolved);
+    const previewImageUrl = /^https?:\/\//i.test(String(previewAssetResolved || ''))
+      ? String(previewAssetResolved)
       : previewAssetKey
         ? `${R2_PUBLIC_URL}/${previewAssetKey}`
         : null;
+
+    const hasTemplateEngineConfig = Boolean(t?.templateEngine === 'template-engine' && t?.configJson && typeof t.configJson === 'object');
+    const hasBackgroundAsset = Boolean(templateEnginePreviewAsset);
 
     return {
       key: t.key,
@@ -356,6 +385,11 @@ async function listInviteTemplates() {
       ornamentStyle: t.ornamentStyle || 'traditional',
       templateEngine: t.templateEngine || 'classic',
       previewImageUrl,
+      debug: {
+        hasTemplateEngineConfig,
+        hasBackgroundAsset,
+        backgroundAssetRef: backgroundAssetRef || null,
+      },
       preview: {
         background: t.palette.background,
         frame: t.palette.frame,

@@ -84,6 +84,17 @@ const GuestManagement = () => {
     selectedLanguage === 'te'
       ? `Priyamaina ${previewGuestName} garu`
       : `Dear ${previewGuestName}`;
+  const templateEngineLabel = selectedTemplate?.templateEngine || 'classic';
+  const templateDebug = selectedTemplate?.debug || {};
+  const previewModeLabel = selectedDesign ? 'Invite Studio Design' : `Template Engine: ${templateEngineLabel}`;
+  const templateHealth = selectedDesign
+    ? null
+    : {
+        templateKey: selectedTemplate?.key || 'n/a',
+        templateEngine: templateEngineLabel,
+        hasTemplateEngineConfig: Boolean(templateDebug.hasTemplateEngineConfig),
+        hasBackgroundAsset: Boolean(templateDebug.hasBackgroundAsset),
+      };
 
   // Real-time socket handlers
   const handleGuestRsvp = useCallback((data) => {
@@ -563,6 +574,23 @@ const GuestManagement = () => {
                     Preview guest: {previewGuestName}
                     {extraSelectedCount > 0 ? ` +${extraSelectedCount} more selected` : ''}
                   </div>
+                  <div className="invite-live-preview-footer" style={{ marginTop: 6 }}>
+                    {previewModeLabel}
+                    {selectedTemplate?.key ? ` | key: ${selectedTemplate.key}` : ''}
+                  </div>
+                  {templateHealth ? (
+                    <div
+                      className={
+                        templateHealth.hasTemplateEngineConfig && templateHealth.hasBackgroundAsset
+                          ? 'invite-live-preview-health-ok'
+                          : 'invite-live-preview-health-warn'
+                      }
+                    >
+                      {templateHealth.hasTemplateEngineConfig ? 'config ok' : 'config missing'}
+                      {' | '}
+                      {templateHealth.hasBackgroundAsset ? 'background linked' : 'background not linked'}
+                    </div>
+                  ) : null}
                 </div>
               </div>
             </div>
