@@ -111,6 +111,153 @@ const getSectionPreviewText = (section) => {
   return `${section.componentType || section.type || 'Section'} preview`;
 };
 
+const pickFirstText = (...values) => values.find((value) => typeof value === 'string' && value.trim()) || '';
+
+const resolveSectionModel = (section) => {
+  const props = coerceObject(section.props);
+  const bindings = coerceObject(section.bindings);
+  const type = String(section.componentType || section.type || 'section').toLowerCase();
+
+  const title = pickFirstText(
+    props.title,
+    props.heading,
+    props.label,
+    bindings.title,
+    bindings.heading,
+    section.componentType,
+    section.type
+  );
+
+  const body = pickFirstText(
+    props.message,
+    props.body,
+    props.text,
+    props.description,
+    bindings.message,
+    bindings.body,
+    bindings.text,
+    bindings.value,
+    getSectionPreviewText(section)
+  );
+
+  const subtitle = pickFirstText(props.subtitle, props.subheading, bindings.subtitle);
+
+  const actionCandidates = [];
+  if (Array.isArray(props.actions)) {
+    props.actions.forEach((action) => {
+      const label = pickFirstText(action?.label, action?.text, action?.title);
+      if (label) actionCandidates.push(label);
+    });
+  }
+  if (!actionCandidates.length) {
+    const labels = [props.primaryAction, props.secondaryAction, bindings.primaryAction, bindings.secondaryAction]
+      .map((value) => String(value || '').trim())
+      .filter(Boolean);
+    actionCandidates.push(...labels);
+  }
+
+  return {
+    type,
+    title,
+    subtitle,
+    body,
+    actions: actionCandidates.slice(0, 3),
+    tone: pickFirstText(props.tone, bindings.tone).toLowerCase(),
+    tag: pickFirstText(props.badge, props.tag, bindings.badge, bindings.tag, body),
+  };
+};
+
+const renderEnginePreviewSection = (section, index) => {
+  const model = resolveSectionModel(section);
+  const key = section.id || `${model.type}-${index}`;
+
+  const shellStyle = {
+    border: '1px solid #e9ddc2',
+    background: '#fffdf7',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 10,
+  };
+
+  if (model.type.includes('pill') || model.type.includes('badge')) {
+    return (
+      <div key={key} style={{ ...shellStyle, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ fontSize: 12, color: '#8b6a1f', fontWeight: 700 }}>{model.title || 'Badge'}</div>
+        <Tag color="gold" style={{ marginInlineEnd: 0 }}>{model.tag || 'VIP'}</Tag>
+      </div>
+    );
+  }
+
+  if (model.type.includes('button')) {
+    const actions = model.actions.length ? model.actions : ['RSVP Now', 'View Details'];
+    return (
+      <div key={key} style={shellStyle}>
+        <div style={{ fontSize: 12, color: '#8b6a1f', fontWeight: 700, marginBottom: 8 }}>{model.title || 'Actions'}</div>
+        <Space wrap>
+          {actions.map((label, actionIndex) => (
+            <Button
+              key={`${key}-btn-${actionIndex}`}
+              size="small"
+              type={actionIndex === 0 ? 'primary' : 'default'}
+            >
+              {label}
+            </Button>
+          ))}
+        </Space>
+      </div>
+    );
+  }
+
+  if (model.type.includes('info')) {
+    return (
+      <div key={key} style={shellStyle}>
+        <div style={{ fontSize: 12, color: '#8b6a1f', fontWeight: 700 }}>{model.title || 'Information'}</div>
+        {model.subtitle ? <div style={{ color: '#6b7280', fontSize: 12, marginTop: 2 }}>{model.subtitle}</div> : null}
+        <div style={{ color: '#253045', lineHeight: 1.45, marginTop: 6 }}>{model.body}</div>
+      </div>
+    );
+  }
+
+  if (model.type.includes('card') || model.type.includes('hero')) {
+    return (
+      <div key={key} style={shellStyle}>
+        <div style={{ fontSize: 12, color: '#8b6a1f', fontWeight: 700 }}>{model.title || 'Card'}</div>
+        {model.subtitle ? <div style={{ color: '#6b7280', fontSize: 12, marginTop: 2 }}>{model.subtitle}</div> : null}
+        <div style={{ color: '#253045', lineHeight: 1.5, marginTop: 6 }}>{model.body}</div>
+      </div>
+    );
+  }
+
+  if (model.type.includes('qr')) {
+    return (
+      <div key={key} style={{ ...shellStyle, display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div
+          style={{
+            width: 50,
+            height: 50,
+            borderRadius: 8,
+            background: 'repeating-linear-gradient(45deg, #1f2937 0, #1f2937 4px, #f8f4ea 4px, #f8f4ea 8px)',
+            border: '1px solid #d9c37c',
+          }}
+        />
+        <div>
+          <div style={{ fontSize: 12, color: '#8b6a1f', fontWeight: 700 }}>{model.title || 'QR Pass'}</div>
+          <div style={{ color: '#253045' }}>{model.body || 'Scan at entrance'}</div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div key={key} style={shellStyle}>
+      <div style={{ fontSize: 12, color: '#8b6a1f', fontWeight: 700, marginBottom: 4 }}>
+        {section.componentType || section.type || 'Section'}
+      </div>
+      <div style={{ color: '#253045', lineHeight: 1.45 }}>{model.body}</div>
+    </div>
+  );
+};
+
 const AdminControlCenter = () => {
   // ── Vendor Verification ────────────────────────────────────────────
   const [vendors, setVendors] = useState([]);
@@ -1946,25 +2093,7 @@ const AdminControlCenter = () => {
                     </div>
 
                     <div style={{ padding: 14 }}>
-                      {(effectiveRenderedPreview.sections || []).slice(0, 10).map((section, index) => (
-                        <div
-                          key={section.id || `${section.componentType || section.type || 'section'}-${index}`}
-                          style={{
-                            border: '1px solid #e9ddc2',
-                            background: '#fffdf7',
-                            borderRadius: 12,
-                            padding: 10,
-                            marginBottom: 10,
-                          }}
-                        >
-                          <div style={{ fontSize: 12, color: '#8b6a1f', fontWeight: 700, marginBottom: 4 }}>
-                            {section.componentType || section.type || 'Section'}
-                          </div>
-                          <div style={{ color: '#253045', lineHeight: 1.45 }}>
-                            {getSectionPreviewText(section)}
-                          </div>
-                        </div>
-                      ))}
+                      {(effectiveRenderedPreview.sections || []).slice(0, 10).map((section, index) => renderEnginePreviewSection(section, index))}
 
                       {!(effectiveRenderedPreview.sections || []).length ? (
                         <div style={{ color: '#667085' }}>No visible sections found in this template config.</div>
