@@ -31,6 +31,7 @@ import AdminControlCenter from './pages/AdminControlCenter';
 import EventPlanner from './pages/EventPlanner';
 import ActivityTracker from './pages/ActivityTracker';
 import InviteDesignStudio from './pages/InviteDesignStudio';
+import InviteCanvasEditor from './pages/InviteCanvasEditor';
 
 import NotificationsPage from './pages/NotificationsPage';
 import Profile from './pages/Profile';
@@ -235,6 +236,14 @@ const AppInner = () => {
               <AppLayout>
                 <InviteDesignStudio />
               </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/events/:eventId/invite-studio/canvas/:designId"
+          element={
+            <ProtectedRoute allowedRoles={['admin', 'organizer']}>
+              <InviteCanvasEditor />
             </ProtectedRoute>
           }
         />

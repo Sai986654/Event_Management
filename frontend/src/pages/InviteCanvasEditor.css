@@ -1,0 +1,99 @@
+/* ────────────────────────────────────────────────────────
+   InviteCanvasEditor — full-page / immersive canvas shell
+   ──────────────────────────────────────────────────────── */
+
+/* Reset AppLayout padding so this page truly fills the screen */
+.ice-shell {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: #0f172a;
+  z-index: 10;
+  overflow: hidden;
+}
+
+.ice-shell--fullscreen {
+  z-index: 9999;
+}
+
+/* ── Top bar ── */
+.ice-topbar {
+  flex: 0 0 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  background: #1e293b;
+  border-bottom: 1px solid #334155;
+  gap: 12px;
+  z-index: 20;
+}
+
+.ice-topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.ice-topbar-center {
+  flex: 1;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ice-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  justify-content: flex-end;
+}
+
+.ice-topbar-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #f1f5f9;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 260px;
+}
+
+.ice-topbar-btn {
+  color: #94a3b8 !important;
+}
+.ice-topbar-btn:hover {
+  color: #f1f5f9 !important;
+  background: #334155 !important;
+}
+
+.ice-save-btn {
+  margin-left: 8px;
+}
+
+/* ── Body — holds InviteDesignCanvas at full size ── */
+.ice-body {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  position: relative;
+}
+
+/* Let InviteDesignCanvas fill the ice-body */
+.ice-body .invite-design-canvas--fullpage {
+  width: 100%;
+}
+
+/* Loader */
+.ice-loader {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  background: #0f172a;
+}

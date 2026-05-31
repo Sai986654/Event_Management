@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   Button,
   Card,
@@ -27,6 +27,7 @@ import {
   ReloadOutlined,
   CodeOutlined,
   BgColorsOutlined,
+  ExpandOutlined,
 } from '@ant-design/icons';
 import { eventService } from '../services/eventService';
 import { guestService } from '../services/guestService';
@@ -52,6 +53,7 @@ const { TextArea } = Input;
 
 const InviteDesignStudio = () => {
   const { eventId } = useParams();
+  const navigate = useNavigate();
 
   const [event, setEvent] = useState(null);
   const [guests, setGuests] = useState([]);
@@ -1169,6 +1171,15 @@ const InviteDesignStudio = () => {
                 </Row>
 
                 <Space wrap size={[10, 10]}>
+                  <Button
+                    icon={<ExpandOutlined />}
+                    type="default"
+                    onClick={() => navigate(`/events/${eventId}/invite-studio/canvas/${selectedDesignId}`)}
+                    disabled={!selectedDesignId}
+                    style={{ background: '#1e293b', color: '#60a5fa', borderColor: '#3b82f6', fontWeight: 600 }}
+                  >
+                    Open Full Canvas Editor
+                  </Button>
                   <Button icon={<SaveOutlined />} type="primary" onClick={handleSaveDesign} loading={saving}>
                     Save Design
                   </Button>

@@ -182,6 +182,7 @@ const InviteDesignCanvas = ({
   previewMergeContext = null,
   quickTextBlocks = [],
   sectionBlocks = [],
+  fullPageMode = false,
 }) => {
   const screens = Grid.useBreakpoint();
   const [elements, setElements] = useState(layout.elements || []);
@@ -1122,8 +1123,8 @@ const InviteDesignCanvas = ({
   );
 
   return (
-    <div className="invite-design-canvas">
-      <Row gutter={[14, 14]} className="invite-canvas-layout" wrap={!desktopWorkbench}>
+    <div className={`invite-design-canvas${fullPageMode ? ' invite-design-canvas--fullpage' : ''}`}>
+      <Row gutter={[14, 14]} className={`invite-canvas-layout${fullPageMode ? ' invite-canvas-layout--fullpage' : ''}`} wrap={!desktopWorkbench}>
         {/* Left Panel - Element Manager */}
         <Col
           xs={{ span: 24, order: 2 }}
