@@ -993,10 +993,14 @@ function buildTemplateEnginePdfBuffer({ guest, event, inviteMessage, inviteUrl, 
         : {};
       const cardOverlaySetting = canvasConfig.cardOverlay;
       const cardFrameSetting = canvasConfig.cardFrame;
+      const parsedBackgroundTintOpacity = Number(canvasConfig.backgroundTintOpacity);
       const parsedCardOverlayOpacity = Number(canvasConfig.cardOverlayOpacity);
       const cardOverlayOpacity = Number.isFinite(parsedCardOverlayOpacity)
         ? Math.max(0, Math.min(1, parsedCardOverlayOpacity))
         : 0.68;
+      const backgroundTintOpacity = Number.isFinite(parsedBackgroundTintOpacity)
+        ? Math.max(0, Math.min(1, parsedBackgroundTintOpacity))
+        : (useAbsoluteLayout ? 0 : 0.06);
       const cardOverlayEnabled = typeof cardOverlaySetting === 'boolean' ? cardOverlaySetting : !useAbsoluteLayout;
       const cardFrameEnabled = typeof cardFrameSetting === 'boolean' ? cardFrameSetting : !useAbsoluteLayout;
 
@@ -1044,8 +1048,10 @@ function buildTemplateEnginePdfBuffer({ guest, event, inviteMessage, inviteUrl, 
       const backgroundImageBuffer = await loadR2AssetBuffer(backgroundImageUrl);
 
       if (backgroundImageBuffer) {
-        doc.image(backgroundImageBuffer, 0, 0, { fit: [W, H], align: 'center', valign: 'center' });
-        doc.save().fillOpacity(0.06).rect(0, 0, W, H).fill('#fffaf0').restore();
+        doc.image(backgroundImageBuffer, 0, 0, { cover: [W, H], align: 'center', valign: 'center' });
+        if (backgroundTintOpacity > 0) {
+          doc.save().fillOpacity(backgroundTintOpacity).rect(0, 0, W, H).fill('#fffaf0').restore();
+        }
         if (cardOverlayEnabled) {
           doc.save().fillOpacity(cardOverlayOpacity).roundedRect(cardX, cardTop, cardW, cardBottom - cardTop, 24).fill('#fffdf7').restore();
         }
@@ -1117,6 +1123,33 @@ function buildTemplateEnginePdfBuffer({ guest, event, inviteMessage, inviteUrl, 
           };
         };
 
+        const fitTextToHeight = (text, { width, maxHeight, fontName = 'Helvetica', fontSize = 10, lineGap = 1 }) => {
+          const source = String(text || '').trim();
+          if (!source) return '';
+          doc.font(fontName).fontSize(fontSize);
+          const fullHeight = doc.heightOfString(source, { width, lineGap });
+          if (fullHeight <= maxHeight) return source;
+
+          const words = source.split(/\s+/).filter(Boolean);
+          if (words.length <= 1) return source;
+
+          let low = 1;
+          let high = words.length;
+          let best = `${words[0]}...`;
+          while (low <= high) {
+            const mid = Math.floor((low + high) / 2);
+            const candidate = `${words.slice(0, mid).join(' ')}...`;
+            const h = doc.heightOfString(candidate, { width, lineGap });
+            if (h <= maxHeight) {
+              best = candidate;
+              low = mid + 1;
+            } else {
+              high = mid - 1;
+            }
+          }
+          return best;
+        };
+
         const canvasContent = (resolvedTemplateConfig?.canvas?.contentArea && typeof resolvedTemplateConfig.canvas.contentArea === 'object')
           ? resolvedTemplateConfig.canvas.contentArea
           : (resolvedTemplateConfig?.canvas?.contentBox && typeof resolvedTemplateConfig.canvas.contentBox === 'object')
@@ -1124,7 +1157,7 @@ function buildTemplateEnginePdfBuffer({ guest, event, inviteMessage, inviteUrl, 
             : {};
 
         const defaultContentContainer = backgroundImageBuffer
-          ? { x: W * 0.12, y: H * 0.17, w: W * 0.76, h: H * 0.70 }
+          ? { x: W * 0.10, y: H * 0.14, w: W * 0.80, h: H * 0.76 }
           : { x: cardX + 18, y: cardTop + 18, w: cardW - 36, h: cardBottom - cardTop - 36 };
         const contentRect = resolveRect(canvasContent, defaultContentContainer);
 
@@ -1148,6 +1181,32 @@ function buildTemplateEnginePdfBuffer({ guest, event, inviteMessage, inviteUrl, 
           return byId || byType || byTypeLower || fallback;
         };
 
+        const sectionsWithRects = sections
+          .map((section) => {
+            const placement = findPlacement(section);
+            if (!placement) return null;
+            const rect = resolveRect(placement, contentRect);
+            return { section, rect };
+          })
+          .filter(Boolean)
+          .sort((a, b) => a.rect.y - b.rect.y);
+
+        const minGap = 6;
+        let cursorY = contentRect.y;
+        sectionsWithRects.forEach((entry) => {
+          const r = entry.rect;
+          if (r.y < cursorY) r.y = cursorY;
+          const maxY = contentRect.y + contentRect.h;
+          if (r.y + r.h > maxY) {
+            r.h = Math.max(18, maxY - r.y);
+          }
+          cursorY = r.y + r.h + minGap;
+        });
+
+        const rectBySectionId = new Map(
+          sectionsWithRects.map(({ section, rect }) => [section?.id || `${section?.componentType || 'section'}-${section?.order || 0}`, rect])
+        );
+
         const drawContainer = (rect, radius = 14, fill = 'rgba(255,253,247,0.86)') => {
           doc.save();
           doc.fillOpacity(1);
@@ -1168,9 +1227,9 @@ function buildTemplateEnginePdfBuffer({ guest, event, inviteMessage, inviteUrl, 
         };
 
         sections.forEach((section) => {
-          const placement = findPlacement(section);
-          if (!placement) return;
-          const rect = resolveRect(placement, contentRect);
+          const rectKey = section?.id || `${section?.componentType || 'section'}-${section?.order || 0}`;
+          const rect = rectBySectionId.get(rectKey);
+          if (!rect) return;
           const type = String(section?.componentType || '').toLowerCase();
 
           if (type === 'guestheader') {
@@ -1202,7 +1261,17 @@ function buildTemplateEnginePdfBuffer({ guest, event, inviteMessage, inviteUrl, 
           if (type === 'personalmessage') {
             drawContainer(rect, 12, '#fffdf7');
             drawText(salutation, rect.x + 12, rect.y + 12, { width: rect.w - 24, size: 12.5, bold: true, color: p.title || '#4B3621' });
-            drawText(body, rect.x + 12, rect.y + 34, { width: rect.w - 24, size: 9.8, color: p.body || '#1f2937', lineGap: 2 });
+            const messageY = rect.y + 34;
+            const tailHeight = 32;
+            const messageMaxHeight = Math.max(14, rect.h - (messageY - rect.y) - tailHeight);
+            const fittedBody = fitTextToHeight(body, {
+              width: rect.w - 24,
+              maxHeight: messageMaxHeight,
+              fontName: 'Helvetica',
+              fontSize: 9.8,
+              lineGap: 2,
+            });
+            drawText(fittedBody, rect.x + 12, messageY, { width: rect.w - 24, size: 9.8, color: p.body || '#1f2937', lineGap: 2 });
             drawText(dateLine, rect.x + 12, rect.y + rect.h - 30, { width: rect.w - 24, size: 8.8, bold: true, color: p.subtitle || '#6B5A45' });
             drawText(venueLine, rect.x + 12, rect.y + rect.h - 16, { width: rect.w - 24, size: 8.8, color: p.subtle || '#6B7280' });
             return;
