@@ -87,6 +87,111 @@ const buildLocalRenderedPreview = (templateConfig) => {
   };
 };
 
+const normalizeAssetCollection = (value) => {
+  if (Array.isArray(value)) return value;
+  if (value && typeof value === 'object') return Object.values(value);
+  return [];
+};
+
+const buildAssetSlotUrlMap = (preview) => {
+  const map = {};
+  if (!preview || typeof preview !== 'object') return map;
+
+  const assets = [
+    ...normalizeAssetCollection(preview.backgroundAssets),
+    ...normalizeAssetCollection(preview.decorativeAssets),
+  ];
+
+  assets.forEach((asset) => {
+    if (!asset || typeof asset !== 'object') return;
+    const url = pickFirstText(asset.url, asset.assetUrl, asset.src);
+    if (!url) return;
+
+    const keys = [asset.assetSlot, asset.slot, asset.id, asset.key]
+      .map((entry) => String(entry || '').trim())
+      .filter(Boolean);
+
+    keys.forEach((key) => {
+      map[key] = url;
+    });
+  });
+
+  return map;
+};
+
+const pickSectionAssetUrl = (section, assetSlotUrls, ...candidates) => {
+  const props = coerceObject(section?.props);
+  const bindings = coerceObject(section?.bindings);
+
+  for (const key of candidates) {
+    const direct = pickFirstText(props[key], bindings[key]);
+    if (direct) return direct;
+
+    const slotRef = pickFirstText(props[`${key}AssetRef`], bindings[`${key}AssetRef`]);
+    if (slotRef && assetSlotUrls[slotRef]) return assetSlotUrls[slotRef];
+  }
+
+  return '';
+};
+
+const buildPreviewVisualModel = (preview) => {
+  if (!preview || typeof preview !== 'object') {
+    return {
+      backgroundUrl: '',
+      heroImageUrl: '',
+      mapPreviewUrl: '',
+      assetSlotUrls: {},
+    };
+  }
+
+  const assetSlotUrls = buildAssetSlotUrlMap(preview);
+  const canvas = coerceObject(preview.canvas);
+  const sections = Array.isArray(preview.sections) ? preview.sections : [];
+
+  const headerSection = sections.find((section) => String(section?.componentType || section?.type || '').toLowerCase().includes('header'));
+  const heroSection = sections.find((section) => String(section?.componentType || section?.type || '').toLowerCase().includes('hero'));
+  const qrSection = sections.find((section) => {
+    const type = String(section?.componentType || section?.type || '').toLowerCase();
+    return type.includes('qr') || type.includes('pass');
+  });
+
+  const backgroundSlotRef = pickFirstText(
+    coerceObject(headerSection?.props).backgroundAssetRef,
+    coerceObject(headerSection?.bindings).backgroundAssetRef,
+    coerceObject(canvas).backgroundAssetRef
+  );
+
+  const backgroundUrl = pickFirstText(
+    backgroundSlotRef ? assetSlotUrls[backgroundSlotRef] : '',
+    assetSlotUrls.backgroundTextureImage,
+    assetSlotUrls.backgroundImage,
+    canvas.backgroundImage,
+    canvas.backgroundImageUrl
+  );
+
+  const heroImageUrl = pickSectionAssetUrl(
+    heroSection,
+    assetSlotUrls,
+    'heroImageUrl',
+    'imageUrl',
+    'coupleImageUrl'
+  );
+
+  const mapPreviewUrl = pickSectionAssetUrl(
+    qrSection,
+    assetSlotUrls,
+    'mapPreviewUrl',
+    'mapImageUrl'
+  );
+
+  return {
+    backgroundUrl,
+    heroImageUrl,
+    mapPreviewUrl,
+    assetSlotUrls,
+  };
+};
+
 const getSectionPreviewText = (section) => {
   const props = coerceObject(section.props);
   const bindings = coerceObject(section.bindings);
@@ -167,9 +272,10 @@ const resolveSectionModel = (section) => {
   };
 };
 
-const renderEnginePreviewSection = (section, index) => {
+const renderEnginePreviewSection = (section, index, visualModel = {}) => {
   const model = resolveSectionModel(section);
   const key = section.id || `${model.type}-${index}`;
+  const type = String(section.componentType || section.type || model.type || '').toLowerCase();
 
   const shellStyle = {
     border: '1px solid #e9ddc2',
@@ -219,9 +325,28 @@ const renderEnginePreviewSection = (section, index) => {
   }
 
   if (model.type.includes('card') || model.type.includes('hero')) {
+    const heroImageUrl = pickSectionAssetUrl(
+      section,
+      visualModel.assetSlotUrls || {},
+      'heroImageUrl',
+      'imageUrl',
+      'coupleImageUrl'
+    ) || visualModel.heroImageUrl;
+
     return (
       <div key={key} style={shellStyle}>
         <div style={{ fontSize: 12, color: '#8b6a1f', fontWeight: 700 }}>{model.title || 'Card'}</div>
+        {heroImageUrl ? (
+          <div
+            style={{
+              marginTop: 8,
+              height: 138,
+              borderRadius: 10,
+              border: '1px solid #e6d7af',
+              background: `url(${heroImageUrl}) center / cover no-repeat`,
+            }}
+          />
+        ) : null}
         {model.subtitle ? <div style={{ color: '#6b7280', fontSize: 12, marginTop: 2 }}>{model.subtitle}</div> : null}
         <div style={{ color: '#253045', lineHeight: 1.5, marginTop: 6 }}>{model.body}</div>
       </div>
@@ -229,20 +354,52 @@ const renderEnginePreviewSection = (section, index) => {
   }
 
   if (model.type.includes('qr')) {
+    const mapPreviewUrl = pickSectionAssetUrl(
+      section,
+      visualModel.assetSlotUrls || {},
+      'mapPreviewUrl',
+      'mapImageUrl'
+    ) || visualModel.mapPreviewUrl;
+
     return (
       <div key={key} style={{ ...shellStyle, display: 'flex', alignItems: 'center', gap: 12 }}>
-        <div
-          style={{
-            width: 50,
-            height: 50,
-            borderRadius: 8,
-            background: 'repeating-linear-gradient(45deg, #1f2937 0, #1f2937 4px, #f8f4ea 4px, #f8f4ea 8px)',
-            border: '1px solid #d9c37c',
-          }}
-        />
+        {mapPreviewUrl ? (
+          <div
+            style={{
+              width: 64,
+              height: 64,
+              borderRadius: 8,
+              border: '1px solid #d9c37c',
+              background: `url(${mapPreviewUrl}) center / cover no-repeat`,
+            }}
+          />
+        ) : (
+          <div
+            style={{
+              width: 50,
+              height: 50,
+              borderRadius: 8,
+              background: 'repeating-linear-gradient(45deg, #1f2937 0, #1f2937 4px, #f8f4ea 4px, #f8f4ea 8px)',
+              border: '1px solid #d9c37c',
+            }}
+          />
+        )}
         <div>
           <div style={{ fontSize: 12, color: '#8b6a1f', fontWeight: 700 }}>{model.title || 'QR Pass'}</div>
           <div style={{ color: '#253045' }}>{model.body || 'Scan at entrance'}</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (type.includes('guestheader') || type.includes('header')) {
+    return (
+      <div key={key} style={shellStyle}>
+        <div style={{ color: '#8b6a1f', fontSize: 11, letterSpacing: 0.5, textTransform: 'uppercase', fontWeight: 700 }}>
+          {model.title || 'Guest of Honour'}
+        </div>
+        <div style={{ fontSize: 20, color: '#1f2b49', fontWeight: 700, marginTop: 6 }}>
+          {pickFirstText(model.body, PREVIEW_SAMPLE_CONTEXT.guest.name)}
         </div>
       </div>
     );
@@ -381,6 +538,10 @@ const AdminControlCenter = () => {
   }, [engineTemplateConfigText]);
 
   const effectiveRenderedPreview = renderedPreview || editorLivePreview;
+  const previewVisualModel = useMemo(
+    () => buildPreviewVisualModel(effectiveRenderedPreview),
+    [effectiveRenderedPreview]
+  );
   const effectivePreviewSource = renderedPreview
     ? previewSource
     : (editorLivePreview ? 'editor-live' : null);
@@ -600,6 +761,62 @@ const AdminControlCenter = () => {
 
     try {
       const res = await adminService.uploadTemplateEngineAsset({ id: selectedEngineTemplate.id, file });
+      const uploadedAsset = res?.asset;
+
+      if (uploadedAsset?.url) {
+        try {
+          const parsedConfig = engineTemplateConfigText ? JSON.parse(engineTemplateConfigText) : {};
+          const config = coerceObject(parsedConfig);
+          const currentBackgroundAssets = normalizeAssetCollection(config.backgroundAssets);
+          const currentDecorativeAssets = normalizeAssetCollection(config.decorativeAssets);
+          const existingSlots = new Set(
+            [...currentBackgroundAssets, ...currentDecorativeAssets]
+              .map((asset) => String(asset?.assetSlot || asset?.slot || '').trim())
+              .filter(Boolean)
+          );
+
+          const looksLikeBackground = /bg|background|texture|paper|floral/i.test(String(uploadedAsset.name || ''));
+          const preferredSlot = looksLikeBackground ? 'backgroundTextureImage' : 'decorativeImage';
+          let slot = preferredSlot;
+
+          if (existingSlots.has(slot)) {
+            let suffix = 2;
+            while (existingSlots.has(`${slot}${suffix}`)) suffix += 1;
+            slot = `${slot}${suffix}`;
+          }
+
+          const assetEntry = {
+            id: slot,
+            assetSlot: slot,
+            url: uploadedAsset.url,
+            mimeType: uploadedAsset.mimeType,
+            name: uploadedAsset.name,
+          };
+
+          const nextBackgroundAssets = looksLikeBackground
+            ? [...currentBackgroundAssets, assetEntry]
+            : currentBackgroundAssets;
+
+          const nextDecorativeAssets = looksLikeBackground
+            ? currentDecorativeAssets
+            : [...currentDecorativeAssets, assetEntry];
+
+          const nextConfig = {
+            ...config,
+            canvas: {
+              ...coerceObject(config.canvas),
+              ...(looksLikeBackground ? { backgroundImage: uploadedAsset.url, backgroundAssetRef: slot } : {}),
+            },
+            backgroundAssets: nextBackgroundAssets,
+            decorativeAssets: nextDecorativeAssets,
+          };
+
+          setEngineTemplateConfigText(JSON.stringify(nextConfig, null, 2));
+        } catch (_error) {
+          // Keep upload success even if JSON editor currently has invalid content.
+        }
+      }
+
       message.success(`${res?.asset?.name || 'Asset'} uploaded`);
       if (onSuccess) onSuccess(res);
     } catch (err) {
@@ -2068,7 +2285,9 @@ const AdminControlCenter = () => {
                     margin: '0 auto',
                     borderRadius: 22,
                     border: '2px solid #d9c37c',
-                    background: '#f5efe1',
+                    background: previewVisualModel.backgroundUrl
+                      ? `url(${previewVisualModel.backgroundUrl}) center / cover no-repeat`
+                      : '#f5efe1',
                     boxShadow: '0 18px 38px rgba(15, 23, 42, 0.18)',
                     padding: 14,
                   }}
@@ -2079,6 +2298,7 @@ const AdminControlCenter = () => {
                       border: '1px solid #e6d7af',
                       overflow: 'hidden',
                       background: effectiveRenderedPreview?.palette?.background || '#fff7eb',
+                      backdropFilter: 'saturate(110%) blur(1px)',
                     }}
                   >
                     <div
@@ -2093,7 +2313,9 @@ const AdminControlCenter = () => {
                     </div>
 
                     <div style={{ padding: 14 }}>
-                      {(effectiveRenderedPreview.sections || []).slice(0, 10).map((section, index) => renderEnginePreviewSection(section, index))}
+                      {(effectiveRenderedPreview.sections || []).slice(0, 10).map((section, index) =>
+                        renderEnginePreviewSection(section, index, previewVisualModel)
+                      )}
 
                       {!(effectiveRenderedPreview.sections || []).length ? (
                         <div style={{ color: '#667085' }}>No visible sections found in this template config.</div>
