@@ -337,7 +337,15 @@ const GuestManagement = () => {
     try {
       setLoadingDesigns(true);
       const data = await inviteDesignService.listDesigns(eventId);
-      setInviteDesigns(Array.isArray(data?.designs) ? data.designs : []);
+      const designs = Array.isArray(data?.designs) ? data.designs : [];
+      setInviteDesigns(designs);
+      setSelectedDesignId((prevSelectedId) => {
+        if (prevSelectedId && designs.some((design) => design.id === prevSelectedId)) {
+          return prevSelectedId;
+        }
+        const latestPublished = designs.find((design) => String(design.status || '').toLowerCase() === 'published');
+        return latestPublished?.id;
+      });
     } catch (error) {
       message.error(getErrorMessage(error));
     } finally {
@@ -686,7 +694,7 @@ const GuestManagement = () => {
                 style={{ minWidth: 240 }}
                 options={inviteDesigns.map((design) => ({
                   value: design.id,
-                  label: `${design.name} (${design.status})`,
+                  label: `${design.name} (${design.status})${String(design.status || '').toLowerCase() === 'published' ? ' • live' : ''}`,
                 }))}
               />
               <Select
