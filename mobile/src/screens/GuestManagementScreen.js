@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { View, StyleSheet, ScrollView, RefreshControl, Alert, TouchableOpacity, Linking } from 'react-native';
 import {
   Text, Card, Button, Chip, FAB, ActivityIndicator, TextInput, Portal, Modal, IconButton, Divider,
@@ -136,6 +136,62 @@ function InviteLivePreview({ template, language, tone, guestName, relationship, 
   );
 }
 
+const TOKEN_LABELS = {
+  'guest.name': 'Guest Name',
+  'guest.relationship': 'Guest Relationship',
+  'guest.invitationMessage': 'Guest Invitation Message',
+  'event.title': 'Event Title',
+  'event.brideName': 'Bride Name',
+  'event.groomName': 'Groom Name',
+  'event.dateText': 'Event Date',
+  'event.timeText': 'Event Time',
+  'event.venue': 'Venue',
+  'event.city': 'City',
+};
+
+const normalizeToken = (token) => String(token || '').replace(/\{\{\s*|\s*\}\}/g, '').trim();
+
+const extractTemplateTokens = (value) => {
+  const tokenSet = new Set();
+
+  const walk = (node) => {
+    if (typeof node === 'string') {
+      const matches = node.match(/\{\{\s*[\w.]+\s*\}\}/g) || [];
+      matches.forEach((match) => tokenSet.add(normalizeToken(match)));
+      return;
+    }
+    if (Array.isArray(node)) {
+      node.forEach(walk);
+      return;
+    }
+    if (node && typeof node === 'object') {
+      Object.values(node).forEach(walk);
+    }
+  };
+
+  walk(value);
+  return Array.from(tokenSet);
+};
+
+const getValueByPath = (source, path) => String(path || '')
+  .split('.')
+  .filter(Boolean)
+  .reduce((acc, segment) => (acc && acc[segment] !== undefined ? acc[segment] : undefined), source);
+
+const setValueByPath = (source, path, value) => {
+  const segments = String(path || '').split('.').filter(Boolean);
+  if (!segments.length) return source;
+  const next = { ...(source || {}) };
+  let cursor = next;
+  for (let i = 0; i < segments.length - 1; i += 1) {
+    const key = segments[i];
+    cursor[key] = cursor[key] && typeof cursor[key] === 'object' && !Array.isArray(cursor[key]) ? { ...cursor[key] } : {};
+    cursor = cursor[key];
+  }
+  cursor[segments[segments.length - 1]] = value;
+  return next;
+};
+
 const GuestManagementScreen = ({ route }) => {
   const { eventId } = route.params;
   const [guests, setGuests] = useState([]);
@@ -159,6 +215,8 @@ const GuestManagementScreen = ({ route }) => {
   const [selectedSendChannel, setSelectedSendChannel] = useState('email');
   const [sendingInvites, setSendingInvites] = useState(false);
   const [fabOpen, setFabOpen] = useState(false);
+  const [placeholderDraft, setPlaceholderDraft] = useState({ hosts: {}, custom: {}, event: {}, guest: {} });
+  const [activePlaceholderToken, setActivePlaceholderToken] = useState('');
 
   const fetchGuests = useCallback(async () => {
     try {
@@ -227,6 +285,7 @@ const GuestManagementScreen = ({ route }) => {
         language: selectedLanguage,
         tone: selectedTone,
         templateKey: selectedTemplateKey,
+        mergeData: placeholderDraft,
       });
       Alert.alert('Success', `Invite generated for ${guest.name}`);
       fetchGuests();
@@ -244,6 +303,7 @@ const GuestManagementScreen = ({ route }) => {
         defaultLanguage: selectedLanguage,
         defaultTone: selectedTone,
         defaultTemplateKey: selectedTemplateKey,
+        mergeData: placeholderDraft,
       };
 
       if (selectedGuestIds.length) {
@@ -321,6 +381,7 @@ const GuestManagementScreen = ({ route }) => {
         defaultLanguage: selectedLanguage,
         defaultTone: selectedTone,
         defaultTemplateKey: selectedTemplateKey,
+        mergeData: placeholderDraft,
       };
 
       if (selectedGuestIds.length) {
@@ -351,6 +412,35 @@ const GuestManagementScreen = ({ route }) => {
   };
 
   const selectedTemplate = inviteTemplates.find((template) => template.key === selectedTemplateKey) || null;
+  const selectedTemplateConfig = selectedTemplate?.templateConfig && typeof selectedTemplate.templateConfig === 'object'
+    ? selectedTemplate.templateConfig
+    : {};
+  const selectedTemplateTokens = useMemo(() => extractTemplateTokens(selectedTemplateConfig), [selectedTemplateConfig]);
+  const placeholderOptions = useMemo(() => {
+    const tokens = Array.from(new Set(selectedTemplateTokens.filter(Boolean)));
+    if (!tokens.length) return [];
+    return tokens.map((token) => {
+      const labelKey = normalizeToken(token);
+      return {
+        token,
+        label: TOKEN_LABELS[labelKey] || labelKey,
+      };
+    });
+  }, [selectedTemplateTokens]);
+  const activePlaceholderPath = useMemo(() => normalizeToken(activePlaceholderToken), [activePlaceholderToken]);
+  const activePlaceholderEditTarget = useMemo(() => {
+    if (!activePlaceholderPath) return null;
+    const [scope, ...rest] = activePlaceholderPath.split('.');
+    if (!['event', 'guest', 'hosts', 'custom'].includes(scope)) return null;
+    if (!rest.length) return null;
+    if (scope === 'guest' && rest.join('.') !== 'invitationMessage') return null;
+    return { scope, key: rest.join('.') };
+  }, [activePlaceholderPath]);
+  const activePlaceholderValue = useMemo(() => {
+    if (!activePlaceholderPath) return '';
+    const value = getValueByPath(placeholderDraft, activePlaceholderPath);
+    return value === undefined || value === null ? '' : String(value);
+  }, [activePlaceholderPath, placeholderDraft]);
   const selectedGuests = guests.filter((guest) => selectedGuestIds.includes(guest.id));
   const previewGuest = selectedGuests[0] || guests[0] || null;
   const extraSelectedCount = Math.max(0, selectedGuests.length - 1);
@@ -369,6 +459,21 @@ const GuestManagementScreen = ({ route }) => {
     },
   };
   const previewBody = sampleCopy[selectedLanguage]?.[selectedTone] || sampleCopy.en.friendly;
+
+  useEffect(() => {
+    setPlaceholderDraft({ hosts: {}, custom: {}, event: {}, guest: {} });
+    setActivePlaceholderToken('');
+  }, [selectedTemplateKey]);
+
+  useEffect(() => {
+    if (!placeholderOptions.length) {
+      setActivePlaceholderToken('');
+      return;
+    }
+    if (!activePlaceholderToken || !placeholderOptions.some((item) => item.token === activePlaceholderToken)) {
+      setActivePlaceholderToken(placeholderOptions[0].token);
+    }
+  }, [activePlaceholderToken, placeholderOptions]);
 
   if (loading) return <ActivityIndicator style={{ flex: 1 }} size="large" color={Colors.primary} />;
 
@@ -447,6 +552,58 @@ const GuestManagementScreen = ({ route }) => {
                 ))}
               </View>
             </View>
+
+            <View style={styles.placeholderCard}>
+              <Text variant="titleSmall" style={styles.placeholderTitle}>Placeholder Overrides</Text>
+              {placeholderOptions.length ? (
+                <>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.placeholderChipsRow}>
+                    {placeholderOptions.map((item) => (
+                      <Chip
+                        key={item.token}
+                        selected={activePlaceholderToken === item.token}
+                        onPress={() => setActivePlaceholderToken(item.token)}
+                        style={styles.placeholderChip}
+                      >
+                        {item.label}
+                      </Chip>
+                    ))}
+                  </ScrollView>
+
+                  <TextInput
+                    label="Placeholder value"
+                    mode="outlined"
+                    value={activePlaceholderValue}
+                    onChangeText={(value) => {
+                      if (!activePlaceholderEditTarget) return;
+                      setPlaceholderDraft((prev) => setValueByPath(prev, activePlaceholderPath, value));
+                    }}
+                    disabled={!activePlaceholderEditTarget}
+                    style={styles.input}
+                    outlineStyle={styles.outline}
+                  />
+
+                  <Button
+                    mode="contained-tonal"
+                    onPress={() => Alert.alert('Saved', 'Placeholder values are ready for generation')}
+                    style={styles.placeholderButton}
+                  >
+                    Apply Overrides
+                  </Button>
+
+                  <Text style={styles.placeholderHint}>
+                    {activePlaceholderEditTarget
+                      ? `Editing ${activePlaceholderEditTarget.scope}.${activePlaceholderEditTarget.key}`
+                      : 'Selected token cannot be edited.'}
+                  </Text>
+                </>
+              ) : (
+                <Text style={styles.placeholderHint}>
+                  No placeholder tokens were detected in this template configuration.
+                </Text>
+              )}
+            </View>
+
             <InviteLivePreview
               template={selectedTemplate}
               language={selectedLanguage}
@@ -831,6 +988,20 @@ const styles = StyleSheet.create({
   choiceLabel: { fontWeight: '700', color: Colors.textPrimary, marginBottom: 6 },
   choiceChips: { flexDirection: 'row', flexWrap: 'wrap' },
   choiceChip: { marginRight: 8, marginBottom: 8 },
+  placeholderCard: {
+    marginTop: Spacing.md,
+    marginBottom: Spacing.sm,
+    borderRadius: Radius.lg,
+    backgroundColor: '#eef4ff',
+    borderWidth: 1,
+    borderColor: '#d5def8',
+    padding: Spacing.md,
+  },
+  placeholderTitle: { fontWeight: '800', marginBottom: Spacing.sm, color: Colors.textPrimary },
+  placeholderChipsRow: { paddingBottom: Spacing.sm },
+  placeholderChip: { marginRight: 8, marginBottom: 8 },
+  placeholderButton: { marginTop: Spacing.sm, alignSelf: 'flex-start' },
+  placeholderHint: { marginTop: Spacing.sm, color: Colors.textSecondary, fontSize: 12 },
   previewCard: {
     marginVertical: Spacing.sm,
     borderRadius: Radius.lg,

@@ -333,10 +333,7 @@ const GuestManagement = () => {
   const designPlaceholderOptions = useMemo(() => {
     const knownLabelByToken = new Map(
       designPlaceholderGroups.flatMap((group) =>
-        group.items.map((item) => ({
-          token: item.token,
-          label: `${group.label} - ${item.label}`,
-        }))
+        group.items.map((item) => [item.token, `${group.label} - ${item.label}`])
       )
     );
 
@@ -387,9 +384,9 @@ const GuestManagement = () => {
 
   const activePlaceholderValue = useMemo(() => {
     if (!activePlaceholderPath) return '';
-    const value = getValueByPath(designPreviewMergeContext, activePlaceholderPath);
+    const value = getValueByPath(designMergeDraft, activePlaceholderPath);
     return value === undefined || value === null ? '' : String(value);
-  }, [activePlaceholderPath, designPreviewMergeContext]);
+  }, [activePlaceholderPath, designMergeDraft]);
 
   const activePlaceholderEditTarget = useMemo(() => {
     if (!activePlaceholderPath) return null;
@@ -946,7 +943,7 @@ const GuestManagement = () => {
                   value={activePlaceholderToken || undefined}
                   onChange={setActivePlaceholderToken}
                   style={{ minWidth: 280 }}
-                  options={designPlaceholderOptions.map((item) => ({ value: item.token, label: `${item.label} (${item.token})` }))}
+                  options={designPlaceholderOptions.map((item) => ({ value: item.token, label: item.label }))}
                   placeholder="Select placeholder"
                 />
                 <Input

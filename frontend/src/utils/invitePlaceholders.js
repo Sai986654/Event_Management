@@ -1,6 +1,7 @@
 const COMMON_PLACEHOLDERS = [
   { token: '{{guest.name}}', label: 'Guest Name' },
   { token: '{{guest.relationship}}', label: 'Guest Relationship' },
+  { token: '{{guest.invitationMessage}}', label: 'Guest Invitation Message' },
   { token: '{{event.title}}', label: 'Event Title' },
   { token: '{{event.dateText}}', label: 'Event Date' },
   { token: '{{event.timeText}}', label: 'Event Time' },
@@ -511,6 +512,8 @@ export const buildPreviewMergeContext = ({ event, guest, mergeData }) => {
     },
     event: {
       title: eventOverride.title || event?.title || 'Special Celebration',
+      brideName: eventOverride.brideName || event?.brideName || 'Bride',
+      groomName: eventOverride.groomName || event?.groomName || 'Groom',
       venue: eventOverride.venue || event?.venue || 'Venue TBD',
       city: eventOverride.city || event?.city || '',
       dateText: eventOverride.dateText || (resolvedDate && !Number.isNaN(resolvedDate.getTime())

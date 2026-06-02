@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Alert, Modal, ScrollView, StyleSheet, View, Linking, Share } from 'react-native';
 import { Button, Card, Chip, Divider, Text, TextInput } from 'react-native-paper';
 import { inviteDesignService } from '../services/inviteDesignService';
@@ -13,6 +13,63 @@ import {
   autoBeautifyLayout,
   buildInviteStarterLayout,
 } from '../utils/inviteTemplatePresets';
+
+const TOKEN_LABELS = {
+  'guest.name': 'Guest Name',
+  'guest.relationship': 'Guest Relationship',
+  'guest.invitationMessage': 'Guest Invitation Message',
+  'event.title': 'Event Title',
+  'event.brideName': 'Bride Name',
+  'event.groomName': 'Groom Name',
+  'event.dateText': 'Event Date',
+  'event.timeText': 'Event Time',
+  'event.venue': 'Venue',
+  'event.city': 'City',
+  'hosts.blessingLine': 'Blessing Line',
+};
+
+const normalizeToken = (token) => String(token || '').replace(/^\{\{\s*|\s*\}\}$/g, '').trim();
+
+const extractTemplateTokens = (value) => {
+  const tokenSet = new Set();
+
+  const walk = (node) => {
+    if (typeof node === 'string') {
+      const matches = node.match(/\{\{\s*[\w.]+\s*\}\}/g) || [];
+      matches.forEach((match) => tokenSet.add(normalizeToken(match)));
+      return;
+    }
+    if (Array.isArray(node)) {
+      node.forEach(walk);
+      return;
+    }
+    if (node && typeof node === 'object') {
+      Object.values(node).forEach(walk);
+    }
+  };
+
+  walk(value);
+  return Array.from(tokenSet);
+};
+
+const getValueByPath = (source, path) => String(path || '')
+  .split('.')
+  .filter(Boolean)
+  .reduce((acc, segment) => (acc && acc[segment] !== undefined ? acc[segment] : undefined), source);
+
+const setValueByPath = (source, path, value) => {
+  const segments = String(path || '').split('.').filter(Boolean);
+  if (!segments.length) return source;
+  const next = { ...(source || {}) };
+  let cursor = next;
+  for (let i = 0; i < segments.length - 1; i += 1) {
+    const key = segments[i];
+    cursor[key] = cursor[key] && typeof cursor[key] === 'object' && !Array.isArray(cursor[key]) ? { ...cursor[key] } : {};
+    cursor = cursor[key];
+  }
+  cursor[segments[segments.length - 1]] = value;
+  return next;
+};
 
 const InviteDesignStudioScreen = ({ route }) => {
   const { eventId } = route.params;
@@ -32,6 +89,8 @@ const InviteDesignStudioScreen = ({ route }) => {
   const [designStatus, setDesignStatus] = useState('draft');
   const [layoutText, setLayoutText] = useState('{}');
   const [canvasLayout, setCanvasLayout] = useState({});
+  const [placeholderDraft, setPlaceholderDraft] = useState({ hosts: {}, custom: {}, event: {}, guest: {} });
+  const [activePlaceholderToken, setActivePlaceholderToken] = useState('');
   const [editorMode, setEditorMode] = useState('canvas');
   const [sendVia, setSendVia] = useState('email');
   const [canvasFullScreenVisible, setCanvasFullScreenVisible] = useState(false);
@@ -39,6 +98,35 @@ const InviteDesignStudioScreen = ({ route }) => {
 
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+
+  const selectedLayoutTokens = useMemo(() => extractTemplateTokens(canvasLayout), [canvasLayout]);
+  const placeholderOptions = useMemo(() => {
+    const tokens = Array.from(new Set(selectedLayoutTokens.filter(Boolean)));
+    return tokens.map((token) => ({
+      token,
+      label: TOKEN_LABELS[token] || token,
+    }));
+  }, [selectedLayoutTokens]);
+  const activePlaceholderPath = useMemo(() => normalizeToken(activePlaceholderToken), [activePlaceholderToken]);
+  const activePlaceholderEditTarget = useMemo(() => {
+    if (!activePlaceholderPath) return null;
+    const [scope, ...rest] = activePlaceholderPath.split('.');
+    if (!['event', 'guest', 'hosts', 'custom'].includes(scope)) return null;
+    if (!rest.length) return null;
+    if (scope === 'guest' && rest.join('.') !== 'invitationMessage') return null;
+    return { scope, key: rest.join('.') };
+  }, [activePlaceholderPath]);
+  const activePlaceholderValue = useMemo(() => {
+    if (!activePlaceholderPath) return '';
+    const value = getValueByPath(placeholderDraft, activePlaceholderPath);
+    return value === undefined || value === null ? '' : String(value);
+  }, [activePlaceholderPath, placeholderDraft]);
+
+  useEffect(() => {
+    if (!activePlaceholderToken && placeholderOptions.length) {
+      setActivePlaceholderToken(placeholderOptions[0].token);
+    }
+  }, [activePlaceholderToken, placeholderOptions]);
 
   const loadDesign = async (designId) => {
     try {
@@ -52,6 +140,7 @@ const InviteDesignStudioScreen = ({ route }) => {
       setDesignStatus(design.status || 'draft');
       setLayoutText(JSON.stringify(design.jsonLayout || {}, null, 2));
       setCanvasLayout(design.jsonLayout || {});
+      setPlaceholderDraft(design.jsonLayout?.mergeData || { hosts: {}, custom: {}, event: {}, guest: {} });
       setExportsList(exportRes.exports || []);
     } catch (err) {
       Alert.alert('Error', getErrorMessage(err));
@@ -110,7 +199,7 @@ const InviteDesignStudioScreen = ({ route }) => {
         category: event?.type || 'general',
         status: 'draft',
         language: 'en',
-        jsonLayout: starterLayout,
+        jsonLayout: { ...starterLayout, mergeData: { hosts: {}, custom: {}, event: {}, guest: {} } },
       });
 
       setNewDesignName('');
@@ -145,12 +234,19 @@ const InviteDesignStudioScreen = ({ route }) => {
       setCanvasLayout(parsedLayout);
     }
 
+    const nextLayout = {
+      ...parsedLayout,
+      mergeData: placeholderDraft,
+    };
+    setCanvasLayout(nextLayout);
+    setLayoutText(JSON.stringify(nextLayout, null, 2));
+
     setBusy(true);
     try {
       await inviteDesignService.updateDesign(selectedDesign.id, {
         name: designName || selectedDesign.name,
         status: designStatus,
-        jsonLayout: parsedLayout,
+        jsonLayout: nextLayout,
       });
       const listRes = await inviteDesignService.listDesigns(eventId);
       setDesigns(listRes.designs || []);
@@ -183,8 +279,9 @@ const InviteDesignStudioScreen = ({ route }) => {
         {
           text: 'Apply',
           onPress: () => {
-            setCanvasLayout(templateLayout);
-            setLayoutText(JSON.stringify(templateLayout, null, 2));
+            const nextLayout = { ...templateLayout, mergeData: placeholderDraft };
+            setCanvasLayout(nextLayout);
+            setLayoutText(JSON.stringify(nextLayout, null, 2));
             setEditorMode('canvas');
           },
         },
@@ -204,8 +301,9 @@ const InviteDesignStudioScreen = ({ route }) => {
       event,
     });
 
-    setCanvasLayout(nextLayout);
-    setLayoutText(JSON.stringify(nextLayout, null, 2));
+    const mergedLayout = { ...nextLayout, mergeData: placeholderDraft };
+    setCanvasLayout(mergedLayout);
+    setLayoutText(JSON.stringify(mergedLayout, null, 2));
     setEditorMode('canvas');
     Alert.alert('Pack Applied', 'Occasion style pack has been applied. You can continue editing.');
   };
@@ -217,8 +315,9 @@ const InviteDesignStudioScreen = ({ route }) => {
     }
 
     const nextLayout = autoBeautifyLayout(canvasLayout);
-    setCanvasLayout(nextLayout);
-    setLayoutText(JSON.stringify(nextLayout, null, 2));
+    const mergedLayout = { ...nextLayout, mergeData: placeholderDraft };
+    setCanvasLayout(mergedLayout);
+    setLayoutText(JSON.stringify(mergedLayout, null, 2));
     setEditorMode('canvas');
     Alert.alert('Beautified', 'Layout spacing and alignment were polished automatically.');
   };
@@ -483,6 +582,42 @@ const InviteDesignStudioScreen = ({ route }) => {
               />
             )}
 
+            <Card style={styles.placeholderCard}>
+              <Card.Content>
+                <Text style={styles.sectionTitle}>Template Placeholders</Text>
+                <Text style={styles.subtitle}>Only placeholders detected in the current template are shown here.</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginVertical: 8 }}>
+                  <View style={styles.rowWrap}>
+                    {placeholderOptions.length ? placeholderOptions.map((placeholder) => (
+                      <Chip
+                        key={placeholder.token}
+                        selected={activePlaceholderToken === placeholder.token}
+                        onPress={() => setActivePlaceholderToken(placeholder.token)}
+                        style={styles.chip}
+                      >
+                        {placeholder.label}
+                      </Chip>
+                    )) : <Text style={styles.subtitle}>No placeholders detected in this layout.</Text>}
+                  </View>
+                </ScrollView>
+
+                {activePlaceholderEditTarget ? (
+                  <TextInput
+                    mode="outlined"
+                    label={TOKEN_LABELS[activePlaceholderPath] || activePlaceholderPath}
+                    value={activePlaceholderValue}
+                    onChangeText={(text) => {
+                      setPlaceholderDraft((prev) => setValueByPath(prev, activePlaceholderPath, text));
+                    }}
+                    multiline={activePlaceholderEditTarget.scope === 'guest' && activePlaceholderEditTarget.key === 'invitationMessage'}
+                    style={styles.input}
+                  />
+                ) : (
+                  <Text style={styles.subtitle}>Select a placeholder token to edit its draft value.</Text>
+                )}
+              </Card.Content>
+            </Card>
+
             <View style={styles.rowWrap}>
               <Button mode="contained" onPress={saveDesign} loading={busy} disabled={busy}>Save</Button>
               <Button mode="contained-tonal" onPress={duplicateDesign} loading={busy} disabled={busy}>Duplicate</Button>
@@ -587,6 +722,7 @@ const styles = StyleSheet.create({
   input: { marginBottom: 10, backgroundColor: Colors.surface },
   rowWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'center' },
   chip: { marginRight: 8, marginBottom: 8, backgroundColor: '#ede9fe' },
+  placeholderCard: { marginBottom: 8, borderRadius: Radius.md, backgroundColor: Colors.surfaceVariant },
   exportCard: { marginBottom: 8, borderRadius: Radius.md, backgroundColor: Colors.surfaceVariant },
   exportTitle: { fontWeight: '700', color: Colors.textPrimary, marginBottom: 4 },
   exportUrl: { color: Colors.textSecondary, marginBottom: 8 },
