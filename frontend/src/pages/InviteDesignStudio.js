@@ -568,6 +568,10 @@ const InviteDesignStudio = () => {
   const loadStudioData = async () => {
     try {
       setLoading(true);
+      const query = new URLSearchParams(location.search);
+      const queryTemplateKey = String(query.get('templateKey') || '').trim();
+      const queryCreateFromMaster = query.get('createFromMaster') === '1';
+
       const [eventRes, guestsRes, templatesRes, designsRes] = await Promise.all([
         eventService.getEventById(eventId),
         guestService.getEventGuests(eventId),
@@ -581,7 +585,65 @@ const InviteDesignStudio = () => {
       setDesigns(designsRes.designs || []);
 
       const firstTemplate = (templatesRes.templates || [])[0];
-      if (firstTemplate) setSelectedTemplate(firstTemplate.key);
+      const initialTemplateKey =
+        queryTemplateKey && (templatesRes.templates || []).some((template) => template.key === queryTemplateKey)
+          ? queryTemplateKey
+          : firstTemplate?.key;
+      if (initialTemplateKey) setSelectedTemplate(initialTemplateKey);
+
+      if (queryCreateFromMaster && queryTemplateKey) {
+        const existingMasterDesign = (designsRes.designs || []).find(
+          (design) => design?.jsonLayout && design.jsonLayout.masterTemplateKey === queryTemplateKey
+        );
+
+        if (existingMasterDesign) {
+          await loadDesignDetails(existingMasterDesign.id, templatesRes.templates || []);
+          return;
+        }
+
+        const templateMeta = (templatesRes.templates || []).find((template) => template.key === queryTemplateKey) || null;
+        if (templateMeta) {
+          const draftEventType = eventRes.event?.type || 'other';
+          const seedLayout = buildCanvasLayoutFromTemplate({
+            templateMeta,
+            baseLayout: {
+              templateKey: queryTemplateKey,
+              masterTemplateKey: queryTemplateKey,
+              eventType: draftEventType,
+              mergeData: buildDefaultMergeData(draftEventType),
+              title: eventRes.event?.title || '',
+              venue: eventRes.event?.venue || '',
+              date: eventRes.event?.date || null,
+            },
+            eventType: draftEventType,
+          }) || buildStarterLayout({
+            eventType: draftEventType,
+            event: eventRes.event,
+            templateKey: queryTemplateKey,
+            mergeData: buildDefaultMergeData(draftEventType),
+          });
+
+          const createRes = await inviteDesignService.createDesign({
+            eventId: Number(eventId),
+            name: `${queryTemplateKey} master`,
+            language: 'en',
+            status: 'draft',
+            category: eventRes.event?.type || 'general',
+            jsonLayout: {
+              ...seedLayout,
+              masterTemplateKey: queryTemplateKey,
+            },
+          });
+
+          const newDesign = createRes?.design;
+          if (newDesign?.id) {
+            const refreshed = await inviteDesignService.listDesigns(eventId);
+            setDesigns(refreshed.designs || []);
+            await loadDesignDetails(newDesign.id, templatesRes.templates || []);
+            return;
+          }
+        }
+      }
 
       const preferredDesignId = Number(new URLSearchParams(location.search).get('designId'));
       const designsList = designsRes.designs || [];

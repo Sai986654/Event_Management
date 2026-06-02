@@ -13,6 +13,7 @@ const InviteTemplateLibrary = () => {
   const [loading, setLoading] = useState(true);
   const [loadingEvents, setLoadingEvents] = useState(true);
   const [designs, setDesigns] = useState([]);
+  const [masterTemplates, setMasterTemplates] = useState([]);
   const [events, setEvents] = useState([]);
   const [eventForCreate, setEventForCreate] = useState(undefined);
 
@@ -22,6 +23,10 @@ const InviteTemplateLibrary = () => {
       const data = await inviteDesignService.listDesignLibrary();
       const rows = Array.isArray(data?.designs) ? data.designs : [];
       setDesigns(rows);
+
+      const templateRes = await inviteDesignService.getTemplates();
+      const templateRows = Array.isArray(templateRes?.templates) ? templateRes.templates : [];
+      setMasterTemplates(templateRows);
     } catch (error) {
       message.error(getErrorMessage(error));
     } finally {
@@ -141,6 +146,40 @@ const InviteTemplateLibrary = () => {
                 <Button type="default">Back to Dashboard</Button>
               </Link>
             </Space>
+          </Card>
+
+          <Card size="small" title="Master Templates (Template Engine)">
+            {masterTemplates.length ? (
+              <Table
+                rowKey="key"
+                size="small"
+                pagination={{ pageSize: 5 }}
+                dataSource={masterTemplates}
+                columns={[
+                  { title: 'Key', dataIndex: 'key', key: 'key' },
+                  { title: 'Name', dataIndex: 'name', key: 'name' },
+                  {
+                    title: 'Action',
+                    key: 'action',
+                    render: (_, row) => (
+                      <Button
+                        icon={<EditOutlined />}
+                        disabled={!eventForCreate}
+                        onClick={() =>
+                          navigate(
+                            `/invite-studio/${eventForCreate}?createFromMaster=1&templateKey=${encodeURIComponent(row.key)}`
+                          )
+                        }
+                      >
+                        Design In Studio
+                      </Button>
+                    ),
+                  },
+                ]}
+              />
+            ) : (
+              <Empty description="No master templates available" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+            )}
           </Card>
 
           {loading ? (

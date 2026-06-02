@@ -514,10 +514,10 @@ export const buildPreviewMergeContext = ({ event, guest, mergeData }) => {
       city: eventOverride.city || event?.city || '',
       dateText: eventOverride.dateText || (resolvedDate && !Number.isNaN(resolvedDate.getTime())
         ? resolvedDate.toLocaleDateString('en-IN', { dateStyle: 'medium' })
-        : 'Date TBD',
+        : 'Date TBD'),
       timeText: eventOverride.timeText || (resolvedDate && !Number.isNaN(resolvedDate.getTime())
         ? resolvedDate.toLocaleTimeString('en-IN', { timeStyle: 'short' })
-        : 'Time TBD',
+        : 'Time TBD'),
       date: eventOverride.date || event?.date || '',
     },
     hosts: safeMerge.hosts,
