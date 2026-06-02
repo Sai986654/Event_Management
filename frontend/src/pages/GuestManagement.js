@@ -6,7 +6,7 @@ import { guestService } from '../services/guestService';
 import { inviteDesignService } from '../services/inviteDesignService';
 import { useEventSocket } from '../hooks/useEventSocket';
 import { getErrorMessage } from '../utils/helpers';
-import { buildDefaultMergeData, buildPreviewMergeContext, getInvitePlaceholderGroups } from '../utils/invitePlaceholders';
+import { buildDefaultMergeData, getInvitePlaceholderGroups } from '../utils/invitePlaceholders';
 import './GuestManagement.css';
 
 const GuestManagement = () => {
@@ -367,15 +367,6 @@ const GuestManagement = () => {
       setActivePlaceholderToken(designPlaceholderOptions[0].token);
     }
   }, [designPlaceholderOptions, activePlaceholderToken]);
-
-  const designPreviewMergeContext = useMemo(
-    () => buildPreviewMergeContext({
-      event: previewGuest?.event || null,
-      guest: previewGuest || null,
-      mergeData: designMergeDraft,
-    }),
-    [previewGuest, designMergeDraft]
-  );
 
   const activePlaceholderPath = useMemo(
     () => String(activePlaceholderToken || '').replace(/^\{\{\s*|\s*\}\}$/g, '').trim(),
