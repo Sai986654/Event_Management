@@ -11,6 +11,11 @@ export const inviteDesignService = {
     return response.data;
   },
 
+  listDesignLibrary: async (params = {}) => {
+    const response = await api.get('/invites/designs/library', { params });
+    return response.data;
+  },
+
   createDesign: async (payload) => {
     const response = await api.post('/invites/designs', payload);
     return response.data;

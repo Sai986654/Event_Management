@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   Button,
   Card,
@@ -52,6 +52,7 @@ const { TextArea } = Input;
 
 const InviteDesignStudio = () => {
   const { eventId } = useParams();
+  const location = useLocation();
   const navigate = useNavigate();
 
   const [event, setEvent] = useState(null);
@@ -525,7 +526,12 @@ const InviteDesignStudio = () => {
       const firstTemplate = (templatesRes.templates || [])[0];
       if (firstTemplate) setSelectedTemplate(firstTemplate.key);
 
-      const firstDesign = (designsRes.designs || [])[0];
+      const preferredDesignId = Number(new URLSearchParams(location.search).get('designId'));
+      const designsList = designsRes.designs || [];
+      const preferredDesign = Number.isInteger(preferredDesignId) && preferredDesignId > 0
+        ? designsList.find((design) => design.id === preferredDesignId)
+        : null;
+      const firstDesign = preferredDesign || designsList[0];
       if (firstDesign) {
         await loadDesignDetails(firstDesign.id, templatesRes.templates || []);
       }
@@ -618,7 +624,7 @@ const InviteDesignStudio = () => {
   useEffect(() => {
     loadStudioData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [eventId]);
+  }, [eventId, location.search]);
 
   useEffect(() => {
     if (!previewGuestId && guests.length) {
@@ -803,12 +809,36 @@ const InviteDesignStudio = () => {
       return;
     }
 
+    let finalLayout;
+    if (editorMode === 'canvas') {
+      finalLayout = {
+        ...canvasLayout,
+        eventType: inviteEventType,
+        mergeData,
+      };
+      setLayoutText(JSON.stringify(finalLayout, null, 2));
+    } else {
+      try {
+        finalLayout = JSON.parse(layoutText || '{}');
+      } catch (_error) {
+        message.error('Layout JSON is invalid.');
+        return;
+      }
+      finalLayout = {
+        ...finalLayout,
+        eventType: inviteEventType,
+        mergeData: buildDefaultMergeData(inviteEventType, finalLayout.mergeData),
+      };
+      setCanvasLayout(finalLayout);
+    }
+
     setPublishing(true);
     try {
       await inviteDesignService.updateDesign(selectedDesignId, {
         name: designName.trim() || selectedDesign?.name,
         language: designLanguage,
         status: 'published',
+        jsonLayout: finalLayout,
       });
       message.success('Design published');
       await loadDesignDetails(selectedDesignId);
@@ -866,8 +896,8 @@ const InviteDesignStudio = () => {
       <Card className="invite-studio-header">
         <Space direction="vertical" size={4}>
           <Space>
-            <Link to={`/events/${eventId}`}>
-              <Button icon={<ArrowLeftOutlined />}>Back to Event</Button>
+            <Link to="/invite-studio">
+              <Button icon={<ArrowLeftOutlined />}>Back to Studio Home</Button>
             </Link>
             <Button icon={<ReloadOutlined />} onClick={loadStudioData}>Refresh</Button>
           </Space>
@@ -1172,7 +1202,7 @@ const InviteDesignStudio = () => {
                   <Button
                     icon={<ExpandOutlined />}
                     type="default"
-                    onClick={() => navigate(`/events/${eventId}/invite-studio/canvas/${selectedDesignId}`)}
+                    onClick={() => navigate(`/invite-studio/${eventId}/canvas/${selectedDesignId}`)}
                     disabled={!selectedDesignId}
                     style={{ background: '#1e293b', color: '#60a5fa', borderColor: '#3b82f6', fontWeight: 600 }}
                   >

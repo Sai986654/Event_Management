@@ -693,6 +693,52 @@ exports.listInviteDesigns = asyncHandler(async (req, res) => {
   res.json({ eventId, designs });
 });
 
+// GET /api/invites/designs/library
+exports.listInviteDesignLibrary = asyncHandler(async (req, res) => {
+  if (!(await ensureInviteDesignTablesReady(res))) return;
+
+  const eventFilter = req.user.role === 'admin' ? {} : { organizerId: req.user.id };
+  const manageableEvents = await prisma.event.findMany({
+    where: eventFilter,
+    select: { id: true, title: true, type: true, venue: true, organizerId: true },
+  });
+
+  if (!manageableEvents.length) {
+    return res.json({ designs: [], events: [] });
+  }
+
+  const eventMap = new Map(manageableEvents.map((event) => [event.id, event]));
+  const eventIds = manageableEvents.map((event) => event.id);
+
+  const status = req.query.status ? String(req.query.status).toLowerCase() : null;
+  const allowedStatuses = new Set(['draft', 'published', 'archived']);
+  const where = {
+    eventId: { in: eventIds },
+    ...(status && allowedStatuses.has(status) ? { status } : {}),
+  };
+
+  const designs = await prisma.inviteDesign.findMany({
+    where,
+    orderBy: [{ updatedAt: 'desc' }],
+    include: {
+      _count: {
+        select: {
+          assets: true,
+          exports: true,
+          guests: true,
+        },
+      },
+    },
+  });
+
+  const withEvent = designs.map((design) => ({
+    ...design,
+    event: eventMap.get(design.eventId) || null,
+  }));
+
+  res.json({ designs: withEvent, events: manageableEvents });
+});
+
 // POST /api/invites/designs
 exports.createInviteDesign = asyncHandler(async (req, res) => {
   if (!(await ensureInviteDesignTablesReady(res))) return;

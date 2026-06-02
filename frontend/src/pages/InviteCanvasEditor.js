@@ -150,7 +150,7 @@ const InviteCanvasEditor = () => {
               icon={<ArrowLeftOutlined />}
               type="text"
               className="ice-topbar-btn"
-              onClick={() => navigate(`/events/${eventId}/invite-studio`)}
+              onClick={() => navigate(`/invite-studio/${eventId}`)}
             />
           </Tooltip>
           <div className="ice-topbar-title">

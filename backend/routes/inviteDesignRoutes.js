@@ -5,6 +5,7 @@ const { protect, authorize } = require('../middleware/auth');
 const {
   getInviteDesignTemplates,
   listInviteDesigns,
+  listInviteDesignLibrary,
   createInviteDesign,
   getInviteDesignById,
   updateInviteDesign,
@@ -19,6 +20,7 @@ router.use(protect);
 router.use(authorize('admin', 'organizer'));
 
 router.get('/templates', getInviteDesignTemplates);
+router.get('/designs/library', listInviteDesignLibrary);
 router.get('/designs', listInviteDesigns);
 
 router.post(

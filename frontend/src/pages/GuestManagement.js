@@ -436,12 +436,17 @@ const GuestManagement = () => {
   const handleGenerateInvite = async (guest) => {
     try {
       setGeneratingGuestId(guest.id);
-      if (selectedDesignId) {
-        await inviteDesignService.generateAndSend(selectedDesignId, {
+      const publishedDesignId = inviteDesigns.find((design) => String(design.status || '').toLowerCase() === 'published')?.id;
+      const designIdToUse = selectedDesignId || publishedDesignId;
+      if (designIdToUse) {
+        await inviteDesignService.generateAndSend(designIdToUse, {
           sendVia: 'none',
           guestIds: [guest.id],
           defaultLanguage: selectedLanguage,
         });
+        if (!selectedDesignId && publishedDesignId) {
+          message.info('Using published Invite Studio design.');
+        }
         message.success(`Design PDF generated for ${guest.name}`);
         fetchGuests();
         return;
@@ -469,7 +474,9 @@ const GuestManagement = () => {
   const handleGenerateBulkInvites = async () => {
     try {
       setBulkGenerating(true);
-      if (selectedDesignId) {
+      const publishedDesignId = inviteDesigns.find((design) => String(design.status || '').toLowerCase() === 'published')?.id;
+      const designIdToUse = selectedDesignId || publishedDesignId;
+      if (designIdToUse) {
         const payload = {
           sendVia: 'none',
           defaultLanguage: selectedLanguage,
@@ -479,7 +486,10 @@ const GuestManagement = () => {
           payload.guestIds = selectedGuestIds;
         }
 
-        const result = await inviteDesignService.generateAndSend(selectedDesignId, payload);
+        const result = await inviteDesignService.generateAndSend(designIdToUse, payload);
+        if (!selectedDesignId && publishedDesignId) {
+          message.info('Using published Invite Studio design.');
+        }
         message.success(`Generated ${result.generated}/${result.total} design PDF invite(s)`);
         fetchGuests();
         return;
