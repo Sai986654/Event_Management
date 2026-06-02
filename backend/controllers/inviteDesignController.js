@@ -78,30 +78,32 @@ const buildMergeContext = ({ guest, event, layout }) => {
   const mergeData = coerceObject(layout.mergeData);
   const hosts = coerceObject(mergeData.hosts);
   const custom = coerceObject(mergeData.custom);
+  const eventOverride = coerceObject(mergeData.event);
+  const guestOverride = coerceObject(mergeData.guest);
   const guestData = coerceObject(guest);
   const eventData = coerceObject(event);
 
   return {
     guest: {
-      id: guestData.id || '',
-      name: guestData.name || '',
-      email: guestData.email || '',
-      phone: guestData.phone || '',
-      tableAssignment: guestData.tableAssignment || '',
-      plusOnes: guestData.plusOnes ?? 0,
-      rsvpStatus: guestData.rsvpStatus || '',
-      relationship: guestData.relationship || '',
+      id: guestOverride.id || guestData.id || '',
+      name: guestOverride.name || guestData.name || '',
+      email: guestOverride.email || guestData.email || '',
+      phone: guestOverride.phone || guestData.phone || '',
+      tableAssignment: guestOverride.tableAssignment || guestData.tableAssignment || '',
+      plusOnes: guestOverride.plusOnes ?? guestData.plusOnes ?? 0,
+      rsvpStatus: guestOverride.rsvpStatus || guestData.rsvpStatus || '',
+      relationship: guestOverride.relationship || guestData.relationship || '',
     },
     event: {
-      id: eventData.id || '',
-      title: eventData.title || '',
-      venue: eventData.venue || '',
-      slug: eventData.slug || '',
-      type: eventData.type || layout.eventType || '',
-      date: eventData.date || '',
-      dateText: formatEventDate(eventData.date),
-      timeText: formatEventTime(eventData.date),
-      city: eventData.city || '',
+      id: eventOverride.id || eventData.id || '',
+      title: eventOverride.title || eventData.title || '',
+      venue: eventOverride.venue || eventData.venue || '',
+      slug: eventOverride.slug || eventData.slug || '',
+      type: eventOverride.type || eventData.type || layout.eventType || '',
+      date: eventOverride.date || eventData.date || '',
+      dateText: eventOverride.dateText || formatEventDate(eventOverride.date || eventData.date),
+      timeText: eventOverride.timeText || formatEventTime(eventOverride.date || eventData.date),
+      city: eventOverride.city || eventData.city || '',
     },
     hosts,
     custom,

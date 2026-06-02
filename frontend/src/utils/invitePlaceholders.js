@@ -465,6 +465,8 @@ export const buildDefaultMergeData = (eventType, existing = {}) => {
   const current = existing && typeof existing === 'object' ? existing : {};
   const hosts = current.hosts && typeof current.hosts === 'object' ? current.hosts : {};
   const custom = current.custom && typeof current.custom === 'object' ? current.custom : {};
+  const event = current.event && typeof current.event === 'object' ? current.event : {};
+  const guest = current.guest && typeof current.guest === 'object' ? current.guest : {};
   const nextHosts = { ...hosts };
 
   config.hostFields.forEach((field) => {
@@ -476,6 +478,8 @@ export const buildDefaultMergeData = (eventType, existing = {}) => {
   return {
     hosts: nextHosts,
     custom,
+    event,
+    guest,
   };
 };
 
@@ -491,23 +495,30 @@ export const resolveTemplateString = (value, context = {}) => {
 
 export const buildPreviewMergeContext = ({ event, guest, mergeData }) => {
   const safeMerge = buildDefaultMergeData(event?.type, mergeData);
+  const eventOverride = safeMerge.event || {};
+  const guestOverride = safeMerge.guest || {};
   const eventDate = event?.date ? new Date(event.date) : null;
+  const overrideDate = eventOverride.date ? new Date(eventOverride.date) : null;
+  const resolvedDate = overrideDate && !Number.isNaN(overrideDate.getTime())
+    ? overrideDate
+    : eventDate;
 
   return {
     guest: {
-      name: guest?.name || 'Guest Name',
-      relationship: guest?.relationship || 'family',
+      name: guestOverride.name || guest?.name || 'Guest Name',
+      relationship: guestOverride.relationship || guest?.relationship || 'family',
     },
     event: {
-      title: event?.title || 'Special Celebration',
-      venue: event?.venue || 'Venue TBD',
-      city: event?.city || '',
-      dateText: eventDate && !Number.isNaN(eventDate.getTime())
-        ? eventDate.toLocaleDateString('en-IN', { dateStyle: 'medium' })
+      title: eventOverride.title || event?.title || 'Special Celebration',
+      venue: eventOverride.venue || event?.venue || 'Venue TBD',
+      city: eventOverride.city || event?.city || '',
+      dateText: eventOverride.dateText || (resolvedDate && !Number.isNaN(resolvedDate.getTime())
+        ? resolvedDate.toLocaleDateString('en-IN', { dateStyle: 'medium' })
         : 'Date TBD',
-      timeText: eventDate && !Number.isNaN(eventDate.getTime())
-        ? eventDate.toLocaleTimeString('en-IN', { timeStyle: 'short' })
+      timeText: eventOverride.timeText || (resolvedDate && !Number.isNaN(resolvedDate.getTime())
+        ? resolvedDate.toLocaleTimeString('en-IN', { timeStyle: 'short' })
         : 'Time TBD',
+      date: eventOverride.date || event?.date || '',
     },
     hosts: safeMerge.hosts,
     custom: safeMerge.custom,

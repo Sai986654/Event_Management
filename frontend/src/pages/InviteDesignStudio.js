@@ -73,6 +73,7 @@ const InviteDesignStudio = () => {
   const [editorMode, setEditorMode] = useState('canvas'); // 'canvas' or 'json'
 
   const [previewGuestId, setPreviewGuestId] = useState(null);
+  const [activePlaceholderToken, setActivePlaceholderToken] = useState('');
   const [customKey, setCustomKey] = useState('');
   const [customValue, setCustomValue] = useState('');
 
@@ -115,6 +116,62 @@ const InviteDesignStudio = () => {
     () => buildPreviewMergeContext({ event, guest: previewGuest, mergeData }),
     [event, previewGuest, mergeData]
   );
+
+  const getValueByPath = (source, path) =>
+    String(path || '')
+      .split('.')
+      .filter(Boolean)
+      .reduce((acc, segment) => (acc && acc[segment] !== undefined ? acc[segment] : undefined), source);
+
+  const placeholderCatalog = useMemo(() => {
+    const base = placeholderGroups.flatMap((group) =>
+      group.items.map((item) => ({
+        token: item.token,
+        label: item.label,
+        group: group.label,
+      }))
+    );
+    const dynamicCustom = Object.keys(mergeData.custom || {}).map((key) => ({
+      token: `{{custom.${key}}}`,
+      label: `Custom: ${key}`,
+      group: 'Custom Fields',
+    }));
+    return [...base, ...dynamicCustom];
+  }, [placeholderGroups, mergeData.custom]);
+
+  const activePlaceholderMeta = useMemo(
+    () => placeholderCatalog.find((item) => item.token === activePlaceholderToken) || placeholderCatalog[0] || null,
+    [placeholderCatalog, activePlaceholderToken]
+  );
+
+  const activePlaceholderPath = useMemo(() => {
+    if (!activePlaceholderMeta?.token) return '';
+    return String(activePlaceholderMeta.token).replace(/^\{\{\s*|\s*\}\}$/g, '').trim();
+  }, [activePlaceholderMeta]);
+
+  const activePlaceholderValue = useMemo(() => {
+    if (!activePlaceholderPath) return '';
+    const value = getValueByPath(previewMergeContext, activePlaceholderPath);
+    return value === undefined || value === null ? '' : String(value);
+  }, [activePlaceholderPath, previewMergeContext]);
+
+  const activePlaceholderEditTarget = useMemo(() => {
+    if (!activePlaceholderPath) return null;
+    const [scope, ...rest] = activePlaceholderPath.split('.');
+    if (!['event', 'hosts', 'custom'].includes(scope)) return null;
+    if (!rest.length) return null;
+    return { scope, key: rest.join('.') };
+  }, [activePlaceholderPath]);
+
+  useEffect(() => {
+    if (!activePlaceholderToken && placeholderCatalog.length) {
+      setActivePlaceholderToken(placeholderCatalog[0].token);
+      return;
+    }
+    if (activePlaceholderToken && !placeholderCatalog.some((item) => item.token === activePlaceholderToken)) {
+      setActivePlaceholderToken(placeholderCatalog[0]?.token || '');
+    }
+  }, [activePlaceholderToken, placeholderCatalog]);
 
   const patchMergeData = useMemo(
     () => (scope, key, value) => {
@@ -1123,6 +1180,34 @@ const InviteDesignStudio = () => {
                       <Text type="secondary">
                         Click a token to copy it, then paste it into any text element. The canvas preview resolves these using sample guest data.
                       </Text>
+                      <div className="invite-studio-placeholder-group" style={{ marginTop: 12 }}>
+                        <Text strong>Placeholder Value Manager</Text>
+                        <Select
+                          value={activePlaceholderMeta?.token}
+                          onChange={setActivePlaceholderToken}
+                          style={{ width: '100%', marginTop: 8 }}
+                          options={placeholderCatalog.map((item) => ({
+                            value: item.token,
+                            label: `${item.group} · ${item.label} (${item.token})`,
+                          }))}
+                          placeholder="Select placeholder"
+                        />
+                        <Input
+                          value={activePlaceholderValue}
+                          onChange={(eventInput) => {
+                            if (!activePlaceholderEditTarget) return;
+                            patchMergeData(activePlaceholderEditTarget.scope, activePlaceholderEditTarget.key, eventInput.target.value);
+                          }}
+                          style={{ marginTop: 8 }}
+                          placeholder="Value"
+                          disabled={!activePlaceholderEditTarget}
+                        />
+                        <Text type="secondary" style={{ display: 'block', marginTop: 6 }}>
+                          {activePlaceholderEditTarget
+                            ? `Editing ${activePlaceholderEditTarget.scope}.${activePlaceholderEditTarget.key} for this design.`
+                            : 'This placeholder is read-only here (example: guest tokens).'}
+                        </Text>
+                      </div>
                       <div className="invite-studio-placeholder-groups">
                         {placeholderGroups.map((group) => (
                           <div key={group.label} className="invite-studio-placeholder-group">
