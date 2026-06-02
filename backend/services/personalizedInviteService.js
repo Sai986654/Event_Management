@@ -441,6 +441,10 @@ function normalizeRelationship(relationship) {
   return String(relationship).trim().toLowerCase().slice(0, 80) || 'guest';
 }
 
+function asObject(value) {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+}
+
 function tokenizeRelationship(relationship) {
   const rel = normalizeRelationship(relationship);
   const familyMap = {
@@ -984,7 +988,7 @@ function resolveDynamicTheme(templateConfig = {}, palette = {}) {
   };
 }
 
-function buildTemplateEnginePdfBuffer({ guest, event, inviteMessage, inviteUrl, qrBuffer, relationship, template }) {
+function buildTemplateEnginePdfBuffer({ guest, event, inviteMessage, inviteUrl, qrBuffer, relationship, template, mergeData = {} }) {
   return new Promise(async (resolve, reject) => {
     try {
       const chunks = [];
@@ -1011,7 +1015,7 @@ function buildTemplateEnginePdfBuffer({ guest, event, inviteMessage, inviteUrl, 
           guestCategory: guest?.guestCategory || 'VIP',
           relationship: relationship || guest?.relationship || 'Guest',
           qrData: inviteUrl || '',
-          invitationMessage: inviteMessage,
+          invitationMessage: firstText(guest?.invitationMessage, guest?.customInviteMessage, inviteMessage),
         },
         event: {
           title: event?.title || 'Wedding Celebration',
@@ -1024,6 +1028,8 @@ function buildTemplateEnginePdfBuffer({ guest, event, inviteMessage, inviteUrl, 
           groomFamily: event?.groomFamily || '',
           brideFamily: event?.brideFamily || '',
         },
+        hosts: asObject(mergeData.hosts),
+        custom: asObject(mergeData.custom),
       };
 
       const resolvedTemplateConfig = resolveTemplateTokens(template.configJson || {}, context);
@@ -1991,7 +1997,7 @@ async function renderHtmlToPdfBuffer(html) {
   }
 }
 
-async function buildTemplateEngineHtmlPdfBuffer({ guest, event, inviteMessage, inviteUrl, qrBuffer, relationship, template }) {
+async function buildTemplateEngineHtmlPdfBuffer({ guest, event, inviteMessage, inviteUrl, qrBuffer, relationship, template, mergeData = {} }) {
   const p = template?.palette || {};
   const eventDate = event?.date ? new Date(event.date) : null;
   const dateText = eventDate
@@ -2007,7 +2013,7 @@ async function buildTemplateEngineHtmlPdfBuffer({ guest, event, inviteMessage, i
       guestCategory: guest?.guestCategory || 'VIP',
       relationship: relationship || guest?.relationship || 'Guest',
       qrData: inviteUrl || '',
-      invitationMessage: inviteMessage,
+      invitationMessage: firstText(guest?.invitationMessage, guest?.customInviteMessage, inviteMessage),
     },
     event: {
       title: event?.title || 'Wedding Celebration',
@@ -2026,6 +2032,8 @@ async function buildTemplateEngineHtmlPdfBuffer({ guest, event, inviteMessage, i
       segment2Label: event?.segment2Label || 'Program 2',
       segment3Label: event?.segment3Label || 'Program 3',
     },
+    hosts: asObject(mergeData.hosts),
+    custom: asObject(mergeData.custom),
   };
 
   const resolvedTemplateConfig = template?.configJson && typeof template.configJson === 'object'
@@ -2870,23 +2878,37 @@ async function uploadPdfToR2(pdfBuffer, key) {
 
 async function generatePersonalizedInvite({ guest, event, clientBaseUrl, payload = {} }) {
   const startedAt = Date.now();
+  const mergeData = asObject(payload.mergeData);
+  const mergedEvent = {
+    ...event,
+    ...asObject(mergeData.event),
+    id: event?.id,
+    slug: event?.slug,
+    organizerId: event?.organizerId,
+  };
+  const mergedGuest = {
+    ...guest,
+    ...asObject(mergeData.guest),
+    id: guest?.id,
+    eventId: guest?.eventId,
+  };
   const templates = await getTemplateCatalog();
-  const language = normalizeLanguage(payload.language || guest.inviteLanguage);
-  const tone = normalizeTone(payload.tone || guest.inviteTone);
-  const inviteTemplateKey = normalizeTemplateKey(payload.templateKey || guest.inviteTemplateKey, templates);
+  const language = normalizeLanguage(payload.language || mergedGuest.inviteLanguage);
+  const tone = normalizeTone(payload.tone || mergedGuest.inviteTone);
+  const inviteTemplateKey = normalizeTemplateKey(payload.templateKey || mergedGuest.inviteTemplateKey, templates);
   const template = getTemplateByKey(inviteTemplateKey, templates);
-  const relationship = normalizeRelationship(payload.relationship || guest.relationship);
-  const customMessage = payload.customMessage || guest.customInviteMessage || '';
+  const relationship = normalizeRelationship(payload.relationship || mergedGuest.relationship);
+  const customMessage = payload.customMessage || mergedGuest.customInviteMessage || mergedGuest.invitationMessage || '';
   const memoryNote = payload.memoryNote || '';
-  const inviteToken = guest.inviteToken || crypto.randomBytes(16).toString('hex');
+  const inviteToken = mergedGuest.inviteToken || crypto.randomBytes(16).toString('hex');
 
-  const inviteUrl = buildInviteUrl({ clientBaseUrl, event, guest, inviteToken });
+  const inviteUrl = buildInviteUrl({ clientBaseUrl, event: mergedEvent, guest: mergedGuest, inviteToken });
   const qrBuffer = inviteUrl ? await QRCode.toBuffer(inviteUrl, { width: 240, margin: 1 }) : null;
   const qrCodeDataUrl = inviteUrl ? await QRCode.toDataURL(inviteUrl) : null;
 
   const inviteMessage = buildInviteMessage({
-    guest,
-    event,
+    guest: mergedGuest,
+    event: mergedEvent,
     language,
     tone,
     relationship,
@@ -2924,8 +2946,8 @@ async function generatePersonalizedInvite({ guest, event, clientBaseUrl, payload
   let pdfBuffer;
   if (hasAdobeTemplate) {
     pdfBuffer = await buildAdobeExpressPdfBuffer({
-      guest,
-      event,
+      guest: mergedGuest,
+      event: mergedEvent,
       template,
       inviteMessage,
       inviteUrl,
@@ -2937,33 +2959,35 @@ async function generatePersonalizedInvite({ guest, event, clientBaseUrl, payload
     htmlRendererAttempted = true;
     try {
       pdfBuffer = await buildTemplateEngineHtmlPdfBuffer({
-        guest,
-        event,
+        guest: mergedGuest,
+        event: mergedEvent,
         template,
         inviteMessage,
         inviteUrl,
         qrBuffer,
         relationship,
+        mergeData,
       });
       rendererUsed = 'template-engine-html';
     } catch (error) {
       htmlRendererFailed = true;
       htmlRendererError = firstText(error?.message, String(error || ''));
       pdfBuffer = await buildTemplateEnginePdfBuffer({
-        guest,
-        event,
+        guest: mergedGuest,
+        event: mergedEvent,
         template,
         inviteMessage,
         inviteUrl,
         qrBuffer,
         relationship,
+        mergeData,
       });
       rendererUsed = 'template-engine-pdfkit-fallback';
     }
   } else {
     pdfBuffer = await buildPdfBuffer({
-      guest,
-      event,
+      guest: mergedGuest,
+      event: mergedEvent,
       inviteMessage,
       inviteUrl,
       qrBuffer,
@@ -2974,14 +2998,14 @@ async function generatePersonalizedInvite({ guest, event, clientBaseUrl, payload
     });
   }
 
-  const key = `invites/personalized/${event.id}/${inviteTemplateKey}/guest-${guest.id}-${Date.now()}.pdf`;
+  const key = `invites/personalized/${mergedEvent.id}/${inviteTemplateKey}/guest-${mergedGuest.id}-${Date.now()}.pdf`;
   const pdfUrl = await uploadPdfToR2(pdfBuffer, key);
 
   const generationMs = Date.now() - startedAt;
   if (htmlRendererFailed) {
     console.warn('[invite-renderer] html renderer fallback engaged', {
       guestId: guest?.id,
-      eventId: event?.id,
+      eventId: mergedEvent?.id,
       templateKey: inviteTemplateKey,
       rendererUsed,
       generationMs,
@@ -2990,7 +3014,7 @@ async function generatePersonalizedInvite({ guest, event, clientBaseUrl, payload
   } else {
     console.info('[invite-renderer] invite generated', {
       guestId: guest?.id,
-      eventId: event?.id,
+      eventId: mergedEvent?.id,
       templateKey: inviteTemplateKey,
       rendererUsed,
       generationMs,

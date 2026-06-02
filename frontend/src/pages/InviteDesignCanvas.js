@@ -419,13 +419,15 @@ const InviteDesignCanvas = ({
   // Update element
   const handleUpdateElement = useCallback(
     (id, updates) => {
-      const newElements = elements.map((el) =>
+      const sourceElements = elementsRef.current || [];
+      const newElements = sourceElements.map((el) =>
         el.id === id ? { ...el, ...updates } : el
       );
+      elementsRef.current = newElements;
       setElements(newElements);
       updateLayout(newElements);
     },
-    [elements, updateLayout]
+    [updateLayout]
   );
 
   const handleAddQuickTextBlock = useCallback(
@@ -665,12 +667,17 @@ const InviteDesignCanvas = ({
   const handleNumericPositionUpdate = useCallback(
     (id, key, value) => {
       if (value === null || value === undefined || Number.isNaN(Number(value))) return;
-      const normalized = key === 'x' || key === 'y' || key === 'width' || key === 'height'
-        ? snapValue(value)
-        : value;
+      const raw = Number(value);
+      let normalized = raw;
+
+      // Keep numeric input direct and predictable; grid snap is applied during drag/resize/nudge.
+      if (key === 'width' || key === 'height') {
+        normalized = Math.max(1, raw);
+      }
+
       handleUpdateElement(id, { [key]: normalized });
     },
-    [handleUpdateElement, snapValue]
+    [handleUpdateElement]
   );
 
   const nudgeSelected = useCallback(

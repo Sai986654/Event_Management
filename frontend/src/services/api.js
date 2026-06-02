@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Trailing slash + paths without a leading slash avoids wrong URLs like host/login
-const rawBase = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+const rawBase = process.env.REACT_APP_API_URL || 'https://event-management-9i4d.onrender.com/api';
 const API_BASE_URL = `${rawBase.replace(/\/+$/, '')}/`;
 const COLD_START_RETRY_TIMEOUT = 25000;
 const COLD_START_POLL_INTERVAL = 2000;

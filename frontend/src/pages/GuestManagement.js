@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { Card, Table, Button, Modal, Form, Input, Select, Upload, message, Spin, Row, Col, Statistic, Badge, Typography } from 'antd';
 import { PlusOutlined, UploadOutlined } from '@ant-design/icons';
@@ -6,6 +6,7 @@ import { guestService } from '../services/guestService';
 import { inviteDesignService } from '../services/inviteDesignService';
 import { useEventSocket } from '../hooks/useEventSocket';
 import { getErrorMessage } from '../utils/helpers';
+import { buildDefaultMergeData, buildPreviewMergeContext, getInvitePlaceholderGroups } from '../utils/invitePlaceholders';
 import './GuestManagement.css';
 
 const GuestManagement = () => {
@@ -30,6 +31,9 @@ const GuestManagement = () => {
   const [isSendModalVisible, setIsSendModalVisible] = useState(false);
   const [quickAddText, setQuickAddText] = useState('');
   const [selectedSendChannel, setSelectedSendChannel] = useState('email');
+  const [designMergeDraft, setDesignMergeDraft] = useState({ hosts: {}, custom: {}, event: {}, guest: {} });
+  const [activePlaceholderToken, setActivePlaceholderToken] = useState('');
+  const [savingPlaceholderOverrides, setSavingPlaceholderOverrides] = useState(false);
   const [form] = Form.useForm();
 
   const renderTemplateOption = (template) => {
@@ -59,14 +63,26 @@ const GuestManagement = () => {
     inviteTemplates[0] ||
     null;
   const selectedDesign = inviteDesigns.find((design) => design.id === selectedDesignId) || null;
+  const selectedDesignLayout = useMemo(
+    () => (selectedDesign?.jsonLayout && typeof selectedDesign.jsonLayout === 'object'
+      ? selectedDesign.jsonLayout
+      : {}),
+    [selectedDesign]
+  );
 
   const selectedGuests = guests.filter((guest) => selectedGuestIds.includes(guest.id));
   const previewGuest = selectedGuests[0] || guests[0] || null;
   const extraSelectedCount = Math.max(0, selectedGuests.length - 1);
   const previewGuestName = previewGuest?.name || 'Guest';
   const previewRelationship = previewGuest?.relationship || 'guest';
+  const selectedDesignEventType = selectedDesignLayout.eventType || previewGuest?.event?.type || 'other';
 
   const coerceObject = (value) => (value && typeof value === 'object' && !Array.isArray(value) ? value : {});
+  const getValueByPath = (source, path) =>
+    String(path || '')
+      .split('.')
+      .filter(Boolean)
+      .reduce((acc, segment) => (acc && acc[segment] !== undefined ? acc[segment] : undefined), source);
   const resolveTemplateTokens = (value, context) => {
     if (typeof value === 'string') {
       return value.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (_match, token) => {
@@ -108,6 +124,39 @@ const GuestManagement = () => {
   const selectedTemplateSections = Array.isArray(selectedTemplateConfig?.layout?.sections)
     ? selectedTemplateConfig.layout.sections
     : [];
+
+  const extractTemplateTokens = useCallback((value) => {
+    const tokenSet = new Set();
+
+    const walk = (node) => {
+      if (typeof node === 'string') {
+        const matches = node.match(/\{\{\s*[\w.]+\s*\}\}/g) || [];
+        matches.forEach((match) => tokenSet.add(match.replace(/\s+/g, ' ').trim()));
+        return;
+      }
+      if (Array.isArray(node)) {
+        node.forEach(walk);
+        return;
+      }
+      if (node && typeof node === 'object') {
+        Object.values(node).forEach(walk);
+      }
+    };
+
+    walk(value);
+    return Array.from(tokenSet);
+  }, []);
+
+  const detectedDesignTokens = useMemo(
+    () => extractTemplateTokens(selectedDesignLayout),
+    [extractTemplateTokens, selectedDesignLayout]
+  );
+
+  const detectedTemplateTokens = useMemo(
+    () => extractTemplateTokens(selectedTemplateConfig),
+    [extractTemplateTokens, selectedTemplateConfig]
+  );
+
   const getSectionProps = (componentType) => {
     const section = selectedTemplateSections.find(
       (item) => String(item?.componentType || '').toLowerCase() === String(componentType || '').toLowerCase()
@@ -267,6 +316,129 @@ const GuestManagement = () => {
     ? []
     : (sectionCards.length > 0 ? sectionCards : (simpleTemplateModel ? simpleModelCards : []));
 
+  useEffect(() => {
+    if (selectedDesign) {
+      const nextMerge = buildDefaultMergeData(selectedDesignEventType, selectedDesignLayout.mergeData);
+      setDesignMergeDraft(nextMerge);
+      return;
+    }
+    setDesignMergeDraft((prev) => buildDefaultMergeData(selectedDesignEventType, prev));
+  }, [selectedDesign, selectedDesignEventType, selectedDesignLayout.mergeData]);
+
+  const designPlaceholderGroups = useMemo(
+    () => getInvitePlaceholderGroups(selectedDesignEventType),
+    [selectedDesignEventType]
+  );
+
+  const designPlaceholderOptions = useMemo(() => {
+    const knownLabelByToken = new Map(
+      designPlaceholderGroups.flatMap((group) =>
+        group.items.map((item) => ({
+          token: item.token,
+          label: `${group.label} - ${item.label}`,
+        }))
+      )
+    );
+
+    const usedTokens = selectedDesign ? detectedDesignTokens : detectedTemplateTokens;
+    const uniqueUsedTokens = Array.from(new Set((usedTokens || []).filter(Boolean)));
+
+    if (!uniqueUsedTokens.length) {
+      if (!selectedDesign) {
+        return [];
+      }
+      return designPlaceholderGroups.flatMap((group) =>
+        group.items.map((item) => ({
+          token: item.token,
+          label: `${group.label} - ${item.label}`,
+        }))
+      );
+    }
+
+    return uniqueUsedTokens.map((token) => ({
+      token,
+      label: knownLabelByToken.get(token) || `${selectedDesign ? 'Used in design' : 'Used in template'} - ${token}`,
+    }));
+  }, [designPlaceholderGroups, detectedDesignTokens, detectedTemplateTokens, selectedDesign]);
+
+  useEffect(() => {
+    if (!designPlaceholderOptions.length) {
+      setActivePlaceholderToken('');
+      return;
+    }
+    if (!activePlaceholderToken || !designPlaceholderOptions.some((item) => item.token === activePlaceholderToken)) {
+      setActivePlaceholderToken(designPlaceholderOptions[0].token);
+    }
+  }, [designPlaceholderOptions, activePlaceholderToken]);
+
+  const designPreviewMergeContext = useMemo(
+    () => buildPreviewMergeContext({
+      event: previewGuest?.event || null,
+      guest: previewGuest || null,
+      mergeData: designMergeDraft,
+    }),
+    [previewGuest, designMergeDraft]
+  );
+
+  const activePlaceholderPath = useMemo(
+    () => String(activePlaceholderToken || '').replace(/^\{\{\s*|\s*\}\}$/g, '').trim(),
+    [activePlaceholderToken]
+  );
+
+  const activePlaceholderValue = useMemo(() => {
+    if (!activePlaceholderPath) return '';
+    const value = getValueByPath(designPreviewMergeContext, activePlaceholderPath);
+    return value === undefined || value === null ? '' : String(value);
+  }, [activePlaceholderPath, designPreviewMergeContext]);
+
+  const activePlaceholderEditTarget = useMemo(() => {
+    if (!activePlaceholderPath) return null;
+    const [scope, ...rest] = activePlaceholderPath.split('.');
+    if (scope === 'guest') {
+      const guestKey = rest.join('.');
+      if (guestKey === 'invitationMessage') {
+        return { scope, key: guestKey };
+      }
+      return null;
+    }
+    if (!['event', 'hosts', 'custom'].includes(scope)) return null;
+    if (!rest.length) return null;
+    return { scope, key: rest.join('.') };
+  }, [activePlaceholderPath]);
+
+  const updateDesignMergeDraft = (scope, key, value) => {
+    setDesignMergeDraft((prev) => ({
+      ...prev,
+      [scope]: {
+        ...(prev[scope] || {}),
+        [key]: value,
+      },
+    }));
+  };
+
+  const handleSavePlaceholderOverrides = async () => {
+    if (!selectedDesignId || !selectedDesign) {
+      message.success('Template placeholder overrides will be used for the next generate action');
+      return;
+    }
+    setSavingPlaceholderOverrides(true);
+    try {
+      const nextLayout = {
+        ...(selectedDesignLayout || {}),
+        mergeData: designMergeDraft,
+      };
+      await inviteDesignService.updateDesign(selectedDesignId, {
+        jsonLayout: nextLayout,
+      });
+      setInviteDesigns((prev) => prev.map((item) => (item.id === selectedDesignId ? { ...item, jsonLayout: nextLayout } : item)));
+      message.success('Placeholder overrides saved');
+    } catch (error) {
+      message.error(getErrorMessage(error));
+    } finally {
+      setSavingPlaceholderOverrides(false);
+    }
+  };
+
   const templateHealth = selectedDesign
     ? null
     : {
@@ -343,8 +515,7 @@ const GuestManagement = () => {
         if (prevSelectedId && designs.some((design) => design.id === prevSelectedId)) {
           return prevSelectedId;
         }
-        const latestPublished = designs.find((design) => String(design.status || '').toLowerCase() === 'published');
-        return latestPublished?.id;
+        return undefined;
       });
     } catch (error) {
       message.error(getErrorMessage(error));
@@ -456,6 +627,7 @@ const GuestManagement = () => {
         language: selectedLanguage,
         tone: selectedTone,
         templateKey: selectedTemplateKey,
+        mergeData: designMergeDraft,
       });
       const rendererUsed = result?.invite?.rendererUsed || 'unknown';
       const appliedTemplateKey = result?.invite?.templateKey || selectedTemplateKey;
@@ -499,6 +671,7 @@ const GuestManagement = () => {
         defaultLanguage: selectedLanguage,
         defaultTone: selectedTone,
         defaultTemplateKey: selectedTemplateKey,
+        mergeData: designMergeDraft,
       };
 
       if (selectedGuestIds.length) {
@@ -558,6 +731,7 @@ const GuestManagement = () => {
         defaultLanguage: selectedLanguage,
         defaultTone: selectedTone,
         defaultTemplateKey: selectedTemplateKey,
+        mergeData: designMergeDraft,
       };
 
       if (selectedGuestIds.length) {
@@ -698,7 +872,9 @@ const GuestManagement = () => {
             <div className="invite-generator-controls">
               <Select
                 value={selectedDesignId}
-                onChange={setSelectedDesignId}
+                onChange={(value) => {
+                  setSelectedDesignId(value);
+                }}
                 allowClear
                 placeholder="Use Invite Studio design"
                 style={{ minWidth: 240 }}
@@ -709,7 +885,10 @@ const GuestManagement = () => {
               />
               <Select
                 value={selectedTemplateKey}
-                onChange={setSelectedTemplateKey}
+                onChange={(value) => {
+                  setSelectedTemplateKey(value);
+                  setSelectedDesignId(undefined);
+                }}
                 placeholder="Select template"
                 style={{ minWidth: 220 }}
                 disabled={Boolean(selectedDesignId)}
@@ -757,6 +936,41 @@ const GuestManagement = () => {
                 Using saved design <strong>{selectedDesign.name}</strong>. Guest PDFs will be rendered from the Invite Studio canvas with placeholders and host data.
               </div>
             ) : null}
+
+            <div className="invite-placeholder-editor">
+              <Typography.Text strong>
+                Placeholder Overrides {selectedDesign ? '(Selected Design)' : '(Selected Template)'}
+              </Typography.Text>
+              <div className="invite-placeholder-editor-controls">
+                <Select
+                  value={activePlaceholderToken || undefined}
+                  onChange={setActivePlaceholderToken}
+                  style={{ minWidth: 280 }}
+                  options={designPlaceholderOptions.map((item) => ({ value: item.token, label: `${item.label} (${item.token})` }))}
+                  placeholder="Select placeholder"
+                />
+                <Input
+                  value={activePlaceholderValue}
+                  onChange={(eventInput) => {
+                    if (!activePlaceholderEditTarget) return;
+                    updateDesignMergeDraft(activePlaceholderEditTarget.scope, activePlaceholderEditTarget.key, eventInput.target.value);
+                  }}
+                  placeholder="Placeholder value"
+                  disabled={!activePlaceholderEditTarget}
+                  style={{ minWidth: 260 }}
+                />
+                <Button type="primary" loading={savingPlaceholderOverrides} onClick={handleSavePlaceholderOverrides}>
+                  {selectedDesign ? 'Save Placeholder Values' : 'Apply Overrides'}
+                </Button>
+              </div>
+              <Typography.Text type="secondary" style={{ display: 'block', marginTop: 6 }}>
+                {!designPlaceholderOptions.length && !selectedDesign
+                  ? 'No placeholders were detected in this template configuration. Choose a template with explicit {{...}} tokens (for example {{guest.invitationMessage}}).'
+                  : activePlaceholderEditTarget
+                  ? `Editing ${activePlaceholderEditTarget.scope}.${activePlaceholderEditTarget.key}. ${selectedDesign ? 'Save before generating.' : 'Applied values are used during generate.'}`
+                  : 'Selected token is runtime-only (for example guest fields) and cannot be overridden here.'}
+              </Typography.Text>
+            </div>
 
             <div className="invite-live-preview-wrap">
               <div

@@ -247,6 +247,7 @@ exports.generatePersonalizedInviteForGuest = asyncHandler(async (req, res) => {
       templateKey: req.body.templateKey || req.body.inviteTemplateKey,
       customMessage: req.body.customMessage || req.body.customInviteMessage,
       memoryNote: req.body.memoryNote,
+      mergeData: req.body.mergeData,
     },
   });
 
@@ -331,6 +332,7 @@ exports.generatePersonalizedInvitesBulk = asyncHandler(async (req, res) => {
           tone: req.body.defaultTone,
           language: req.body.defaultLanguage,
           templateKey: req.body.defaultTemplateKey,
+          mergeData: req.body.mergeData,
         },
       });
 
@@ -502,6 +504,7 @@ exports.generateAndSendInvites = asyncHandler(async (req, res) => {
           tone: req.body.defaultTone || 'friendly',
           language: req.body.defaultLanguage || 'en',
           templateKey: req.body.defaultTemplateKey || 'royal-maroon',
+          mergeData: req.body.mergeData,
         },
       });
 

@@ -45,6 +45,22 @@
   color: #5e4a1b;
 }
 
+.invite-placeholder-editor {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid #d6e4ff;
+  background: linear-gradient(135deg, #eef6ff 0%, #f8fbff 100%);
+}
+
+.invite-placeholder-editor-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-top: 8px;
+}
+
 .invite-live-preview-wrap {
   margin-top: 14px;
 }
@@ -255,6 +271,11 @@
   }
 
   .invite-generator-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .invite-placeholder-editor-controls {
     flex-direction: column;
     align-items: stretch;
   }

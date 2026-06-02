@@ -507,6 +507,7 @@ export const buildPreviewMergeContext = ({ event, guest, mergeData }) => {
     guest: {
       name: guestOverride.name || guest?.name || 'Guest Name',
       relationship: guestOverride.relationship || guest?.relationship || 'family',
+      invitationMessage: guestOverride.invitationMessage || guest?.customInviteMessage || guest?.invitationMessage || '',
     },
     event: {
       title: eventOverride.title || event?.title || 'Special Celebration',
