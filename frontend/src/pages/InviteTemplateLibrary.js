@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button, Card, Empty, Select, Space, Spin, Table, Tag, Typography, message } from 'antd';
 import { BgColorsOutlined, EditOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
@@ -16,7 +16,7 @@ const InviteTemplateLibrary = () => {
   const [events, setEvents] = useState([]);
   const [eventForCreate, setEventForCreate] = useState(undefined);
 
-  const loadLibrary = async () => {
+  const loadLibrary = useCallback(async () => {
     try {
       setLoading(true);
       const data = await inviteDesignService.listDesignLibrary();
@@ -27,9 +27,9 @@ const InviteTemplateLibrary = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const loadEvents = async () => {
+  const loadEvents = useCallback(async () => {
     try {
       setLoadingEvents(true);
       const data = await eventService.getEvents();
@@ -43,12 +43,12 @@ const InviteTemplateLibrary = () => {
     } finally {
       setLoadingEvents(false);
     }
-  };
+  }, [eventForCreate]);
 
   useEffect(() => {
     loadLibrary();
     loadEvents();
-  }, []);
+  }, [loadLibrary, loadEvents]);
 
   const columns = useMemo(
     () => [
