@@ -1,5 +1,5 @@
 const CACHE_VERSION = 'vedika360-v1';
-const APP_SHELL = ['/', '/index.html', '/manifest.json', '/icon.jpeg'];
+const APP_SHELL = ['/', '/index.html', '/manifest.json', '/icon.png'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(

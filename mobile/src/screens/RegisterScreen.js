@@ -47,7 +47,7 @@ const RegisterScreen = ({ navigation }) => {
     >
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         <View style={styles.brandHeader}>
-          <Image source={require('../../assets/icon.jpeg')} style={styles.logoImage} />
+          <Image source={require('../../assets/icon.png')} style={styles.logoImage} />
           <Text variant="displaySmall" style={styles.brandName}>Vedika360</Text>
           <Text variant="bodySmall" style={styles.brandTagline}>Premium Telugu Wedding Ecosystem</Text>
         </View>

@@ -50,7 +50,7 @@ const VendorStack = () => (
 
 const BrandTitle = () => (
   <View style={brandStyles.row}>
-    <Image source={require('../../assets/icon.jpeg')} style={brandStyles.iconImage} />
+    <Image source={require('../../assets/icon.png')} style={brandStyles.iconImage} />
     <RNText style={brandStyles.title}>Vedika360</RNText>
   </View>
 );

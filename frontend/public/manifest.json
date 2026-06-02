@@ -5,13 +5,13 @@
   "scope": "/",
   "icons": [
     {
-      "src": "icon.jpeg",
+      "src": "icon.png",
       "sizes": "192x192",
       "type": "image/jpeg",
       "purpose": "any"
     },
     {
-      "src": "icon.jpeg",
+      "src": "icon.png",
       "sizes": "512x512",
       "type": "image/jpeg",
       "purpose": "any"
@@ -31,7 +31,7 @@
       "url": "/dashboard",
       "icons": [
         {
-          "src": "icon.jpeg",
+          "src": "icon.png",
           "sizes": "192x192",
           "type": "image/jpeg"
         }
@@ -43,7 +43,7 @@
       "url": "/vendors",
       "icons": [
         {
-          "src": "icon.jpeg",
+          "src": "icon.png",
           "sizes": "192x192",
           "type": "image/jpeg"
         }
@@ -55,7 +55,7 @@
       "url": "/bookings",
       "icons": [
         {
-          "src": "icon.jpeg",
+          "src": "icon.png",
           "sizes": "192x192",
           "type": "image/jpeg"
         }
