@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useRef, useState, useCallback } from 'react';
-import { View, StyleSheet, FlatList, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, StyleSheet, FlatList, KeyboardAvoidingView, Platform, Image } from 'react-native';
 import { Text, TextInput, IconButton, Chip } from 'react-native-paper';
 import { chatService } from '../services/chatService';
 import { AuthContext } from '../context/AuthContext';
@@ -85,8 +85,20 @@ const ChatScreen = ({ route }) => {
   const renderMessage = ({ item }) => {
     const isMe = item.senderId === user?.id;
     const isStaff = item.sender?.role === 'admin' || item.sender?.role === 'organizer';
+    const senderInitial = item.sender?.name?.charAt(0)?.toUpperCase() || '?';
     return (
       <View style={[styles.msgRow, isMe ? styles.msgRowMe : styles.msgRowOther]}>
+        {!isMe && (
+          <View style={styles.avatarCol}>
+            {item.sender?.avatar ? (
+              <Image source={{ uri: item.sender.avatar }} style={styles.msgAvatar} />
+            ) : (
+              <View style={styles.msgAvatarFallback}>
+                <Text style={styles.msgAvatarInitial}>{senderInitial}</Text>
+              </View>
+            )}
+          </View>
+        )}
         <View style={[styles.msgBubble, isMe ? styles.bubbleMe : styles.bubbleOther]}>
           {!isMe && (
             <Text variant="labelSmall" style={styles.senderName}>
@@ -157,9 +169,13 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   closedBanner: { padding: Spacing.sm, backgroundColor: Colors.surfaceVariant, alignItems: 'center' },
   messageList: { padding: Spacing.md, paddingBottom: 8 },
-  msgRow: { marginBottom: Spacing.sm, maxWidth: '80%' },
+  msgRow: { marginBottom: Spacing.sm, maxWidth: '82%', flexDirection: 'row', alignItems: 'flex-end' },
   msgRowMe: { alignSelf: 'flex-end' },
   msgRowOther: { alignSelf: 'flex-start' },
+  avatarCol: { marginRight: 6, marginBottom: 2 },
+  msgAvatar: { width: 28, height: 28, borderRadius: 14 },
+  msgAvatarFallback: { width: 28, height: 28, borderRadius: 14, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center' },
+  msgAvatarInitial: { color: '#fff', fontWeight: '800', fontSize: 12 },
   msgBubble: { padding: Spacing.md, borderRadius: Radius.md },
   bubbleMe: { backgroundColor: Colors.primary, borderBottomRightRadius: 4 },
   bubbleOther: { backgroundColor: Colors.surface, elevation: 1, borderBottomLeftRadius: 4 },

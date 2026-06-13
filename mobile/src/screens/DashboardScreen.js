@@ -1,6 +1,6 @@
 import React, { useContext, useEffect, useState, useCallback, useLayoutEffect } from 'react';
-import { View, StyleSheet, ScrollView, RefreshControl, Linking, TouchableOpacity, Alert } from 'react-native';
-import { Text, Card, Button, Chip, FAB, ActivityIndicator, IconButton, Menu } from 'react-native-paper';
+import { View, StyleSheet, ScrollView, RefreshControl, Linking, TouchableOpacity, Alert, Image } from 'react-native';
+import { Text, Card, Button, Chip, FAB, ActivityIndicator, IconButton, Menu, Avatar } from 'react-native-paper';
 import * as Location from 'expo-location';
 import { MotiView } from 'moti';
 import { Easing } from 'react-native-reanimated';
@@ -209,9 +209,16 @@ const EventsDashboard = ({ user, navigation }) => {
         {/* Hero */}
         <AnimatedEntrance delay={60}>
           <Card style={styles.heroCard}>
-            <Card.Content>
-              <Text variant="headlineSmall" style={styles.greeting}>Welcome, {user?.name}! 👋</Text>
-              <Text variant="bodySmall" style={styles.heroSubtext}>Track families, budgets, vendors, and function progress in one command center.</Text>
+            <Card.Content style={styles.heroRow}>
+              {user?.avatar ? (
+                <Avatar.Image size={54} source={{ uri: user.avatar }} style={styles.heroAvatar} />
+              ) : (
+                <Avatar.Text size={54} label={user?.name?.charAt(0)?.toUpperCase() || 'U'} style={[styles.heroAvatar, { backgroundColor: Colors.primaryDark }]} labelStyle={{ fontWeight: '800', fontSize: 22 }} />
+              )}
+              <View style={{ flex: 1 }}>
+                <Text variant="headlineSmall" style={styles.greeting}>Welcome, {user?.name}! 👋</Text>
+                <Text variant="bodySmall" style={styles.heroSubtext}>Track families, budgets, vendors, and function progress in one command center.</Text>
+              </View>
             </Card.Content>
           </Card>
         </AnimatedEntrance>
@@ -465,9 +472,16 @@ const VendorDashboard = ({ user, navigation }) => {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchBookings(); }} colors={[Colors.primary]} />}
       >
         <Card style={styles.heroCard}>
-          <Card.Content>
-            <Text variant="headlineSmall" style={styles.greeting}>Welcome, {user?.name}! 👋</Text>
-            <Text variant="bodySmall" style={styles.heroSubtext}>Stay updated on wedding bookings and service performance.</Text>
+          <Card.Content style={styles.heroRow}>
+            {user?.avatar ? (
+              <Avatar.Image size={54} source={{ uri: user.avatar }} style={styles.heroAvatar} />
+            ) : (
+              <Avatar.Text size={54} label={user?.name?.charAt(0)?.toUpperCase() || 'U'} style={[styles.heroAvatar, { backgroundColor: Colors.primaryDark }]} labelStyle={{ fontWeight: '800', fontSize: 22 }} />
+            )}
+            <View style={{ flex: 1 }}>
+              <Text variant="headlineSmall" style={styles.greeting}>Welcome, {user?.name}! 👋</Text>
+              <Text variant="bodySmall" style={styles.heroSubtext}>Stay updated on wedding bookings and service performance.</Text>
+            </View>
           </Card.Content>
         </Card>
 
@@ -586,7 +600,23 @@ const DashboardScreen = ({ navigation }) => {
   useLayoutEffect(() => {
     navigation.setOptions({
       headerRight: () => (
-        <View>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('ProfileTab')}
+            style={{ marginRight: 4, marginLeft: 8 }}
+          >
+            {user?.avatar ? (
+              <Image
+                source={{ uri: user.avatar }}
+                style={{ width: 34, height: 34, borderRadius: 17, borderWidth: 2, borderColor: 'rgba(255,255,255,0.5)' }}
+              />
+            ) : (
+              <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: Colors.primaryDark, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: 'rgba(255,255,255,0.35)' }}>
+                <Text style={{ color: '#fff', fontWeight: '800', fontSize: 15 }}>{user?.name?.charAt(0)?.toUpperCase() || 'U'}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+          <View>
           <IconButton
             icon="bell-outline"
             iconColor={Colors.textOnDark}
@@ -604,10 +634,11 @@ const DashboardScreen = ({ navigation }) => {
               </Text>
             </View>
           )}
+          </View>
         </View>
       ),
     });
-  }, [navigation, unreadCount]);
+  }, [navigation, unreadCount, user]);
 
   if (role === 'vendor') return <VendorDashboard user={user} navigation={navigation} />;
   return <EventsDashboard user={user} navigation={navigation} />;
@@ -647,6 +678,8 @@ const styles = StyleSheet.create({
     elevation: 3,
     backgroundColor: Colors.surface,
   },
+  heroRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  heroAvatar: { flexShrink: 0 },
   greeting: { fontWeight: '800', color: Colors.textPrimary, marginBottom: 4 },
   heroSubtext: { color: Colors.textSecondary, lineHeight: 20 },
   statsRow: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm },

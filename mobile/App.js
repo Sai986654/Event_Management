@@ -1,6 +1,10 @@
 import 'react-native-reanimated';
 import React, { useContext, useCallback, useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
+import { Platform } from 'react-native';
+import * as NavigationBar from 'expo-navigation-bar';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { View, StyleSheet, ActivityIndicator, Image } from 'react-native';
 import { PaperProvider, Text } from 'react-native-paper';
 import { AuthProvider, AuthContext } from './src/context/AuthContext';
@@ -46,15 +50,26 @@ const AppInner = () => {
 };
 
 export default function App() {
+  useEffect(() => {
+    if (Platform.OS === 'android') {
+      NavigationBar.setButtonStyleAsync('light');
+      NavigationBar.setBackgroundColorAsync(Colors.secondary);
+    }
+  }, []);
+
   return (
-    <AuthProvider>
-      <PushNotificationProvider>
-        <SocketProvider>
-          <PaperProvider theme={AppTheme}>
-            <AppInner />
-          </PaperProvider>
-        </SocketProvider>
-      </PushNotificationProvider>
-    </AuthProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <AuthProvider>
+          <PushNotificationProvider>
+            <SocketProvider>
+              <PaperProvider theme={AppTheme}>
+                <AppInner />
+              </PaperProvider>
+            </SocketProvider>
+          </PushNotificationProvider>
+        </AuthProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }

@@ -2,7 +2,7 @@
   "expo": {
     "name": "Vedika360",
     "slug": "vedika360-mobile",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "scheme": "vedika360",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -29,7 +29,8 @@
       },
       "googleServicesFile": "./google-services.json",
       "package": "com.vedika360.myapp",
-      "versionCode": 2,
+      "versionCode": 4,
+      "edgeToEdgeEnabled": true,
       "permissions": [
         "android.permission.RECORD_AUDIO",
         "android.permission.ACCESS_COARSE_LOCATION",
@@ -41,6 +42,7 @@
     "plugins": [
       "expo-asset",
       "expo-font",
+      "expo-navigation-bar",
       [
         "expo-notifications",
         {

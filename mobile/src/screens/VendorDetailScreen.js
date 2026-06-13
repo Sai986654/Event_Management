@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useRef, useState } from 'react';
-import { View, StyleSheet, ScrollView, Alert, Image, Dimensions, Modal as RNModal, TouchableOpacity, Animated } from 'react-native';
+import { View, StyleSheet, ScrollView, Alert, Image, Dimensions, Modal as RNModal, TouchableOpacity, Animated, FlatList } from 'react-native';
 import { Text, Card, Button, Chip, Divider, ActivityIndicator } from 'react-native-paper';
 import { PinchGestureHandler, State as GestureState } from 'react-native-gesture-handler';
 import { AuthContext } from '../context/AuthContext';
@@ -11,8 +11,11 @@ import { Colors, Spacing, Radius } from '../theme';
 const { width: SCREEN_W } = Dimensions.get('window');
 
 const VendorDetailScreen = ({ route, navigation }) => {
+  // Context
   const { vendorId } = route.params;
   const { user } = useContext(AuthContext);
+
+  // State
   const [vendor, setVendor] = useState(null);
   const [loading, setLoading] = useState(true);
   const [reviewSummary, setReviewSummary] = useState(null);
@@ -20,9 +23,15 @@ const VendorDetailScreen = ({ route, navigation }) => {
   const [viewerVisible, setViewerVisible] = useState(false);
   const [viewerImageIndex, setViewerImageIndex] = useState(0);
   const [viewerZoom, setViewerZoom] = useState(1);
+  const [uiVisible, setUiVisible] = useState(true);
+
+  // Refs
   const baseScale = useRef(new Animated.Value(1)).current;
   const pinchScale = useRef(new Animated.Value(1)).current;
   const lastScaleRef = useRef(1);
+  const flatListRef = useRef(null);
+  const uiFadeAnim = useRef(new Animated.Value(1)).current;
+  const handleViewableItemsChangedRef = useRef(null);
   const animatedScale = Animated.multiply(baseScale, pinchScale);
 
   useEffect(() => {
@@ -39,6 +48,7 @@ const VendorDetailScreen = ({ route, navigation }) => {
     load();
   }, [vendorId]);
 
+  // Early render for loading/error states - AFTER all hooks
   if (loading) return <ActivityIndicator style={{ flex: 1 }} size="large" color={Colors.primary} />;
   if (!vendor) return <Text style={{ textAlign: 'center', marginTop: 40 }}>Wedding vendor not found</Text>;
 
@@ -66,14 +76,48 @@ const VendorDetailScreen = ({ route, navigation }) => {
     baseScale.setValue(1);
     pinchScale.setValue(1);
     setViewerVisible(true);
+    setTimeout(() => {
+      flatListRef.current?.scrollToIndex({ index, animated: false });
+    }, 100);
   };
 
   const closeImageViewer = () => {
     setViewerVisible(false);
     setViewerZoom(1);
+    setUiVisible(true);
     lastScaleRef.current = 1;
     baseScale.setValue(1);
     pinchScale.setValue(1);
+  };
+
+  const toggleUI = () => {
+    Animated.timing(uiFadeAnim, {
+      toValue: uiVisible ? 0 : 1,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+    setUiVisible(!uiVisible);
+  };
+
+  handleViewableItemsChangedRef.current = ({ viewableItems }) => {
+    if (viewableItems.length > 0) {
+      setViewerImageIndex(viewableItems[0].index);
+      setViewerZoom(1);
+      lastScaleRef.current = 1;
+      baseScale.setValue(1);
+      pinchScale.setValue(1);
+    }
+  };
+
+  const renderGalleryItem = ({ item, index }) => {
+    const url = typeof item === 'string' ? item : item?.url;
+    return (
+      <PinchGestureHandler onGestureEvent={onPinchGestureEvent} onHandlerStateChange={onPinchStateChange}>
+        <Animated.View style={[styles.viewerImageContainer, { transform: [{ scale: animatedScale }] }]}>
+          <Image source={{ uri: url }} style={styles.viewerImage} resizeMode="contain" />
+        </Animated.View>
+      </PinchGestureHandler>
+    );
   };
 
   const zoomIn = () => {
@@ -293,56 +337,42 @@ const VendorDetailScreen = ({ route, navigation }) => {
 
       <RNModal visible={viewerVisible} animationType="fade" transparent onRequestClose={closeImageViewer}>
         <View style={styles.viewerOverlay}>
-          <View style={styles.viewerTopBar}>
-            <TouchableOpacity onPress={zoomOut} style={styles.viewerTopBtn}><Text style={styles.viewerTopBtnText}>-</Text></TouchableOpacity>
+          <View style={styles.viewerGalleryWrapper}>
+            <FlatList
+              ref={flatListRef}
+              data={portfolioImages}
+              keyExtractor={(_, idx) => `gallery-${idx}`}
+              horizontal
+              pagingEnabled
+              scrollEnabled
+              showsHorizontalScrollIndicator={false}
+              snapToAlignment="center"
+              snapToInterval={SCREEN_W}
+              decelerationRate={0.98}
+              bounces={false}
+              removeClippedSubviews={true}
+              maxToRenderPerBatch={2}
+              updateCellsBatchingPeriod={50}
+              windowSize={2}
+              onViewableItemsChanged={handleViewableItemsChangedRef.current}
+              viewabilityConfig={{ itemVisiblePercentThreshold: 50 }}
+              renderItem={renderGalleryItem}
+              style={styles.viewerGallery}
+              contentContainerStyle={styles.viewerGalleryContent}
+            />
+          </View>
+
+          <Animated.View style={[styles.viewerTopBar, { opacity: uiFadeAnim }]}>
+            <TouchableOpacity onPress={zoomOut} style={styles.viewerTopBtn}><Text style={styles.viewerTopBtnText}>−</Text></TouchableOpacity>
             <Text style={styles.viewerZoomText}>{Math.round(viewerZoom * 100)}%</Text>
             <TouchableOpacity onPress={zoomIn} style={styles.viewerTopBtn}><Text style={styles.viewerTopBtnText}>+</Text></TouchableOpacity>
-            <TouchableOpacity onPress={closeImageViewer} style={styles.viewerTopBtn}><Text style={styles.viewerTopBtnText}>Close</Text></TouchableOpacity>
-          </View>
+            <TouchableOpacity onPress={closeImageViewer} style={styles.viewerTopBtn}><Text style={styles.viewerTopBtnText}>✕</Text></TouchableOpacity>
+          </Animated.View>
 
-          <View style={styles.viewerBody}>
-            {currentImageUrl ? (
-              <PinchGestureHandler onGestureEvent={onPinchGestureEvent} onHandlerStateChange={onPinchStateChange}>
-                <Animated.View style={styles.viewerPinchArea}>
-                  <Animated.Image
-                    source={{ uri: currentImageUrl }}
-                    style={[styles.viewerImage, { transform: [{ scale: animatedScale }] }]}
-                    resizeMode="contain"
-                  />
-                </Animated.View>
-              </PinchGestureHandler>
-            ) : null}
-          </View>
-
-          <View style={styles.viewerBottomBar}>
-            <TouchableOpacity
-              disabled={viewerImageIndex <= 0}
-              onPress={() => {
-                setViewerImageIndex((i) => Math.max(0, i - 1));
-                setViewerZoom(1);
-                lastScaleRef.current = 1;
-                baseScale.setValue(1);
-                pinchScale.setValue(1);
-              }}
-              style={[styles.viewerNavBtn, viewerImageIndex <= 0 && styles.viewerNavBtnDisabled]}
-            >
-              <Text style={styles.viewerNavBtnText}>Prev</Text>
-            </TouchableOpacity>
+          <Animated.View style={[styles.viewerBottomBar, { opacity: uiFadeAnim }]}>
             <Text style={styles.viewerCountText}>{portfolioImages.length ? `${viewerImageIndex + 1} / ${portfolioImages.length}` : ''}</Text>
-            <TouchableOpacity
-              disabled={viewerImageIndex >= portfolioImages.length - 1}
-              onPress={() => {
-                setViewerImageIndex((i) => Math.min(portfolioImages.length - 1, i + 1));
-                setViewerZoom(1);
-                lastScaleRef.current = 1;
-                baseScale.setValue(1);
-                pinchScale.setValue(1);
-              }}
-              style={[styles.viewerNavBtn, viewerImageIndex >= portfolioImages.length - 1 && styles.viewerNavBtnDisabled]}
-            >
-              <Text style={styles.viewerNavBtnText}>Next</Text>
-            </TouchableOpacity>
-          </View>
+            <Text style={styles.viewerSwipeHint}>Pinch to zoom • Swipe to browse</Text>
+          </Animated.View>
         </View>
       </RNModal>
     </View>
@@ -378,19 +408,19 @@ const styles = StyleSheet.create({
   fullscreenHint: { position: 'absolute', right: 6, bottom: 6, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 },
   fullscreenHintText: { color: Colors.textOnDark, fontSize: 10, fontWeight: '600' },
   mediaCaption: { color: Colors.textMuted, paddingHorizontal: 6, paddingVertical: 4 },
-  viewerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)' },
-  viewerTopBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', paddingTop: Spacing.xxl, paddingHorizontal: Spacing.lg, gap: Spacing.sm },
-  viewerTopBtn: { backgroundColor: 'rgba(255,255,255,0.18)', borderRadius: 16, paddingHorizontal: 10, paddingVertical: 6 },
-  viewerTopBtnText: { color: Colors.textOnDark, fontWeight: '700' },
-  viewerZoomText: { color: Colors.textOnDark, fontWeight: '700', marginRight: Spacing.sm },
-  viewerBody: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: Spacing.md },
-  viewerPinchArea: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
-  viewerImage: { width: SCREEN_W * 0.92, height: '85%' },
-  viewerBottomBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.xl, paddingBottom: Spacing.xl },
-  viewerNavBtn: { backgroundColor: 'rgba(255,255,255,0.18)', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 8 },
-  viewerNavBtnDisabled: { opacity: 0.35 },
-  viewerNavBtnText: { color: Colors.textOnDark, fontWeight: '700' },
-  viewerCountText: { color: Colors.textOnDark, fontWeight: '600' },
+  viewerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.98)', justifyContent: 'space-between', paddingTop: Spacing.lg },
+  viewerTopBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingBottom: Spacing.sm },
+  viewerTopBtn: { paddingHorizontal: 12, paddingVertical: 8, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 6 },
+  viewerTopBtnText: { color: '#fff', fontWeight: '700', fontSize: 18 },
+  viewerZoomText: { color: '#fff', fontSize: 14, fontWeight: '600' },
+  viewerGalleryWrapper: { flex: 1 },
+  viewerGallery: { flex: 1 },
+  viewerGalleryContent: { alignItems: 'center', justifyContent: 'center' },
+  viewerImageContainer: { width: SCREEN_W, justifyContent: 'center', alignItems: 'center' },
+  viewerImage: { width: SCREEN_W * 0.9, height: SCREEN_W * 0.9 },
+  viewerBottomBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.1)' },
+  viewerCountText: { color: '#fff', fontWeight: '600', fontSize: 13 },
+  viewerSwipeHint: { color: 'rgba(255,255,255,0.6)', fontSize: 12, fontStyle: 'italic' },
   testimonialCard: { marginBottom: Spacing.md, borderRadius: Radius.md, elevation: 1, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface },
   testimonialHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.sm },
   testimonialAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center' },

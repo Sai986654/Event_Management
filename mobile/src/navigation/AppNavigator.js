@@ -1,9 +1,9 @@
 import React, { useContext, useEffect, useRef } from 'react';
-import { View, Text as RNText, StyleSheet, Image, BackHandler, ToastAndroid, Platform } from 'react-native';
-import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
+import { View, Text as RNText, StyleSheet, Image, BackHandler, ToastAndroid, Platform } from 'react-native';import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { IconButton } from 'react-native-paper';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthContext } from '../context/AuthContext';
 import { Colors, headerScreenOptions } from '../theme';
 
@@ -101,10 +101,25 @@ const DashboardStack = () => (
 // Tab icon helper
 const tabIcon = (name) => ({ color, size }) => <IconButton icon={name} iconColor={color} size={size} />;
 
+// Profile tab icon — shows the user's actual avatar when available
+const ProfileTabIcon = ({ color, size }) => {
+  const { user } = useContext(AuthContext);
+  if (user?.avatar) {
+    return (
+      <Image
+        source={{ uri: user.avatar }}
+        style={{ width: size, height: size, borderRadius: size / 2, borderWidth: 1.5, borderColor: color }}
+      />
+    );
+  }
+  return <IconButton icon="account-circle" iconColor={color} size={size} />;
+};
+
 // Role-based tab navigator
 const MainTabs = () => {
   const { user } = useContext(AuthContext);
   const role = user?.role;
+  const insets = useSafeAreaInsets();
 
   return (
     <Tab.Navigator
@@ -113,9 +128,9 @@ const MainTabs = () => {
         tabBarActiveTintColor: Colors.primary,
         tabBarInactiveTintColor: Colors.textMuted,
         tabBarStyle: {
-          paddingBottom: 6,
+          paddingBottom: insets.bottom > 0 ? insets.bottom : 6,
           paddingTop: 4,
-          height: 64,
+          height: 64 + (insets.bottom > 0 ? insets.bottom : 0),
           backgroundColor: Colors.surface,
           borderTopColor: Colors.border,
           elevation: 8,
@@ -156,7 +171,7 @@ const MainTabs = () => {
         component={ProfileScreen}
         options={{
           title: 'Profile',
-          tabBarIcon: tabIcon('account-circle'),
+          tabBarIcon: ({ color, size }) => <ProfileTabIcon color={color} size={size} />,
           headerShown: true,
           headerTitle: 'Profile',
           ...headerScreenOptions,

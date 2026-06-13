@@ -21,7 +21,7 @@ const GuestManagement = () => {
   const [selectedTemplateKey, setSelectedTemplateKey] = useState('royal-maroon');
   const [selectedTone, setSelectedTone] = useState('friendly');
   const [selectedLanguage, setSelectedLanguage] = useState('en');
-  const [selectedGuestIds, setSelectedGuestIds] = useState([]);
+  const [selectedGuestIds, setSelectedGuestIds] = useState([]); 
   const [generatingGuestId, setGeneratingGuestId] = useState(null);
   const [bulkGenerating, setBulkGenerating] = useState(false);
   const [quickAdding, setQuickAdding] = useState(false);
