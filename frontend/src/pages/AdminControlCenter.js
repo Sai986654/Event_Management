@@ -1431,6 +1431,7 @@ const AdminControlCenter = () => {
             loading={loadingPaymentConfigs}
             rowKey="entityType"
             dataSource={paymentConfigs}
+            scroll={{ x: 'max-content' }}
             pagination={false}
             locale={{ emptyText: <div className="phase-empty">No payment configurations found.</div> }}
             columns={[
@@ -1508,6 +1509,7 @@ const AdminControlCenter = () => {
             loading={loadingCategories}
             rowKey="id"
             dataSource={categories}
+            scroll={{ x: 'max-content' }}
             pagination={false}
             locale={{ emptyText: <div className="phase-empty">No categories yet.</div> }}
             columns={[
@@ -1539,6 +1541,7 @@ const AdminControlCenter = () => {
             loading={loadingAllVendors}
             rowKey="id"
             dataSource={allVendors}
+            scroll={{ x: 'max-content' }}
             pagination={{
               current: vendorPagination.current,
               pageSize: vendorPagination.pageSize,
@@ -2041,6 +2044,7 @@ const AdminControlCenter = () => {
                 loading={loadingInviteTemplates}
                 rowKey="id"
                 dataSource={inviteTemplates}
+                scroll={{ x: 'max-content' }}
                 pagination={false}
                 locale={{ emptyText: <div className="phase-empty">No invite templates yet.</div> }}
                 columns={[
@@ -2341,6 +2345,7 @@ const AdminControlCenter = () => {
             loading={loadingVendors}
             rowKey="id"
             dataSource={vendors}
+            scroll={{ x: 'max-content' }}
             pagination={false}
             locale={{ emptyText: <div className="phase-empty">No vendors pending verification right now.</div> }}
             columns={[
@@ -2551,7 +2556,7 @@ const AdminControlCenter = () => {
           </Card>
         </Col>
         <Col span={24}>
-          <Tabs defaultActiveKey="categories" items={tabItems} size="large" />
+          <Tabs className="admin-control-tabs" defaultActiveKey="categories" items={tabItems} size="large" />
         </Col>
       </Row>
 

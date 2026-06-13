@@ -59,6 +59,24 @@
   overflow: hidden;
 }
 
+.admin-control-tabs .ant-tabs-nav-wrap {
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.admin-control-tabs .ant-tabs-nav-list {
+  min-width: max-content;
+}
+
+.admin-control-tabs .ant-tabs-tab {
+  white-space: nowrap;
+}
+
+.admin-control-tabs .ant-table-container,
+.admin-control-tabs .ant-table-content {
+  overflow-x: auto;
+}
+
 .phase-section-title {
   margin: 0 0 6px;
   font-weight: 800;
@@ -252,6 +270,20 @@
 @media (max-width: 980px) {
   .planner-layout {
     grid-template-columns: 1fr;
+  }
+
+  .admin-control-tabs .ant-card-head-wrapper {
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: flex-start;
+  }
+
+  .admin-control-tabs .ant-card-extra {
+    margin-inline-start: 0;
+    padding-top: 0;
+    width: 100%;
+    display: flex;
+    justify-content: flex-start;
   }
 }
 
