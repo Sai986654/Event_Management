@@ -7,6 +7,9 @@ const COMMON_PLACEHOLDERS = [
   { token: '{{event.timeText}}', label: 'Event Time' },
   { token: '{{event.venue}}', label: 'Venue' },
   { token: '{{event.city}}', label: 'City' },
+  { token: '{{custom.rsvpLink}}', label: 'RSVP Link' },
+  { token: '{{custom.mapLink}}', label: 'Map Link' },
+  { token: '{{custom.liveStreamUrl}}', label: 'Live Stream Link' },
 ];
 
 const EVENT_CONFIG = {
@@ -317,6 +320,67 @@ export const getSectionBlocks = (eventType) => {
     ],
   };
 
+  const actionButtons = {
+    key: 'invite-actions',
+    label: 'RSVP & Directions',
+    elements: [
+      {
+        type: 'action',
+        x: 130,
+        y: 1380,
+        width: 390,
+        height: 68,
+        label: 'RSVP Now',
+        actionKind: 'rsvp',
+        url: '{{custom.rsvpLink}}',
+        fillColor: '#ffffff',
+        textColor: '#4b2e16',
+        strokeColor: '#c9b07d',
+        strokeWidth: 2,
+        borderRadius: 34,
+        fontSize: 28,
+        fontWeight: 'bold',
+        fontFamily: 'Arial',
+      },
+      {
+        type: 'action',
+        x: 560,
+        y: 1380,
+        width: 390,
+        height: 68,
+        label: 'Join Live Stream',
+        actionKind: 'liveStream',
+        url: '{{custom.liveStreamUrl}}',
+        fillColor: '#ffffff',
+        textColor: '#4b2e16',
+        strokeColor: '#c9b07d',
+        strokeWidth: 2,
+        borderRadius: 34,
+        fontSize: 28,
+        fontWeight: 'bold',
+        fontFamily: 'Arial',
+      },
+      {
+        type: 'action',
+        x: 150,
+        y: 1480,
+        width: 780,
+        height: 76,
+        label: 'Get Directions',
+        actionKind: 'directions',
+        url: '{{custom.mapLink}}',
+        fillColor: '#fffdf7',
+        textColor: '#1f2937',
+        strokeColor: '#c9b07d',
+        strokeWidth: 2,
+        borderRadius: 28,
+        fontSize: 28,
+        fontWeight: 'bold',
+        fontFamily: 'Arial',
+      },
+    ],
+  };
+
   const weddingBody = {
     key: 'wedding-body',
     label: 'Wedding Couple Block',
@@ -450,15 +514,15 @@ export const getSectionBlocks = (eventType) => {
   };
 
   if (type === 'wedding' || type === 'engagement') {
-    return [header, weddingBody, footer];
+    return [header, weddingBody, actionButtons, footer];
   }
   if (type === 'birthday' || type === 'maturity' || type === 'anniversary' || type === 'babyshower') {
-    return [header, celebrantBody, footer];
+    return [header, celebrantBody, actionButtons, footer];
   }
   if (type === 'corporate') {
-    return [header, corporateBody, footer];
+    return [header, corporateBody, actionButtons, footer];
   }
-  return [header, genericBody, footer];
+  return [header, genericBody, actionButtons, footer];
 };
 
 export const buildDefaultMergeData = (eventType, existing = {}) => {
@@ -478,7 +542,12 @@ export const buildDefaultMergeData = (eventType, existing = {}) => {
 
   return {
     hosts: nextHosts,
-    custom,
+    custom: {
+      rsvpLink: '',
+      mapLink: '',
+      liveStreamUrl: '',
+      ...custom,
+    },
     event,
     guest,
   };

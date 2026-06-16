@@ -141,6 +141,31 @@ const buildInviteUrl = ({ clientBaseUrl, event, guest, inviteToken }) => {
   return `${base}/public/${event.slug}?guest=${guest.id}&token=${inviteToken}`;
 };
 
+const buildMapUrl = (event) => {
+  const venue = String(event?.venue || '').trim();
+  const city = String(event?.city || '').trim();
+  const query = [venue, city].filter(Boolean).join(', ');
+  return query ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}` : '';
+};
+
+const mergeActionLinksIntoOverrides = ({ overrides, rsvpLink, mapLink, liveStreamUrl }) => {
+  const source = coerceObject(overrides);
+  const mergeData = coerceObject(source.mergeData);
+  const custom = coerceObject(mergeData.custom);
+  return {
+    ...source,
+    mergeData: {
+      ...mergeData,
+      custom: {
+        ...custom,
+        rsvpLink: custom.rsvpLink || rsvpLink || '',
+        mapLink: custom.mapLink || mapLink || '',
+        liveStreamUrl: custom.liveStreamUrl || liveStreamUrl || '',
+      },
+    },
+  };
+};
+
 const fetchImageBuffer = async (source) => {
   const value = String(source || '').trim();
   if (!value) return null;
@@ -384,6 +409,45 @@ const deriveInviteMessage = ({ guest, event, resolvedLayout, fallbackMessage }) 
   return `${guest?.name || 'Guest'}, you are invited to ${event?.title || 'our event'}.`;
 };
 
+const drawActionElement = (doc, element, { x, y, width, height, scale }) => {
+  const radius = Math.max(0, numberOrFallback(element.borderRadius, 28) * scale);
+  const fillColor = String(element.fillColor || '#ffffff');
+  const strokeColor = String(element.strokeColor || '#c9b07d');
+  const strokeWidth = Math.max(0, numberOrFallback(element.strokeWidth, 2) * scale);
+  const textColor = String(element.textColor || '#374151');
+  const fontSize = Math.max(8, numberOrFallback(element.fontSize, 24) * scale);
+  const label = String(element.label || 'Action');
+  const url = String(element.url || '').trim();
+
+  doc.save();
+  if (radius > 0) {
+    doc.roundedRect(x, y, width, height, radius);
+  } else {
+    doc.rect(x, y, width, height);
+  }
+  doc.lineWidth(strokeWidth);
+  if (strokeWidth > 0) {
+    doc.fillAndStroke(fillColor, strokeColor || fillColor);
+  } else {
+    doc.fill(fillColor);
+  }
+
+  doc.fillColor(textColor);
+  doc.font(element.fontWeight === 'normal' ? 'Helvetica' : 'Helvetica-Bold');
+  doc.fontSize(fontSize);
+  const textHeight = doc.heightOfString(label, { width: Math.max(1, width - 16 * scale), align: 'center' });
+  doc.text(label, x + 8 * scale, y + Math.max(0, (height - textHeight) / 2), {
+    width: Math.max(1, width - 16 * scale),
+    height,
+    align: 'center',
+  });
+
+  if (/^https?:\/\//i.test(url)) {
+    doc.link(x, y, width, height, url);
+  }
+  doc.restore();
+};
+
 const buildRenderedDesignPdfBuffer = async ({ design, event, guest = null, layoutOverrides = {}, fallbackMessage = '' }) => {
   const baseLayout = coerceObject(design.jsonLayout);
   const mergedLayout = deepMerge(baseLayout, coerceObject(layoutOverrides));
@@ -460,6 +524,11 @@ const buildRenderedDesignPdfBuffer = async ({ design, event, guest = null, layou
           align: element.textAlign || 'left',
         });
         doc.restore();
+        continue;
+      }
+
+      if (element.type === 'action') {
+        drawActionElement(doc, element, { x, y, width, height, scale });
         continue;
       }
 
@@ -584,6 +653,11 @@ const buildRenderedDesignPdfBuffer = async ({ design, event, guest = null, layou
           align: element.textAlign || 'left',
         });
         doc.restore();
+        continue;
+      }
+
+      if (element.type === 'action') {
+        drawActionElement(doc, element, { x, y, width, height, scale });
         continue;
       }
 
@@ -906,7 +980,7 @@ exports.exportInviteDesign = asyncHandler(async (req, res) => {
 
   const design = await prisma.inviteDesign.findUnique({
     where: { id },
-    include: { event: { select: { id: true, organizerId: true, title: true, venue: true, date: true } } },
+    include: { event: { select: { id: true, organizerId: true, title: true, venue: true, date: true, slug: true, type: true, city: true } } },
   });
 
   if (!design) return res.status(404).json({ message: 'Invite design not found' });
@@ -932,7 +1006,18 @@ exports.exportInviteDesign = asyncHandler(async (req, res) => {
   let fileKey = req.body.fileKey ? String(req.body.fileKey).trim() : null;
 
   if (format === 'pdf') {
-    const { pdfBuffer } = await buildRenderedDesignPdfBuffer({ design, event: design.event });
+    const clientBaseUrl = resolveClientBaseUrl(req);
+    const publicEventUrl = design.event?.slug ? `${String(clientBaseUrl || '').replace(/\/$/, '')}/public/${design.event.slug}` : '';
+    const { pdfBuffer } = await buildRenderedDesignPdfBuffer({
+      design,
+      event: design.event,
+      layoutOverrides: mergeActionLinksIntoOverrides({
+        overrides: {},
+        rsvpLink: publicEventUrl,
+        mapLink: buildMapUrl(design.event),
+        liveStreamUrl: req.body.liveStreamUrl,
+      }),
+    });
     const key = `invites/design-exports/event-${design.eventId}/design-${design.id}/v${design.version}-${Date.now()}.pdf`;
     fileUrl = await uploadBufferToR2({
       buffer: pdfBuffer,
@@ -1078,11 +1163,25 @@ exports.generateAndSendFromDesign = asyncHandler(async (req, res) => {
         },
       });
 
+      const resolvedInviteToken = generated.inviteToken || guest.inviteToken || crypto.randomBytes(16).toString('hex');
+      const inviteUrl = generated.inviteUrl || buildInviteUrl({
+        clientBaseUrl,
+        event: design.event,
+        guest,
+        inviteToken: resolvedInviteToken,
+      });
+      const actionLayoutOverrides = mergeActionLinksIntoOverrides({
+        overrides: guest.personalizedLayoutOverrides,
+        rsvpLink: inviteUrl,
+        mapLink: buildMapUrl(design.event),
+        liveStreamUrl: req.body.liveStreamUrl,
+      });
+
       const { pdfBuffer, inviteMessage } = await buildRenderedDesignPdfBuffer({
         design,
         event: design.event,
         guest,
-        layoutOverrides: guest.personalizedLayoutOverrides,
+        layoutOverrides: actionLayoutOverrides,
         fallbackMessage: generated.inviteMessage,
       });
 
@@ -1093,12 +1192,6 @@ exports.generateAndSendFromDesign = asyncHandler(async (req, res) => {
         contentType: 'application/pdf',
       });
 
-      const inviteUrl = generated.inviteUrl || buildInviteUrl({
-        clientBaseUrl,
-        event: design.event,
-        guest,
-        inviteToken: generated.inviteToken || guest.inviteToken || crypto.randomBytes(16).toString('hex'),
-      });
       const qrCodeDataUrl = generated.qrCodeDataUrl || (inviteUrl ? await QRCode.toDataURL(inviteUrl) : null);
 
       await prisma.guest.update({
@@ -1111,7 +1204,7 @@ exports.generateAndSendFromDesign = asyncHandler(async (req, res) => {
           personalizedInviteMessage: inviteMessage,
           personalizedInvitePdfUrl: personalizedPdfUrl,
           personalizedInvitePdfKey: personalizedPdfKey,
-          inviteToken: generated.inviteToken,
+          inviteToken: resolvedInviteToken,
           invitationGeneratedAt: new Date(),
           qrCode: qrCodeDataUrl,
         },

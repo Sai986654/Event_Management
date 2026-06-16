@@ -410,32 +410,35 @@ const InviteDesignStudio = () => {
           const btnGap = 20;
           const btnW = Math.round((cardW - pad * 2 - btnGap) / 2);
           [
-            { x: cardX + pad, label: String(props.primaryLabel || 'RSVP Now') },
-            { x: cardX + pad + btnW + btnGap, label: String(props.secondaryLabel || 'Join Live Stream') },
+            {
+              x: cardX + pad,
+              label: String(props.primaryLabel || props.primaryAction || props.actions?.[0]?.label || 'RSVP Now'),
+              actionKind: String(props.primaryActionKind || props.actions?.[0]?.kind || 'rsvp'),
+              url: String(props.primaryUrl || props.rsvpUrl || props.actions?.[0]?.url || '{{custom.rsvpLink}}'),
+            },
+            {
+              x: cardX + pad + btnW + btnGap,
+              label: String(props.secondaryLabel || props.secondaryAction || props.actions?.[1]?.label || 'Join Live Stream'),
+              actionKind: String(props.secondaryActionKind || props.actions?.[1]?.kind || 'liveStream'),
+              url: String(props.secondaryUrl || props.liveStreamUrl || props.actions?.[1]?.url || '{{custom.liveStreamUrl}}'),
+            },
           ].forEach((button) => {
             addElement({
-              type: 'shape',
+              type: 'action',
               x: button.x,
               y: y + 16,
               width: btnW,
               height: 56,
-              shapeType: 'rectangle',
+              label: button.label,
+              actionKind: button.actionKind,
+              url: button.url,
               fillColor: '#ffffff',
+              textColor: '#374151',
               strokeColor: '#c9b07d',
               strokeWidth: 2,
               borderRadius: 28,
-            });
-            addElement({
-              type: 'text',
-              x: button.x,
-              y: y + 30,
-              width: btnW,
-              height: 24,
-              text: button.label,
               fontSize: 24,
               fontWeight: 'bold',
-              color: '#374151',
-              textAlign: 'center',
               fontFamily: 'Arial',
             });
           });
@@ -503,16 +506,21 @@ const InviteDesignStudio = () => {
         if (type === 'qrpass') {
           const y = addCard(108);
           addElement({
-            type: 'text',
+            type: 'action',
             x: cardX + pad,
-            y: y + 20,
-            width: cardW - pad * 2,
-            height: 28,
-            text: String(props.ctaLabel || 'Get Directions / RSVP'),
+            y: y + 18,
+            width: Math.round((cardW - pad * 2) * 0.58),
+            height: 52,
+            label: String(props.ctaLabel || 'Get Directions / RSVP'),
+            actionKind: String(props.actionKind || 'directions'),
+            url: String(props.url || props.mapLink || props.rsvpLink || '{{custom.mapLink}}'),
+            fillColor: '#ffffff',
+            textColor: '#1f2937',
+            strokeColor: '#c9b07d',
+            strokeWidth: 2,
+            borderRadius: 26,
             fontSize: 24,
             fontWeight: 'bold',
-            color: '#1f2937',
-            textAlign: 'left',
             fontFamily: 'Arial',
           });
           addElement({

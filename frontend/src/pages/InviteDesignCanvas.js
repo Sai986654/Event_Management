@@ -153,6 +153,14 @@ const STICKER_CATEGORY_OPTIONS = [
 
 const STICKER_CATEGORY_STORAGE_KEY = 'inviteStudioStickerCategory';
 
+const ACTION_OPTIONS = [
+  { value: 'rsvp', label: 'RSVP' },
+  { value: 'directions', label: 'Directions' },
+  { value: 'liveStream', label: 'Live Stream' },
+  { value: 'details', label: 'View Details' },
+  { value: 'custom', label: 'Custom Link' },
+];
+
 const resolveLottieUrl = (source) => {
   if (!source) return '';
   if (typeof source === 'string') return source;
@@ -405,6 +413,21 @@ const InviteDesignCanvas = ({
           autoPlay: true,
           width: 260,
           height: 260,
+        }),
+        ...(type === 'action' && {
+          label: 'RSVP Now',
+          actionKind: 'rsvp',
+          url: '{{custom.rsvpLink}}',
+          fillColor: '#ffffff',
+          textColor: '#374151',
+          strokeColor: '#c9b07d',
+          strokeWidth: 2,
+          borderRadius: 28,
+          fontSize: 24,
+          fontWeight: 'bold',
+          fontFamily: 'Arial',
+          width: 300,
+          height: 64,
         }),
       };
 
@@ -1157,6 +1180,7 @@ const InviteDesignCanvas = ({
                         <Button size="small" onClick={() => handleAddElement('shape')}>+ Shape</Button>
                         <Button size="small" onClick={() => handleAddElement('divider')}>+ Line</Button>
                         <Button size="small" onClick={() => handleAddElement('lottie')}>+ Animated</Button>
+                        <Button size="small" onClick={() => handleAddElement('action')}>+ Action</Button>
                       </Space>
                     </div>
                   ),
@@ -1243,6 +1267,7 @@ const InviteDesignCanvas = ({
                                   {element.type === 'shape' && element.shapeType}
                                   {element.type === 'divider' && 'Divider'}
                                   {element.type === 'lottie' && 'Animated'}
+                                  {element.type === 'action' && (element.label || 'Action')}
                                 </span>
                               </div>
                               <div className="layer-actions">
@@ -1388,6 +1413,34 @@ const InviteDesignCanvas = ({
                               />
                             );
                           })()
+                        )}
+                        {element.type === 'action' && (
+                          <div
+                            className="invite-action-element"
+                            title={resolveTemplateString(element.url || '', previewMergeContext || {})}
+                            style={{
+                              width: '100%',
+                              height: '100%',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              padding: `${Math.max(4, 10 * scaleY)}px ${Math.max(8, 18 * scaleX)}px`,
+                              backgroundColor: element.fillColor || '#ffffff',
+                              border: `${Number(element.strokeWidth ?? 2)}px solid ${element.strokeColor || '#c9b07d'}`,
+                              borderRadius: Number(element.borderRadius ?? 28) * scaleX,
+                              color: element.textColor || '#374151',
+                              fontSize: Number(element.fontSize || 24) * scaleX,
+                              fontWeight: element.fontWeight || 'bold',
+                              fontFamily: element.fontFamily || 'Arial',
+                              textAlign: 'center',
+                              lineHeight: 1.15,
+                              overflow: 'hidden',
+                              wordBreak: 'break-word',
+                              boxShadow: '0 8px 16px rgba(120, 72, 20, 0.14)',
+                            }}
+                          >
+                            {resolveTemplateString(element.label || 'Action', previewMergeContext || {})}
+                          </div>
                         )}
                         {selectedElementId === element.id && !element.locked ? (
                           <>
@@ -1865,6 +1918,123 @@ const InviteDesignCanvas = ({
                         >
                           {selectedElement.autoPlay !== false ? 'Auto Play' : 'Manual'}
                         </Button>
+                      </Space>
+                    </div>
+                  </>
+                )}
+
+                {/* Action-specific properties */}
+                {selectedElement.type === 'action' && (
+                  <>
+                    <Divider style={{ margin: '8px 0' }} />
+                    <div>
+                      <div style={{ fontWeight: 600, marginBottom: 8 }}>Invite Action</div>
+                      <Row gutter={8}>
+                        <Col span={12}>
+                          <label style={{ fontSize: 12 }}>Action Type</label>
+                          <Select
+                            size="small"
+                            value={selectedElement.actionKind || 'custom'}
+                            onChange={(val) => handleUpdateElement(selectedElement.id, { actionKind: val })}
+                            disabled={selectedElement.locked}
+                            options={ACTION_OPTIONS}
+                          />
+                        </Col>
+                        <Col span={12}>
+                          <label style={{ fontSize: 12 }}>Label</label>
+                          <Input
+                            size="small"
+                            value={selectedElement.label}
+                            onChange={(e) => handleUpdateElement(selectedElement.id, { label: e.target.value })}
+                            placeholder="RSVP Now"
+                            disabled={selectedElement.locked}
+                          />
+                        </Col>
+                      </Row>
+
+                      <label style={{ fontSize: 12, display: 'block', marginTop: 8 }}>Destination URL</label>
+                      <Input
+                        size="small"
+                        value={selectedElement.url}
+                        onChange={(e) => handleUpdateElement(selectedElement.id, { url: e.target.value })}
+                        placeholder="{{custom.rsvpLink}} or https://..."
+                        disabled={selectedElement.locked}
+                      />
+
+                      <Row gutter={8} style={{ marginTop: 8 }}>
+                        <Col span={12}>
+                          <label style={{ fontSize: 12 }}>Font Size</label>
+                          <InputNumber
+                            size="small"
+                            value={selectedElement.fontSize}
+                            onChange={(val) => handleUpdateElement(selectedElement.id, { fontSize: val })}
+                            disabled={selectedElement.locked}
+                            style={{ width: '100%' }}
+                          />
+                        </Col>
+                        <Col span={12}>
+                          <label style={{ fontSize: 12 }}>Weight</label>
+                          <Select
+                            size="small"
+                            value={selectedElement.fontWeight || 'bold'}
+                            onChange={(val) => handleUpdateElement(selectedElement.id, { fontWeight: val })}
+                            disabled={selectedElement.locked}
+                            options={[
+                              { value: 'normal', label: 'Normal' },
+                              { value: 'bold', label: 'Bold' },
+                            ]}
+                          />
+                        </Col>
+                      </Row>
+
+                      <Row gutter={8} style={{ marginTop: 8 }}>
+                        <Col span={12}>
+                          <label style={{ fontSize: 12 }}>Radius</label>
+                          <InputNumber
+                            size="small"
+                            value={selectedElement.borderRadius}
+                            onChange={(val) => handleUpdateElement(selectedElement.id, { borderRadius: val })}
+                            disabled={selectedElement.locked}
+                            style={{ width: '100%' }}
+                          />
+                        </Col>
+                        <Col span={12}>
+                          <label style={{ fontSize: 12 }}>Stroke</label>
+                          <InputNumber
+                            size="small"
+                            value={selectedElement.strokeWidth}
+                            onChange={(val) => handleUpdateElement(selectedElement.id, { strokeWidth: val })}
+                            disabled={selectedElement.locked}
+                            style={{ width: '100%' }}
+                          />
+                        </Col>
+                      </Row>
+
+                      <Space size="middle" wrap style={{ marginTop: 10 }}>
+                        <span>
+                          <label style={{ fontSize: 12 }}>Fill</label>
+                          <ColorPicker
+                            value={selectedElement.fillColor}
+                            onChange={(color) => handleUpdateElement(selectedElement.id, { fillColor: color.toHexString() })}
+                            disabled={selectedElement.locked}
+                          />
+                        </span>
+                        <span>
+                          <label style={{ fontSize: 12 }}>Text</label>
+                          <ColorPicker
+                            value={selectedElement.textColor}
+                            onChange={(color) => handleUpdateElement(selectedElement.id, { textColor: color.toHexString() })}
+                            disabled={selectedElement.locked}
+                          />
+                        </span>
+                        <span>
+                          <label style={{ fontSize: 12 }}>Border</label>
+                          <ColorPicker
+                            value={selectedElement.strokeColor}
+                            onChange={(color) => handleUpdateElement(selectedElement.id, { strokeColor: color.toHexString() })}
+                            disabled={selectedElement.locked}
+                          />
+                        </span>
                       </Space>
                     </div>
                   </>
