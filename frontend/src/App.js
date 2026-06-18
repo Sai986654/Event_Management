@@ -34,6 +34,7 @@ import InviteDesignStudio from './pages/InviteDesignStudio';
 import InviteCanvasEditor from './pages/InviteCanvasEditor';
 import InviteStudioLauncher from './pages/InviteStudioLauncher';
 import InviteTemplateLibrary from './pages/InviteTemplateLibrary';
+import DigitalInvitePage from './pages/DigitalInvitePage';
 
 import NotificationsPage from './pages/NotificationsPage';
 import Profile from './pages/Profile';
@@ -179,6 +180,9 @@ const AppInner = () => {
 
         {/* Public surprise viewer (no auth — recipient views this) */}
         <Route path="/surprise/:slug" element={<SurpriseViewer />} />
+
+        {/* Public interactive digital invite page for guests */}
+        <Route path="/invite/:inviteToken" element={<DigitalInvitePage />} />
 
         {/* Protected Routes */}
         <Route

@@ -50,4 +50,14 @@ export const inviteDesignService = {
     const response = await api.post(`/invites/designs/${designId}/send`, payload);
     return response.data;
   },
+
+  getPublicInvite: async (token) => {
+    const response = await api.get(`/invites/view/${token}`);
+    return response.data;
+  },
+
+  submitPublicRsvp: async (token, data) => {
+    const response = await api.post(`/invites/view/${token}/rsvp`, data);
+    return response.data;
+  },
 };

@@ -136,9 +136,9 @@ const resolveLayoutValue = (value, context) => {
 };
 
 const buildInviteUrl = ({ clientBaseUrl, event, guest, inviteToken }) => {
-  if (!event?.slug || !inviteToken) return '';
+  if (!inviteToken) return '';
   const base = String(clientBaseUrl || '').replace(/\/$/, '');
-  return `${base}/public/${event.slug}?guest=${guest.id}&token=${inviteToken}`;
+  return `${base}/invite/${inviteToken}`;
 };
 
 const buildMapUrl = (event) => {
@@ -1260,4 +1260,127 @@ exports.generateAndSendFromDesign = asyncHandler(async (req, res) => {
     invites: successes,
     failures,
   });
+});
+
+// ── Public Endpoints (no auth — invite token IS the credential) ──────
+
+// GET /api/invites/view/:inviteToken
+exports.getPublicInviteView = asyncHandler(async (req, res) => {
+  if (!(await ensureInviteDesignTablesReady(res))) return;
+
+  const inviteToken = String(req.params.inviteToken || '').trim();
+  if (!inviteToken) return res.status(400).json({ message: 'Invite token is required' });
+
+  const guest = await prisma.guest.findUnique({
+    where: { inviteToken },
+    include: {
+      event: {
+        select: {
+          id: true, title: true, date: true, endDate: true,
+          venue: true, address: true, city: true, state: true,
+          lat: true, lng: true, type: true, slug: true,
+          coverImage: true, description: true, isPublic: true,
+        },
+      },
+    },
+  });
+
+  if (!guest) return res.status(404).json({ message: 'Invitation not found' });
+
+  let design = null;
+  let resolvedLayout = null;
+
+  if (guest.inviteDesignId) {
+    design = await prisma.inviteDesign.findUnique({
+      where: { id: guest.inviteDesignId },
+      select: {
+        id: true, name: true, canvasSize: true, language: true,
+        jsonLayout: true, previewUrl: true, status: true,
+      },
+    });
+  }
+
+  if (design) {
+    const baseLayout = coerceObject(design.jsonLayout);
+    const guestOverrides = coerceObject(guest.personalizedLayoutOverrides);
+    const mergedLayout = deepMerge(baseLayout, guestOverrides);
+
+    const clientBaseUrl = resolveClientBaseUrl(req);
+    const rsvpLink = `${String(clientBaseUrl || '').replace(/\/$/, '')}/invite/${inviteToken}`;
+    const mapLink = buildMapUrl(guest.event);
+    const customData = coerceObject(coerceObject(mergedLayout.mergeData).custom);
+
+    const withActions = mergeActionLinksIntoOverrides({
+      overrides: { mergeData: mergedLayout.mergeData },
+      rsvpLink,
+      mapLink,
+      liveStreamUrl: customData.liveStreamUrl || '',
+    });
+
+    const finalLayout = deepMerge(mergedLayout, withActions);
+    const mergeContext = buildMergeContext({ guest, event: guest.event, layout: finalLayout });
+    resolvedLayout = resolveLayoutValue(finalLayout, mergeContext);
+  }
+
+  const eventDate = guest.event?.date ? new Date(guest.event.date) : null;
+  const validDate = eventDate && !Number.isNaN(eventDate.getTime());
+
+  res.json({
+    guest: {
+      id: guest.id, name: guest.name, relationship: guest.relationship,
+      rsvpStatus: guest.rsvpStatus, plusOnes: guest.plusOnes,
+      dietaryPreferences: guest.dietaryPreferences,
+      personalizedInviteMessage: guest.personalizedInviteMessage,
+      qrCode: guest.qrCode,
+    },
+    event: {
+      id: guest.event.id, title: guest.event.title,
+      date: guest.event.date, endDate: guest.event.endDate,
+      dateText: validDate ? eventDate.toLocaleDateString('en-IN', { dateStyle: 'long' }) : '',
+      timeText: validDate ? eventDate.toLocaleTimeString('en-IN', { timeStyle: 'short' }) : '',
+      venue: guest.event.venue, address: guest.event.address,
+      city: guest.event.city, state: guest.event.state,
+      lat: guest.event.lat, lng: guest.event.lng,
+      type: guest.event.type, slug: guest.event.slug,
+      coverImage: guest.event.coverImage, description: guest.event.description,
+    },
+    design: design ? { id: design.id, name: design.name, canvasSize: design.canvasSize, language: design.language } : null,
+    resolvedLayout,
+    mapUrl: buildMapUrl(guest.event),
+  });
+});
+
+// POST /api/invites/view/:inviteToken/rsvp
+exports.submitPublicRsvp = asyncHandler(async (req, res) => {
+  if (!(await ensureInviteDesignTablesReady(res))) return;
+
+  const inviteToken = String(req.params.inviteToken || '').trim();
+  if (!inviteToken) return res.status(400).json({ message: 'Invite token is required' });
+
+  const guest = await prisma.guest.findUnique({ where: { inviteToken } });
+  if (!guest) return res.status(404).json({ message: 'Invitation not found' });
+
+  const status = String(req.body.status || '').toLowerCase();
+  if (!['accepted', 'declined', 'maybe', 'pending'].includes(status)) {
+    return res.status(400).json({ message: 'status must be accepted, declined, maybe, or pending' });
+  }
+
+  const data = { rsvpStatus: status };
+  if (req.body.dietaryPreferences !== undefined) {
+    data.dietaryPreferences = String(req.body.dietaryPreferences || '').trim() || null;
+  }
+  if (req.body.plusOnes !== undefined) {
+    const parsed = Number(req.body.plusOnes);
+    if (Number.isInteger(parsed) && parsed >= 0 && parsed <= 20) {
+      data.plusOnes = parsed;
+    }
+  }
+
+  const updatedGuest = await prisma.guest.update({
+    where: { id: guest.id },
+    data,
+    select: { id: true, name: true, rsvpStatus: true, plusOnes: true, dietaryPreferences: true },
+  });
+
+  res.json({ guest: updatedGuest, message: 'RSVP updated successfully' });
 });

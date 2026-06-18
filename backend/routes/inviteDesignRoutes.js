@@ -14,7 +14,13 @@ const {
   listInviteDesignExports,
   attachDesignToGuest,
   generateAndSendFromDesign,
+  getPublicInviteView,
+  submitPublicRsvp,
 } = require('../controllers/inviteDesignController');
+
+// Public routes (accessible to guests via unique token)
+router.get('/view/:inviteToken', getPublicInviteView);
+router.post('/view/:inviteToken/rsvp', submitPublicRsvp);
 
 router.use(protect);
 router.use(authorize('admin', 'organizer'));

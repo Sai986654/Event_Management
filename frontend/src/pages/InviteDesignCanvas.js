@@ -1618,6 +1618,29 @@ const InviteDesignCanvas = ({
                     <Divider style={{ margin: '8px 0' }} />
                     <div>
                       <div style={{ fontWeight: 600, marginBottom: 8 }}>Text Content</div>
+                      <Select
+                        placeholder="Insert Placeholder Token"
+                        size="small"
+                        style={{ width: '100%', marginBottom: 8 }}
+                        options={placeholderTokens.map((token) => ({ value: token, label: token }))}
+                        value={undefined}
+                        onChange={(token) => {
+                          const textarea = textAreaRef.current?.resizableTextArea?.textArea;
+                          if (textarea) {
+                            const start = textarea.selectionStart;
+                            const end = textarea.selectionEnd;
+                            const currentText = selectedElement.text || '';
+                            const newText = currentText.substring(0, start) + token + currentText.substring(end);
+                            handleUpdateElement(selectedElement.id, { text: newText });
+                            setTimeout(() => {
+                              textarea.focus();
+                              textarea.setSelectionRange(start + token.length, start + token.length);
+                            }, 50);
+                          } else {
+                            handleUpdateElement(selectedElement.id, { text: (selectedElement.text || '') + token });
+                          }
+                        }}
+                      />
                       <Input.TextArea
                         ref={textAreaRef}
                         value={selectedElement.text}

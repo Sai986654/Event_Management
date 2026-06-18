@@ -1,130 +1,290 @@
-.invite-studio-page {
-  max-width: 1600px;
-  margin: 0 auto;
-  padding: 24px 20px 30px;
-  background: linear-gradient(180deg, #eef4ff 0%, #f7fbff 55%, #eef6ff 100%);
-  color: #0f172a;
-  font-family: 'Poppins', 'Segoe UI', sans-serif;
+/* InviteDesignStudio.css - Premium Organizer Studio Workspace */
+
+.invite-studio-workspace {
+  background-color: #0b090a;
+  background-image: 
+    radial-gradient(at 10% 20%, rgba(30, 20, 25, 0.4) 0px, transparent 50%),
+    radial-gradient(at 90% 10%, rgba(20, 30, 40, 0.3) 0px, transparent 50%);
+  min-height: calc(100vh - 64px);
+  padding: 24px;
+  color: #f5f3f4;
+  box-sizing: border-box;
 }
 
-.invite-studio-loading {
-  min-height: calc(100vh - 180px);
+/* Spinner Loader Wrap */
+.invite-studio-loading-wrap {
+  min-height: 50vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  color: #b1a7a6;
+}
+
+.studio-card-panel.ant-card {
+  background-color: rgba(26, 20, 22, 0.6) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 20px !important;
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4) !important;
+  padding: 8px;
+}
+
+/* NAVBAR HEADER */
+.studio-editor-navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #151113;
+  border: 1px solid rgba(212, 175, 55, 0.15);
+  border-radius: 16px;
+  padding: 14px 24px;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.5);
+}
+
+@media (max-width: 991px) {
+  .studio-editor-navbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
+  }
+}
+
+.navbar-left {
   display: flex;
   align-items: center;
-  justify-content: center;
+  gap: 16px;
 }
 
-.invite-studio-header {
-  margin-bottom: 18px;
-  border-radius: 12px;
-  border: 1px solid #dbeafe;
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
-  background: linear-gradient(120deg, #f8fbff 0%, #f1f7ff 100%);
+.nav-back-btn {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  color: #f5f3f4 !important;
+  border-radius: 10px !important;
 }
 
-.invite-studio-card {
-  border-radius: 12px;
-  border: 1px solid #dbeafe;
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
-  background: #ffffff;
+.nav-back-btn:hover {
+  border-color: #d4af37 !important;
+  color: #d4af37 !important;
 }
 
-.invite-studio-card .ant-card-head {
-  min-height: 48px;
+.navbar-meta {
+  display: flex;
+  flex-direction: column;
 }
 
-.invite-studio-card .ant-card-head-title {
-  font-weight: 700;
-  color: #0b2545;
-  letter-spacing: 0.1px;
+.design-name-input.ant-input {
+  background: transparent !important;
+  border: none !important;
+  border-bottom: 1px dashed rgba(212, 175, 55, 0.4) !important;
+  border-radius: 0 !important;
+  font-family: 'Playfair Display', serif;
+  font-weight: 600 !important;
+  font-size: 18px !important;
+  color: #f5f3f4 !important;
+  padding: 0 0 2px 0 !important;
+  max-width: 260px;
 }
 
-.invite-studio-card .ant-typography,
-.invite-studio-card .ant-typography strong {
-  color: #0f172a;
+.design-name-input.ant-input:focus {
+  border-bottom-color: #d4af37 !important;
+  box-shadow: none !important;
 }
 
-.invite-studio-card--designs .ant-table-wrapper {
-  overflow-x: auto;
+.navbar-subtitle {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #b1a7a6;
+  margin-top: 4px;
 }
 
-.invite-studio-card--editor .ant-card-body {
-  padding: 16px;
+.navbar-right .ant-select-selector {
+  background-color: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 10px !important;
+  color: #f5f3f4 !important;
 }
 
-.invite-studio-card--editor-focus {
-  border-color: #bfdbfe;
-  box-shadow: 0 14px 30px rgba(14, 116, 144, 0.14);
+.navbar-save-btn {
+  background: linear-gradient(135deg, #d4af37 0%, #b8901c 100%) !important;
+  border: none !important;
+  border-radius: 10px !important;
+  color: #0b090a !important;
+  font-weight: 700 !important;
 }
 
-.invite-studio-card--editor-focus .ant-card-head {
-  background: linear-gradient(90deg, #f0f9ff 0%, #e0f2fe 100%);
+.navbar-next-btn {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(212, 175, 55, 0.3) !important;
+  color: #d4af37 !important;
+  border-radius: 10px !important;
+  font-weight: 600 !important;
 }
 
-.invite-studio-json {
-  font-family: 'Courier New', monospace;
+.navbar-next-btn:hover {
+  background-color: rgba(212, 175, 55, 0.1) !important;
+  border-color: #d4af37 !important;
 }
 
-.invite-studio-export-list {
-  margin: 10px 0 0;
-  padding-left: 18px;
+/* HOST FIELD SIDEBAR */
+.host-data-sidebar.ant-card {
+  background-color: rgba(26, 20, 22, 0.6) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 18px !important;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3) !important;
 }
 
-.invite-studio-export-list li {
-  margin-bottom: 8px;
+.sidebar-description {
+  font-size: 12px;
+  color: #b1a7a6;
+  margin-bottom: 16px;
   line-height: 1.4;
 }
 
-.invite-studio-placeholder-groups {
-  display: grid;
-  gap: 12px;
-  margin-top: 12px;
-}
-
-.invite-studio-placeholder-group {
-  display: grid;
+.studio-form-group {
+  display: flex;
+  flex-direction: column;
   gap: 6px;
 }
 
-.invite-studio-placeholder-tag {
+.studio-form-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #b1a7a6;
+  font-weight: 600;
+}
+
+.studio-form-input.ant-input {
+  background-color: rgba(0, 0, 0, 0.25) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 8px !important;
+  color: #f5f3f4 !important;
+  padding: 6px 12px !important;
+}
+
+.studio-form-input.ant-input:focus {
+  border-color: #d4af37 !important;
+  box-shadow: 0 0 6px rgba(212, 175, 55, 0.2) !important;
+}
+
+/* PREVIEW AND SEND PANEL styles */
+.mock-phone-panel.ant-card,
+.send-pipeline-panel.ant-card {
+  background-color: rgba(26, 20, 22, 0.6) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 20px !important;
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4) !important;
+}
+
+.phone-mockup-wrapper {
+  max-width: 320px;
+  width: 100%;
+  margin: 24px auto;
+  border: 8px solid #2d2529;
+  border-radius: 24px;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+  overflow: hidden;
+}
+
+/* Scroll panes */
+.guest-checklist-scroll {
+  max-height: 350px;
+  overflow-y: auto;
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 12px;
+  background-color: rgba(0, 0, 0, 0.15);
+}
+
+.guest-checklist-scroll .ant-table {
+  background: transparent !important;
+  color: #f5f3f4 !important;
+}
+
+.guest-checklist-scroll .ant-table-thead > tr > th {
+  background: rgba(255, 255, 255, 0.03) !important;
+  color: #b1a7a6 !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+}
+
+.guest-checklist-scroll .ant-table-tbody > tr > td {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04) !important;
+}
+
+.guest-checklist-scroll .ant-table-row:hover > td {
+  background: rgba(255, 255, 255, 0.03) !important;
+}
+
+.dispatch-controls-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 16px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+.failure-list-scroll {
+  max-height: 120px;
+  overflow-y: auto;
+  padding: 8px;
+  background-color: rgba(255, 82, 82, 0.05);
+  border: 1px solid rgba(255, 82, 82, 0.1);
+  border-radius: 8px;
+}
+
+/* Scrollbar Customization */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0,0,0,0.1);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(212, 175, 55, 0.2);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(212, 175, 55, 0.4);
+}
+
+/* MOBILE TABS BAR */
+.mobile-tab-navbar {
+  display: flex;
+  background-color: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 4px;
+  margin-top: 16px;
+  margin-bottom: 8px;
+  gap: 4px;
+}
+
+.mobile-tab-btn {
+  flex: 1;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 16px;
+  color: #b1a7a6;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 600;
+  font-size: 13px;
   cursor: pointer;
-  user-select: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border-radius: 999px;
-  font-weight: 500;
+  transition: all 0.25s ease;
 }
 
-@media (max-width: 1200px) {
-  .invite-studio-page {
-    padding: 16px;
-  }
-
-  .invite-studio-card--editor .ant-card-body {
-    padding: 14px;
-  }
+.mobile-tab-btn:hover {
+  color: #f5f3f4;
 }
 
-@media (max-width: 768px) {
-  .invite-studio-page {
-    padding: 12px;
-    background: #f8fbff;
-  }
-
-  .invite-studio-header {
-    margin-bottom: 12px;
-  }
-
-  .invite-studio-card .ant-card-head {
-    min-height: 44px;
-  }
-
-  .invite-studio-card .ant-card-head-title {
-    font-size: 15px;
-  }
-
-  .invite-studio-card--editor .ant-card-body {
-    padding: 12px;
-  }
+.mobile-tab-btn.active {
+  background-color: rgba(212, 175, 55, 0.15);
+  color: #d4af37;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
 }

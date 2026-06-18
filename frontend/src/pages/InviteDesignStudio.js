@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   Button,
@@ -15,26 +15,30 @@ import {
   Tag,
   Typography,
   message,
-  Tabs,
+  Progress,
+  Checkbox,
+  Tooltip,
+  Grid,
 } from 'antd';
 import {
   ArrowLeftOutlined,
   CopyOutlined,
-  ExportOutlined,
   SaveOutlined,
-  PlusOutlined,
   ReloadOutlined,
-  CodeOutlined,
   BgColorsOutlined,
-  ExpandOutlined,
+  EditOutlined,
+  EyeOutlined,
+  SendOutlined,
+  CheckOutlined,
+  SettingOutlined,
 } from '@ant-design/icons';
 import { eventService } from '../services/eventService';
 import { guestService } from '../services/guestService';
 import { inviteDesignService } from '../services/inviteDesignService';
-import { getErrorMessage, getPaymentRequirement } from '../utils/helpers';
-import { paymentService } from '../services/paymentService';
-import PaymentConfirmationModal from '../components/PaymentConfirmationModal';
+import { getErrorMessage } from '../utils/helpers';
+import InviteTemplateGallery from '../components/InviteTemplateGallery';
 import InviteDesignCanvas from './InviteDesignCanvas';
+import Lottie from 'lottie-react';
 import {
   EVENT_TYPE_OPTIONS,
   buildStarterLayout,
@@ -47,48 +51,83 @@ import {
 } from '../utils/invitePlaceholders';
 import './InviteDesignStudio.css';
 
-const { Text, Title } = Typography;
-const { TextArea } = Input;
+const { Text, Title, Paragraph } = Typography;
+
+/* ── Lottie Utilities ───────────────────────────────────────────────── */
+
+const resolveLottieUrl = (source) => {
+  if (!source) return '';
+  if (typeof source === 'string') return source;
+  if (typeof source === 'object' && typeof source.uri === 'string') return source.uri;
+  return '';
+};
+
+const getLottieMirrorUrls = (url) => {
+  const normalized = String(url || '').trim();
+  if (!normalized) return [];
+
+  const packageMatch = normalized.match(/\/packages\/([^/?#]+\.json)/i);
+  if (!packageMatch?.[1]) {
+    return [normalized];
+  }
+
+  const packageFile = packageMatch[1];
+  const variants = Array.from({ length: 10 }, (_, index) => `https://assets${index + 1}.lottiefiles.com/packages/${packageFile}`);
+  return [normalized, ...variants.filter((candidate) => candidate !== normalized)];
+};
+
+/* ── Main Component ─────────────────────────────────────────────────── */
 
 const InviteDesignStudio = () => {
   const { eventId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
 
+  // Workflow steps: 'template' | 'editor' | 'preview'
+  const [step, setStep] = useState('template');
+
+  const screens = Grid.useBreakpoint();
+  const isMobile = !screens.lg;
+  const [editorMobileTab, setEditorMobileTab] = useState('details'); // 'details' | 'canvas'
+  const [previewMobileTab, setPreviewMobileTab] = useState('preview'); // 'preview' | 'send'
+
+  // Loaded Data
   const [event, setEvent] = useState(null);
   const [guests, setGuests] = useState([]);
   const [templates, setTemplates] = useState([]);
   const [designs, setDesigns] = useState([]);
-  const [selectedTemplate, setSelectedTemplate] = useState('');
+  const [lottieDataMap, setLottieDataMap] = useState({});
+
+  // Active Design State
   const [selectedDesignId, setSelectedDesignId] = useState(null);
   const [selectedDesign, setSelectedDesign] = useState(null);
-  const [exportsList, setExportsList] = useState([]);
-
-  const [newDesignName, setNewDesignName] = useState('');
   const [designName, setDesignName] = useState('');
   const [designStatus, setDesignStatus] = useState('draft');
   const [designLanguage, setDesignLanguage] = useState('en');
-  const [layoutText, setLayoutText] = useState('{}');
   const [canvasLayout, setCanvasLayout] = useState({});
-  const [editorMode, setEditorMode] = useState('canvas'); // 'canvas' or 'json'
+  const [selectedTemplate, setSelectedTemplate] = useState('');
 
-  const [previewGuestId, setPreviewGuestId] = useState(null);
-  const [activePlaceholderToken, setActivePlaceholderToken] = useState('');
-  const [customKey, setCustomKey] = useState('');
-  const [customValue, setCustomValue] = useState('');
-
+  // UI States
   const [loading, setLoading] = useState(true);
-  const [creating, setCreating] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [duplicating, setDuplicating] = useState(false);
-  const [exportingPdf, setExportingPdf] = useState(false);
-  const [publishing, setPublishing] = useState(false);
-  const [paymentReceiptVisible, setPaymentReceiptVisible] = useState(false);
-  const [paymentReceipt, setPaymentReceipt] = useState(null);
-  const [loadingReceipt] = useState(false);
+  const [creating, setCreating] = useState(false);
+  
+  // Preview & Send States
+  const [previewGuestId, setPreviewGuestId] = useState(null);
+  const [selectedGuests, setSelectedGuests] = useState([]);
+  const [sendViaChannel, setSendViaChannel] = useState('both');
+  const [isSending, setIsSending] = useState(false);
+  const [sentCount, setSentCount] = useState(0);
+  const [sendFailures, setSendFailures] = useState([]);
+  const [guestSearchQuery, setGuestSearchQuery] = useState('');
 
+  // Scaled preview container
+  const previewContainerRef = useRef(null);
+  const [previewContainerWidth, setPreviewContainerWidth] = useState(320);
+
+  // Derived Properties
   const selectedTemplateMeta = useMemo(
-    () => templates.find((template) => template.key === selectedTemplate) || null,
+    () => templates.find((t) => t.key === selectedTemplate) || null,
     [templates, selectedTemplate]
   );
   const inviteEventType = canvasLayout.eventType || event?.type || selectedDesign?.category || 'other';
@@ -97,7 +136,7 @@ const InviteDesignStudio = () => {
   const quickTextBlocks = useMemo(() => getQuickTextBlocks(inviteEventType), [inviteEventType]);
   const sectionBlocks = useMemo(() => getSectionBlocks(inviteEventType), [inviteEventType]);
   const previewGuest = useMemo(
-    () => guests.find((guest) => guest.id === previewGuestId) || guests[0] || null,
+    () => guests.find((g) => g.id === previewGuestId) || guests[0] || null,
     [guests, previewGuestId]
   );
   const mergeData = useMemo(
@@ -117,124 +156,161 @@ const InviteDesignStudio = () => {
     [event, previewGuest, mergeData]
   );
 
-  const getValueByPath = (source, path) =>
-    String(path || '')
-      .split('.')
-      .filter(Boolean)
-      .reduce((acc, segment) => (acc && acc[segment] !== undefined ? acc[segment] : undefined), source);
+  // Load Lottie animation files dynamically in Step 3 Preview
+  useEffect(() => {
+    if (step !== 'preview' || !canvasLayout?.elements) return;
 
-  const placeholderCatalog = useMemo(() => {
-    const base = placeholderGroups.flatMap((group) =>
-      group.items.map((item) => ({
-        token: item.token,
-        label: item.label,
-        group: group.label,
-      }))
+    const elements = canvasLayout.elements;
+    const urls = Array.from(
+      new Set(
+        elements
+          .filter((el) => el.type === 'lottie')
+          .map((el) => resolveLottieUrl(el.lottieSource))
+          .filter(Boolean)
+      )
     );
-    const dynamicCustom = Object.keys(mergeData.custom || {}).map((key) => ({
-      token: `{{custom.${key}}}`,
-      label: `Custom: ${key}`,
-      group: 'Custom Fields',
-    }));
-    return [...base, ...dynamicCustom];
-  }, [placeholderGroups, mergeData.custom]);
 
-  const activePlaceholderMeta = useMemo(
-    () => placeholderCatalog.find((item) => item.token === activePlaceholderToken) || placeholderCatalog[0] || null,
-    [placeholderCatalog, activePlaceholderToken]
-  );
+    const missing = urls.filter((url) => !lottieDataMap[url]);
+    if (!missing.length) return;
 
-  const activePlaceholderPath = useMemo(() => {
-    if (!activePlaceholderMeta?.token) return '';
-    return String(activePlaceholderMeta.token).replace(/^\{\{\s*|\s*\}\}$/g, '').trim();
-  }, [activePlaceholderMeta]);
+    Promise.all(
+      missing.map(async (requestedUrl) => {
+        const candidates = getLottieMirrorUrls(requestedUrl);
+        for (const candidateUrl of candidates) {
+          try {
+            const response = await fetch(candidateUrl);
+            if (!response.ok) continue;
+            const json = await response.json();
+            return [requestedUrl, candidateUrl, json];
+          } catch (_err) {}
+        }
+        return null;
+      })
+    ).then((results) => {
+      const entries = results.filter(Boolean);
+      if (!entries.length) return;
+      setLottieDataMap((prev) => {
+        const next = { ...prev };
+        entries.forEach(([requestedUrl, resolvedUrl, data]) => {
+          if (!next[requestedUrl]) next[requestedUrl] = data;
+          if (!next[resolvedUrl]) next[resolvedUrl] = data;
+        });
+        return next;
+      });
+    });
+  }, [step, canvasLayout, lottieDataMap]);
 
-  const activePlaceholderValue = useMemo(() => {
-    if (!activePlaceholderPath) return '';
-    const value = getValueByPath(previewMergeContext, activePlaceholderPath);
-    return value === undefined || value === null ? '' : String(value);
-  }, [activePlaceholderPath, previewMergeContext]);
+  // Handle preview mockup resize calculation
+  useEffect(() => {
+    if (step !== 'preview') return;
+    const updateWidth = () => {
+      if (previewContainerRef.current) {
+        setPreviewContainerWidth(previewContainerRef.current.offsetWidth);
+      }
+    };
+    updateWidth();
+    window.addEventListener('resize', updateWidth);
+    return () => window.removeEventListener('resize', updateWidth);
+  }, [step]);
 
-  const activePlaceholderEditTarget = useMemo(() => {
-    if (!activePlaceholderPath) return null;
-    const [scope, ...rest] = activePlaceholderPath.split('.');
-    if (!['event', 'hosts', 'custom'].includes(scope)) return null;
-    if (!rest.length) return null;
-    return { scope, key: rest.join('.') };
-  }, [activePlaceholderPath]);
+  // Load initial studio context
+  const loadStudioData = useCallback(async () => {
+    try {
+      setLoading(true);
+      const [eventRes, guestsRes, templatesRes, designsRes] = await Promise.all([
+        eventService.getEventById(eventId),
+        guestService.getEventGuests(eventId),
+        inviteDesignService.getTemplates(),
+        inviteDesignService.listDesigns(eventId),
+      ]);
+
+      setEvent(eventRes.event || null);
+      setGuests(guestsRes.guests || []);
+      setTemplates(templatesRes.templates || []);
+      setDesigns(designsRes.designs || []);
+
+      const designsList = designsRes.designs || [];
+      const query = new URLSearchParams(location.search);
+      const preferredDesignId = Number(query.get('designId'));
+      
+      const preferredDesign = Number.isInteger(preferredDesignId) && preferredDesignId > 0
+        ? designsList.find((d) => d.id === preferredDesignId)
+        : null;
+
+      const activeDesign = preferredDesign || designsList[0];
+
+      if (activeDesign) {
+        await loadDesignDetails(activeDesign.id, templatesRes.templates || []);
+        setStep('editor');
+      } else {
+        setStep('template');
+      }
+    } catch (error) {
+      message.error(getErrorMessage(error));
+    } finally {
+      setLoading(false);
+    }
+  }, [eventId, location.search]);
 
   useEffect(() => {
-    if (!activePlaceholderToken && placeholderCatalog.length) {
-      setActivePlaceholderToken(placeholderCatalog[0].token);
-      return;
-    }
-    if (activePlaceholderToken && !placeholderCatalog.some((item) => item.token === activePlaceholderToken)) {
-      setActivePlaceholderToken(placeholderCatalog[0]?.token || '');
-    }
-  }, [activePlaceholderToken, placeholderCatalog]);
+    loadStudioData();
+  }, [loadStudioData]);
 
-  const patchMergeData = useMemo(
-    () => (scope, key, value) => {
-      setCanvasLayout((prev) => {
-        const current = buildDefaultMergeData(inviteEventType, prev.mergeData);
-        return {
-          ...prev,
-          mergeData: {
-            ...current,
-            [scope]: {
-              ...(current[scope] || {}),
-              [key]: value,
-            },
-          },
-        };
-      });
-    },
-    [inviteEventType]
-  );
+  // Load selected design details
+  const loadDesignDetails = async (designId, templateCatalog = []) => {
+    if (!designId) return;
 
-  const setEventProfile = (nextType) => {
-    setCanvasLayout((prev) => ({
-      ...prev,
-      eventType: nextType,
-      mergeData: buildDefaultMergeData(nextType, prev.mergeData),
-    }));
-  };
-
-  const addOrUpdateCustomField = () => {
-    const key = customKey.trim().replace(/\s+/g, '_');
-    if (!key) {
-      message.warning('Enter a custom key');
-      return;
-    }
-    patchMergeData('custom', key, customValue);
-    setCustomKey('');
-    setCustomValue('');
-  };
-
-  const removeCustomField = (key) => {
-    setCanvasLayout((prev) => {
-      const current = buildDefaultMergeData(inviteEventType, prev.mergeData);
-      const nextCustom = { ...(current.custom || {}) };
-      delete nextCustom[key];
-      return {
-        ...prev,
-        mergeData: {
-          ...current,
-          custom: nextCustom,
-        },
-      };
-    });
-  };
-
-  const handleCopyPlaceholder = async (token) => {
     try {
-      await navigator.clipboard.writeText(token);
-      message.success(`${token} copied`);
-    } catch (_error) {
-      message.info(token);
+      const designRes = await inviteDesignService.getDesign(designId);
+      const design = designRes.design;
+      const designLayout = design.jsonLayout && typeof design.jsonLayout === 'object' ? design.jsonLayout : {};
+      const designEventType = designLayout.eventType || event?.type || design.category || 'other';
+
+      const hasRenderableElements = Array.isArray(designLayout.elements) && designLayout.elements.length > 0;
+      const availableTemplates = templateCatalog.length ? templateCatalog : templates;
+      const fallbackTemplateKey = designLayout.templateKey || null;
+      const matchedTemplate = availableTemplates.find((t) => t.key === fallbackTemplateKey) || null;
+
+      const templateDrivenLayout = (!hasRenderableElements && matchedTemplate)
+        ? buildCanvasLayoutFromTemplate({
+            templateMeta: matchedTemplate,
+            baseLayout: designLayout,
+            eventType: designEventType,
+          })
+        : null;
+
+      const nextLayout = hasRenderableElements
+        ? {
+            ...designLayout,
+            eventType: designEventType,
+            mergeData: buildDefaultMergeData(designEventType, designLayout.mergeData),
+          }
+        : templateDrivenLayout
+        ? templateDrivenLayout
+        : buildStarterLayout({
+            eventType: designEventType,
+            event,
+            templateKey: fallbackTemplateKey,
+            mergeData: designLayout.mergeData,
+            canvasSize: designLayout.canvasSize || design.canvasSize || '1080x1920',
+            backgroundColor: designLayout.backgroundColor || '#fffaf6',
+          });
+
+      setSelectedDesignId(design.id);
+      setSelectedDesign(design);
+      setDesignName(design.name || '');
+      setDesignStatus(design.status || 'draft');
+      setDesignLanguage(design.language || 'en');
+      setCanvasLayout(nextLayout);
+      if (nextLayout.templateKey) {
+        setSelectedTemplate(nextLayout.templateKey);
+      }
+    } catch (error) {
+      message.error(getErrorMessage(error));
     }
   };
 
+  // Build template parser
   const buildCanvasLayoutFromTemplate = ({ templateMeta, baseLayout = {}, eventType }) => {
     const templateConfig = templateMeta?.templateConfig;
     if (!templateConfig || typeof templateConfig !== 'object') return null;
@@ -324,7 +400,7 @@ const InviteDesignStudio = () => {
     }
 
     sections
-      .filter((section) => section && section.visible !== false)
+      .filter((sec) => sec && sec.visible !== false)
       .sort((a, b) => Number(a?.order || 0) - Number(b?.order || 0))
       .forEach((section) => {
         const type = String(section?.componentType || '').toLowerCase();
@@ -552,12 +628,141 @@ const InviteDesignStudio = () => {
     };
   };
 
-  const handleApplyStarterLayout = () => {
+  // Start with blank template
+  const handleStartBlank = async () => {
+    try {
+      setCreating(true);
+      const draftEventType = event?.type || 'other';
+      const blankLayout = buildStarterLayout({
+        eventType: draftEventType,
+        event,
+        templateKey: null,
+        mergeData: buildDefaultMergeData(draftEventType),
+      });
+
+      const createRes = await inviteDesignService.createDesign({
+        eventId: Number(eventId),
+        name: 'Blank Design Template',
+        language: 'en',
+        status: 'draft',
+        category: event?.type || 'general',
+        jsonLayout: blankLayout,
+      });
+
+      const newDesign = createRes?.design;
+      if (newDesign?.id) {
+        const refreshed = await inviteDesignService.listDesigns(eventId);
+        setDesigns(refreshed.designs || []);
+        await loadDesignDetails(newDesign.id, templates);
+        setStep('editor');
+        message.success('Blank design created successfully');
+      }
+    } catch (error) {
+      message.error(getErrorMessage(error));
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  // Selection handler from Visual Template gallery
+  const handleSelectTemplate = async (template) => {
+    try {
+      setCreating(true);
+      const draftEventType = event?.type || 'other';
+      const seedLayout = buildCanvasLayoutFromTemplate({
+        templateMeta: template,
+        baseLayout: {
+          templateKey: template.key,
+          eventType: draftEventType,
+          mergeData: buildDefaultMergeData(draftEventType),
+        },
+        eventType: draftEventType,
+      }) || buildStarterLayout({
+        eventType: draftEventType,
+        event,
+        templateKey: template.key,
+        mergeData: buildDefaultMergeData(draftEventType),
+      });
+
+      const createRes = await inviteDesignService.createDesign({
+        eventId: Number(eventId),
+        name: `${template.name} Design`,
+        language: 'en',
+        status: 'draft',
+        category: event?.type || 'general',
+        jsonLayout: {
+          ...seedLayout,
+          masterTemplateKey: template.key,
+        },
+      });
+
+      const newDesign = createRes?.design;
+      if (newDesign?.id) {
+        const refreshed = await inviteDesignService.listDesigns(eventId);
+        setDesigns(refreshed.designs || []);
+        await loadDesignDetails(newDesign.id, templates);
+        setStep('editor');
+        message.success(`Design created using ${template.name} template!`);
+      }
+    } catch (error) {
+      message.error(getErrorMessage(error));
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  // Save changes
+  const handleSaveDesign = async (silent = false) => {
     if (!selectedDesignId) {
-      message.warning('Select a design first.');
-      return;
+      message.warning('No design selected.');
+      return false;
     }
 
+    setSaving(true);
+    try {
+      const finalLayout = {
+        ...canvasLayout,
+        eventType: inviteEventType,
+        mergeData,
+      };
+
+      await inviteDesignService.updateDesign(selectedDesignId, {
+        name: designName.trim() || selectedDesign?.name,
+        language: designLanguage,
+        status: designStatus,
+        jsonLayout: finalLayout,
+      });
+
+      setCanvasLayout(finalLayout);
+      if (!silent) message.success('Invitation layout saved successfully');
+      return true;
+    } catch (error) {
+      message.error(getErrorMessage(error));
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Duplicate active design
+  const handleDuplicateDesign = async () => {
+    if (!selectedDesignId) return;
+    try {
+      const nameCopy = `${designName} Copy`;
+      const res = await inviteDesignService.duplicateDesign(selectedDesignId, { name: nameCopy });
+      message.success('Design duplicated successfully');
+      const refreshed = await inviteDesignService.listDesigns(eventId);
+      setDesigns(refreshed.designs || []);
+      if (res.design?.id) {
+        await loadDesignDetails(res.design.id, templates);
+      }
+    } catch (error) {
+      message.error(getErrorMessage(error));
+    }
+  };
+
+  // Reset starter layouts
+  const handleResetStarter = () => {
     const nextLayout = buildStarterLayout({
       eventType: inviteEventType,
       event,
@@ -566,853 +771,599 @@ const InviteDesignStudio = () => {
       canvasSize: canvasLayout.canvasSize || '1080x1920',
       backgroundColor: canvasLayout.backgroundColor || '#fffaf6',
     });
-
     setCanvasLayout(nextLayout);
-    setLayoutText(JSON.stringify(nextLayout, null, 2));
-    setEditorMode('canvas');
-    message.success(`Starter ${inviteEventType} layout applied`);
+    message.success(`Canvas reset to default ${inviteEventType} starter layout.`);
   };
 
-  const loadStudioData = async () => {
-    try {
-      setLoading(true);
-      const query = new URLSearchParams(location.search);
-      const queryTemplateKey = String(query.get('templateKey') || '').trim();
-      const queryCreateFromMaster = query.get('createFromMaster') === '1';
-
-      const [eventRes, guestsRes, templatesRes, designsRes] = await Promise.all([
-        eventService.getEventById(eventId),
-        guestService.getEventGuests(eventId),
-        inviteDesignService.getTemplates(),
-        inviteDesignService.listDesigns(eventId),
-      ]);
-
-      setEvent(eventRes.event || null);
-      setGuests(guestsRes.guests || []);
-      setTemplates(templatesRes.templates || []);
-      setDesigns(designsRes.designs || []);
-
-      const firstTemplate = (templatesRes.templates || [])[0];
-      const initialTemplateKey =
-        queryTemplateKey && (templatesRes.templates || []).some((template) => template.key === queryTemplateKey)
-          ? queryTemplateKey
-          : firstTemplate?.key;
-      if (initialTemplateKey) setSelectedTemplate(initialTemplateKey);
-
-      if (queryCreateFromMaster && queryTemplateKey) {
-        const existingMasterDesign = (designsRes.designs || []).find(
-          (design) => design?.jsonLayout && design.jsonLayout.masterTemplateKey === queryTemplateKey
-        );
-
-        if (existingMasterDesign) {
-          await loadDesignDetails(existingMasterDesign.id, templatesRes.templates || []);
-          return;
-        }
-
-        const templateMeta = (templatesRes.templates || []).find((template) => template.key === queryTemplateKey) || null;
-        if (templateMeta) {
-          const draftEventType = eventRes.event?.type || 'other';
-          const seedLayout = buildCanvasLayoutFromTemplate({
-            templateMeta,
-            baseLayout: {
-              templateKey: queryTemplateKey,
-              masterTemplateKey: queryTemplateKey,
-              eventType: draftEventType,
-              mergeData: buildDefaultMergeData(draftEventType),
-              title: eventRes.event?.title || '',
-              venue: eventRes.event?.venue || '',
-              date: eventRes.event?.date || null,
-            },
-            eventType: draftEventType,
-          }) || buildStarterLayout({
-            eventType: draftEventType,
-            event: eventRes.event,
-            templateKey: queryTemplateKey,
-            mergeData: buildDefaultMergeData(draftEventType),
-          });
-
-          const createRes = await inviteDesignService.createDesign({
-            eventId: Number(eventId),
-            name: `${queryTemplateKey} master`,
-            language: 'en',
-            status: 'draft',
-            category: eventRes.event?.type || 'general',
-            jsonLayout: {
-              ...seedLayout,
-              masterTemplateKey: queryTemplateKey,
-            },
-          });
-
-          const newDesign = createRes?.design;
-          if (newDesign?.id) {
-            const refreshed = await inviteDesignService.listDesigns(eventId);
-            setDesigns(refreshed.designs || []);
-            await loadDesignDetails(newDesign.id, templatesRes.templates || []);
-            return;
-          }
-        }
-      }
-
-      const preferredDesignId = Number(new URLSearchParams(location.search).get('designId'));
-      const designsList = designsRes.designs || [];
-      const preferredDesign = Number.isInteger(preferredDesignId) && preferredDesignId > 0
-        ? designsList.find((design) => design.id === preferredDesignId)
-        : null;
-      const firstDesign = preferredDesign || designsList[0];
-      if (firstDesign) {
-        await loadDesignDetails(firstDesign.id, templatesRes.templates || []);
-      }
-    } catch (error) {
-      message.error(getErrorMessage(error));
-    } finally {
-      setLoading(false);
-    }
+  // Update specific host merge details
+  const patchMergeData = (scope, key, value) => {
+    setCanvasLayout((prev) => {
+      const current = buildDefaultMergeData(inviteEventType, prev.mergeData);
+      return {
+        ...prev,
+        mergeData: {
+          ...current,
+          [scope]: {
+            ...(current[scope] || {}),
+            [key]: value,
+          },
+        },
+      };
+    });
   };
 
-  const loadDesignDetails = async (designId, templateCatalog) => {
-    if (!designId) {
-      setSelectedDesignId(null);
-      setSelectedDesign(null);
-      setExportsList([]);
-      setCanvasLayout({});
+  // Send Invites Pipeline (Phase 3 integration)
+  const handleSendInvites = async () => {
+    if (!selectedGuests.length) {
+      message.warning('Please select at least one guest.');
       return;
     }
 
+    setIsSending(true);
+    setSentCount(0);
+    setSendFailures([]);
+
     try {
-      const [designRes, exportRes] = await Promise.all([
-        inviteDesignService.getDesign(designId),
-        inviteDesignService.listExports(designId),
-      ]);
-
-      const design = designRes.design;
-      const designLayout = design.jsonLayout && typeof design.jsonLayout === 'object' ? design.jsonLayout : {};
-      const designEventType = designLayout.eventType || event?.type || design.category || 'other';
-      const hasRenderableElements = Array.isArray(designLayout.elements) && designLayout.elements.length > 0;
-      const hasAnyLayoutContent = Object.keys(designLayout).length > 0;
-      const availableTemplates = Array.isArray(templateCatalog) && templateCatalog.length ? templateCatalog : templates;
-      const fallbackTemplateKey =
-        (typeof designLayout.templateKey === 'string' && designLayout.templateKey) ||
-        selectedTemplate ||
-        null;
-      const matchedTemplate = availableTemplates.find((template) => template.key === fallbackTemplateKey) || null;
-      const templateDrivenLayout = (!hasRenderableElements && matchedTemplate)
-        ? buildCanvasLayoutFromTemplate({
-            templateMeta: matchedTemplate,
-            baseLayout: designLayout,
-            eventType: designEventType,
-          })
-        : null;
-
-      const nextLayout = hasRenderableElements
-        ? {
-            ...designLayout,
-            eventType: designEventType,
-            mergeData: buildDefaultMergeData(designEventType, designLayout.mergeData),
-          }
-        : templateDrivenLayout
-        ? templateDrivenLayout
-        : !hasAnyLayoutContent
-        ? buildStarterLayout({
-            eventType: designEventType,
-            event,
-            templateKey: fallbackTemplateKey,
-            mergeData: designLayout.mergeData,
-            canvasSize: designLayout.canvasSize || design.canvasSize || '1080x1920',
-            backgroundColor: designLayout.backgroundColor || '#fffaf6',
-          })
-        : {
-            ...designLayout,
-            eventType: designEventType,
-            mergeData: buildDefaultMergeData(designEventType, designLayout.mergeData),
-          };
-      setSelectedDesignId(design.id);
-      setSelectedDesign(design);
-      setDesignName(design.name || '');
-      setDesignStatus(design.status || 'draft');
-      setDesignLanguage(design.language || 'en');
-      setLayoutText(JSON.stringify(nextLayout, null, 2));
-      setCanvasLayout(nextLayout);
-      if (nextLayout.templateKey) {
-        setSelectedTemplate(nextLayout.templateKey);
-      }
-      setExportsList(exportRes.exports || []);
-      if (!hasRenderableElements && templateDrivenLayout) {
-        message.info('Loaded template structure into canvas mode. Click Save to persist editable elements.');
-      } else if (!hasRenderableElements && !hasAnyLayoutContent) {
-        message.info('Loaded starter layout because this design was empty. Click Save to persist it.');
-      } else if (!hasRenderableElements) {
-        message.warning('This design has saved JSON but no canvas elements. Nothing was auto-generated. Use "Apply Full Starter Layout" only if you want a new canvas base.');
-      }
-    } catch (error) {
-      message.error(getErrorMessage(error));
-    }
-  };
-
-  useEffect(() => {
-    loadStudioData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [eventId, location.search]);
-
-  useEffect(() => {
-    if (!previewGuestId && guests.length) {
-      setPreviewGuestId(guests[0].id);
-    }
-  }, [guests, previewGuestId]);
-
-  const handleCreateDesign = async () => {
-    const trimmedName = newDesignName.trim();
-    if (!trimmedName) {
-      message.warning('Enter a design name.');
-      return;
-    }
-
-    setCreating(true);
-    try {
-      const draftEventType = event?.type || 'other';
-      const templateSeedLayout = selectedTemplateMeta
-        ? buildCanvasLayoutFromTemplate({
-            templateMeta: selectedTemplateMeta,
-            baseLayout: {
-              templateKey: selectedTemplate || null,
-              eventType: draftEventType,
-              mergeData: buildDefaultMergeData(draftEventType),
-              title: event?.title || '',
-              venue: event?.venue || '',
-              date: event?.date || null,
-            },
-            eventType: draftEventType,
-          })
-        : null;
-      const starterLayout = buildStarterLayout({
-        eventType: draftEventType,
-        event,
-        templateKey: selectedTemplate || null,
-        mergeData: buildDefaultMergeData(draftEventType),
+      const res = await inviteDesignService.generateAndSend(selectedDesignId, {
+        sendVia: sendViaChannel,
+        guestIds: selectedGuests,
       });
 
-      const payload = {
-        eventId: Number(eventId),
-        name: trimmedName,
-        language: 'en',
-        status: 'draft',
-        category: event?.type || 'general',
-        jsonLayout: templateSeedLayout || starterLayout,
-      };
-
-      const res = await inviteDesignService.createDesign(payload);
-      message.success('Design created');
-      setNewDesignName('');
-
-      const listRes = await inviteDesignService.listDesigns(eventId);
-      setDesigns(listRes.designs || []);
-      await loadDesignDetails(res.design.id);
-    } catch (error) {
-      message.error(getErrorMessage(error));
+      message.success(`Notification batch sent: ${res.generated} successful, ${res.failed} failed.`);
+      setSentCount(res.generated || 0);
+      setSendFailures(res.failures || []);
+    } catch (err) {
+      message.error(getErrorMessage(err));
     } finally {
-      setCreating(false);
+      setIsSending(false);
     }
   };
 
-  const handleSaveDesign = async () => {
-    if (!selectedDesignId) {
-      message.warning('Select a design first.');
-      return;
-    }
+  // Resolve placeholders for mock canvas viewer elements
+  const resolveMockPlaceholderText = (text, context) => {
+    if (typeof text !== 'string') return text;
+    return text.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (match, token) => {
+      const getValueByStringPath = (obj, strPath) =>
+        strPath.split('.').reduce((acc, segment) => (acc && acc[segment] !== undefined ? acc[segment] : undefined), obj);
+      
+      const resolved = getValueByStringPath(context, token);
+      return resolved === undefined || resolved === null ? '' : String(resolved);
+    });
+  };
 
-    let finalLayout;
-    
-    if (editorMode === 'canvas') {
-      // Use canvas layout
-      finalLayout = {
-        ...canvasLayout,
-        eventType: inviteEventType,
-        mergeData,
-      };
-      setLayoutText(JSON.stringify(finalLayout, null, 2));
+  // Helper toggle all checkbox selection
+  const handleToggleSelectAll = (e) => {
+    if (e.target.checked) {
+      setSelectedGuests(filteredGuests.map((g) => g.id));
     } else {
-      // Use JSON editor
-      try {
-        finalLayout = JSON.parse(layoutText || '{}');
-      } catch (_error) {
-        message.error('Layout JSON is invalid.');
-        return;
-      }
-      finalLayout = {
-        ...finalLayout,
-        eventType: inviteEventType,
-        mergeData: buildDefaultMergeData(inviteEventType, finalLayout.mergeData),
-      };
-      setCanvasLayout(finalLayout);
-    }
-
-    setSaving(true);
-    try {
-      await inviteDesignService.updateDesign(selectedDesignId, {
-        name: designName.trim() || selectedDesign?.name,
-        status: designStatus,
-        language: designLanguage,
-        jsonLayout: finalLayout,
-      });
-      message.success('Design saved');
-
-      const listRes = await inviteDesignService.listDesigns(eventId);
-      setDesigns(listRes.designs || []);
-      await loadDesignDetails(selectedDesignId);
-    } catch (error) {
-      message.error(getErrorMessage(error));
-    } finally {
-      setSaving(false);
+      setSelectedGuests([]);
     }
   };
 
-  const handleDuplicate = async () => {
-    if (!selectedDesignId) {
-      message.warning('Select a design first.');
-      return;
-    }
-
-    setDuplicating(true);
-    try {
-      const res = await inviteDesignService.duplicateDesign(selectedDesignId, {
-        name: `${designName || selectedDesign?.name || 'Invite'} Copy`,
-      });
-      message.success('Design duplicated');
-
-      const listRes = await inviteDesignService.listDesigns(eventId);
-      setDesigns(listRes.designs || []);
-      await loadDesignDetails(res.design.id);
-    } catch (error) {
-      message.error(getErrorMessage(error));
-    } finally {
-      setDuplicating(false);
-    }
+  const handleToggleGuest = (guestId) => {
+    setSelectedGuests((prev) =>
+      prev.includes(guestId) ? prev.filter((id) => id !== guestId) : [...prev, guestId]
+    );
   };
 
-  const handleExportPdf = async (hasRetriedAfterPayment = false) => {
-    if (!selectedDesignId) {
-      message.warning('Select a design first.');
-      return;
-    }
+  // Search filter
+  const filteredGuests = useMemo(() => {
+    return guests.filter((g) =>
+      String(g.name || '').toLowerCase().includes(guestSearchQuery.toLowerCase())
+    );
+  }, [guests, guestSearchQuery]);
 
-    setExportingPdf(true);
-    try {
-      await inviteDesignService.exportDesign(selectedDesignId, { format: 'pdf' });
-      message.success('PDF export generated');
-      const exportRes = await inviteDesignService.listExports(selectedDesignId);
-      setExportsList(exportRes.exports || []);
-    } catch (error) {
-      const paymentRequirement = getPaymentRequirement(error);
-      if (paymentRequirement && !hasRetriedAfterPayment) {
-        try {
-          const paymentResult = await paymentService.checkoutForEntity({
-            entityType: paymentRequirement.entityType,
-            entityId: paymentRequirement.entityId,
-            amount: paymentRequirement.config?.amount,
-            description: `Invite design #${paymentRequirement.entityId} export`,
-          });
-          
-          // Show payment confirmation receipt if available
-          if (paymentResult?.receipt) {
-            setPaymentReceipt(paymentResult.receipt);
-            setPaymentReceiptVisible(true);
-          }
-          
-          await handleExportPdf(true);
-          return;
-        } catch (paymentError) {
-          message.error(getErrorMessage(paymentError));
-          return;
-        }
-      }
-      message.error(getErrorMessage(error));
-    } finally {
-      setExportingPdf(false);
-    }
-  };
-
-  const handlePublishDesign = async () => {
-    if (!selectedDesignId) {
-      message.warning('Select a design first.');
-      return;
-    }
-
-    let finalLayout;
-    if (editorMode === 'canvas') {
-      finalLayout = {
-        ...canvasLayout,
-        eventType: inviteEventType,
-        mergeData,
-      };
-      setLayoutText(JSON.stringify(finalLayout, null, 2));
-    } else {
-      try {
-        finalLayout = JSON.parse(layoutText || '{}');
-      } catch (_error) {
-        message.error('Layout JSON is invalid.');
-        return;
-      }
-      finalLayout = {
-        ...finalLayout,
-        eventType: inviteEventType,
-        mergeData: buildDefaultMergeData(inviteEventType, finalLayout.mergeData),
-      };
-      setCanvasLayout(finalLayout);
-    }
-
-    setPublishing(true);
-    try {
-      await inviteDesignService.updateDesign(selectedDesignId, {
-        name: designName.trim() || selectedDesign?.name,
-        language: designLanguage,
-        status: 'published',
-        jsonLayout: finalLayout,
-      });
-      message.success('Design published');
-      await loadDesignDetails(selectedDesignId);
-    } catch (error) {
-      message.error(getErrorMessage(error));
-    } finally {
-      setPublishing(false);
-    }
-  };
-
-  const designColumns = [
-    {
-      title: 'Design',
-      dataIndex: 'name',
-      key: 'name',
-      render: (value, row) => (
-        <Button type="link" onClick={() => loadDesignDetails(row.id)} style={{ padding: 0 }}>
-          {value}
-        </Button>
-      ),
-    },
-    {
-      title: 'Status',
-      dataIndex: 'status',
-      key: 'status',
-      render: (status) => <Tag color={status === 'published' ? 'green' : status === 'archived' ? 'default' : 'blue'}>{status}</Tag>,
-    },
-    {
-      title: 'Version',
-      dataIndex: 'version',
-      key: 'version',
-    },
-    {
-      title: 'Assets',
-      key: 'assets',
-      render: (_, row) => row._count?.assets ?? 0,
-    },
-    {
-      title: 'Exports',
-      key: 'exports',
-      render: (_, row) => row._count?.exports ?? 0,
-    },
-  ];
-
+  // Loading Screen
   if (loading) {
     return (
-      <div className="invite-studio-loading">
+      <div className="invite-studio-loading-wrap">
         <Spin size="large" />
+        <p>Loading Workspace...</p>
       </div>
     );
   }
 
   return (
-    <div className="invite-studio-page">
-      <Card className="invite-studio-header">
-        <Space direction="vertical" size={4}>
-          <Space>
+    <div className="invite-studio-workspace">
+      
+      {/* ── STEP 1: CHOOSE TEMPLATE ────────────────────────────────────── */}
+      {step === 'template' && (
+        <Card className="studio-card-panel">
+          <div style={{ marginBottom: 16 }}>
             <Link to="/invite-studio">
-              <Button icon={<ArrowLeftOutlined />}>Back to Studio Home</Button>
+              <Button icon={<ArrowLeftOutlined />}>Exit to Studio Home</Button>
             </Link>
-            <Button icon={<ReloadOutlined />} onClick={loadStudioData}>Refresh</Button>
-          </Space>
-          <Title level={3} style={{ margin: 0 }}>Invite Design Studio</Title>
-          <Text type="secondary">
-            Event: {event?.title || `Event #${eventId}`} | Guests: {guests.length}
-          </Text>
-        </Space>
-      </Card>
+          </div>
+          <InviteTemplateGallery
+            templates={templates}
+            onSelect={handleSelectTemplate}
+            onStartBlank={handleStartBlank}
+            defaultEventType={event?.type}
+          />
+        </Card>
+      )}
 
-      <Row gutter={[18, 18]}>
-        {!selectedDesign ? (
-        <Col xs={24} lg={8} xl={7}>
-          <Card title="Template + New Design" className="invite-studio-card invite-studio-card--setup">
-            <Space direction="vertical" style={{ width: '100%' }}>
-              <div>
-                <Text strong>Template</Text>
-                <Select
-                  value={selectedTemplate || undefined}
-                  onChange={setSelectedTemplate}
-                  style={{ width: '100%', marginTop: 8 }}
-                  options={templates.map((template) => ({
-                    value: template.key,
-                    label: `${template.name} (${template.key})`,
-                  }))}
-                />
-                {selectedTemplateMeta ? (
-                  <Text type="secondary" style={{ display: 'block', marginTop: 8 }}>
-                    {selectedTemplateMeta.description || 'No description'}
-                  </Text>
-                ) : null}
-              </div>
-
-              <Input
-                value={newDesignName}
-                onChange={(eventInput) => setNewDesignName(eventInput.target.value)}
-                placeholder="Example: Wedding Main Invite v1"
-              />
-              <Button type="primary" icon={<PlusOutlined />} onClick={handleCreateDesign} loading={creating}>
-                Create Design
+      {/* ── STEP 2: CUSTOMIZE DESIGN ───────────────────────────────────── */}
+      {step === 'editor' && (
+        <div className="editor-view-container">
+          {/* Header Action Bar */}
+          <div className="studio-editor-navbar">
+            <div className="navbar-left">
+              <Button 
+                icon={<ArrowLeftOutlined />} 
+                onClick={() => setStep('template')}
+                className="nav-back-btn"
+              >
+                Choose Template
               </Button>
-            </Space>
-          </Card>
+              <div className="navbar-meta">
+                <Input
+                  className="design-name-input"
+                  value={designName}
+                  onChange={(e) => setDesignName(e.target.value)}
+                  placeholder="Invite Design Name"
+                />
+                <Text className="navbar-subtitle">
+                  Event: {event?.title || `Event #${eventId}`}
+                </Text>
+              </div>
+            </div>
 
-          <Card title={`Designs (${designs.length})`} style={{ marginTop: 16 }} className="invite-studio-card invite-studio-card--designs">
-            {designs.length ? (
-              <Table
-                rowKey="id"
-                dataSource={designs}
-                columns={designColumns}
-                pagination={false}
-                size="small"
-              />
-            ) : (
-              <Empty description="No invite designs yet" />
-            )}
-          </Card>
-        </Col>
-        ) : null}
-
-        <Col xs={24} lg={selectedDesign ? 24 : 16} xl={selectedDesign ? 24 : 17}>
-          <Card
-            title={selectedDesign ? `Edit: ${selectedDesign.name}` : 'Design Editor'}
-            extra={selectedDesign ? <Tag>Design ID: {selectedDesign.id}</Tag> : null}
-            className={`invite-studio-card invite-studio-card--editor${selectedDesign ? ' invite-studio-card--editor-focus' : ''}`}
-          >
-            {selectedDesign ? (
-              <Space direction="vertical" style={{ width: '100%' }} size={12}>
-                <Row gutter={12} align="bottom">
-                  <Col xs={24} md={14} lg={15} xl={16}>
-                    <Text strong>Switch Design</Text>
-                    <Select
-                      value={selectedDesignId}
-                      onChange={loadDesignDetails}
-                      style={{ width: '100%', marginTop: 6 }}
-                      options={designs.map((design) => ({
-                        value: design.id,
-                        label: `${design.name} (${design.status || 'draft'})`,
-                      }))}
-                    />
-                  </Col>
-                  <Col xs={24} md={10} lg={9} xl={8}>
-                    <Button onClick={() => loadDesignDetails(null)} style={{ width: '100%' }}>
-                      Back To Design List
-                    </Button>
-                  </Col>
-                </Row>
-
-                <Row gutter={12}>
-                  <Col xs={24} sm={12} lg={10}>
-                    <Text strong>Name</Text>
-                    <Input value={designName} onChange={(e) => setDesignName(e.target.value)} style={{ marginTop: 6 }} />
-                  </Col>
-                  <Col xs={24} sm={6} lg={7}>
-                    <Text strong>Status</Text>
-                    <Select
-                      value={designStatus}
-                      onChange={setDesignStatus}
-                      style={{ width: '100%', marginTop: 6 }}
-                      options={[
-                        { value: 'draft', label: 'draft' },
-                        { value: 'published', label: 'published' },
-                        { value: 'archived', label: 'archived' },
-                      ]}
-                    />
-                  </Col>
-                  <Col xs={24} sm={6} lg={7}>
-                    <Text strong>Language</Text>
-                    <Select
-                      value={designLanguage}
-                      onChange={setDesignLanguage}
-                      style={{ width: '100%', marginTop: 6 }}
-                      options={[
-                        { value: 'en', label: 'English' },
-                        { value: 'te', label: 'Telugu' },
-                      ]}
-                    />
-                  </Col>
-                </Row>
-
-                <Row gutter={12}>
-                  <Col xs={24} md={12} lg={8}>
-                    <Text strong>Event Profile</Text>
-                    <Select
-                      value={inviteEventType}
-                      onChange={setEventProfile}
-                      style={{ width: '100%', marginTop: 6 }}
-                      options={EVENT_TYPE_OPTIONS}
-                    />
-                  </Col>
-                  <Col xs={24} md={12} lg={8}>
-                    <Text strong>Preview Guest</Text>
-                    <Select
-                      value={previewGuest?.id}
-                      onChange={setPreviewGuestId}
-                      style={{ width: '100%', marginTop: 6 }}
-                      options={guests.map((guest) => ({ value: guest.id, label: `${guest.name}${guest.relationship ? ` (${guest.relationship})` : ''}` }))}
-                      placeholder="Select preview guest"
-                    />
-                  </Col>
-                  <Col xs={24} md={24} lg={8}>
-                    <Text strong>Quick Compose</Text>
-                    <Button
-                      type="default"
-                      onClick={handleApplyStarterLayout}
-                      style={{ width: '100%', marginTop: 6 }}
-                    >
-                      Apply Full Starter Layout
-                    </Button>
-                  </Col>
-                </Row>
-
-                <Tabs
-                  value={editorMode}
-                  onChange={setEditorMode}
-                  items={[
-                    {
-                      key: 'canvas',
-                      label: (
-                        <span>
-                          <BgColorsOutlined /> Canvas Editor
-                        </span>
-                      ),
-                      children: (
-                        <div style={{ paddingTop: 16 }}>
-                          <InviteDesignCanvas
-                            layout={canvasLayout}
-                            templateMeta={selectedTemplateMeta}
-                            onLayoutChange={setCanvasLayout}
-                            placeholderTokens={flatPlaceholderTokens}
-                            previewMergeContext={previewMergeContext}
-                            quickTextBlocks={quickTextBlocks}
-                            sectionBlocks={sectionBlocks}
-                          />
-                        </div>
-                      ),
-                    },
-                    {
-                      key: 'json',
-                      label: (
-                        <span>
-                          <CodeOutlined /> JSON Editor
-                        </span>
-                      ),
-                      children: (
-                        <div style={{ paddingTop: 16 }}>
-                          <Text type="secondary">
-                            Edit the raw JSON layout. Changes here will be synced to the canvas editor.
-                          </Text>
-                          <TextArea
-                            value={layoutText}
-                            onChange={(e) => setLayoutText(e.target.value)}
-                            rows={20}
-                            className="invite-studio-json"
-                            style={{ marginTop: 8 }}
-                          />
-                        </div>
-                      ),
-                    },
+            <div className="navbar-right">
+              <Space>
+                <Select
+                  value={designStatus}
+                  onChange={setDesignStatus}
+                  className="navbar-status-select"
+                  options={[
+                    { value: 'draft', label: 'Draft' },
+                    { value: 'published', label: 'Published' },
+                    { value: 'archived', label: 'Archived' },
                   ]}
                 />
+                <Select
+                  value={designLanguage}
+                  onChange={setDesignLanguage}
+                  className="navbar-lang-select"
+                  options={[
+                    { value: 'en', label: 'English (EN)' },
+                    { value: 'te', label: 'Telugu (TE)' },
+                  ]}
+                />
+                <Tooltip title="Reset template coordinates">
+                  <Button icon={<ReloadOutlined />} onClick={handleResetStarter}>Reset</Button>
+                </Tooltip>
+                <Button icon={<CopyOutlined />} onClick={handleDuplicateDesign}>Duplicate</Button>
+                <Button
+                  type="primary"
+                  icon={<SaveOutlined />}
+                  onClick={() => handleSaveDesign(false)}
+                  loading={saving}
+                  className="navbar-save-btn"
+                >
+                  Save
+                </Button>
+                <Button
+                  type="default"
+                  icon={<EyeOutlined />}
+                  onClick={async () => {
+                    const saved = await handleSaveDesign(true);
+                    if (saved) setStep('preview');
+                  }}
+                  className="navbar-next-btn"
+                >
+                  Preview & Send
+                </Button>
+              </Space>
+            </div>
+          </div>
 
-                <Row gutter={[12, 12]}>
-                  <Col xs={24} xl={12}>
-                    <Card size="small" title={`Host Data · ${inviteEventType}`}>
-                      <Space direction="vertical" style={{ width: '100%' }} size={8}>
-                        {hostFieldConfig.map((field) => (
-                          <div key={field.key}>
-                            <Text strong>{field.label}</Text>
-                            <Input
-                              value={mergeData.hosts[field.key] || ''}
-                              onChange={(eventInput) => patchMergeData('hosts', field.key, eventInput.target.value)}
-                              placeholder={field.placeholder}
-                              style={{ marginTop: 6 }}
-                            />
-                          </div>
-                        ))}
-                      </Space>
-                    </Card>
-                  </Col>
-                  <Col xs={24} xl={12}>
-                    <Card size="small" title="Placeholder Catalog">
-                      <Text type="secondary">
-                        Click a token to copy it, then paste it into any text element. The canvas preview resolves these using sample guest data.
-                      </Text>
-                      <div className="invite-studio-placeholder-group" style={{ marginTop: 12 }}>
-                        <Text strong>Placeholder Value Manager</Text>
-                        <Select
-                          value={activePlaceholderMeta?.token}
-                          onChange={setActivePlaceholderToken}
-                          style={{ width: '100%', marginTop: 8 }}
-                          options={placeholderCatalog.map((item) => ({
-                            value: item.token,
-                            label: `${item.group} · ${item.label} (${item.token})`,
-                          }))}
-                          placeholder="Select placeholder"
-                        />
+          {/* Mobile responsive Tabs for Customize Design */}
+          {isMobile && (
+            <div className="mobile-tab-navbar">
+              <button 
+                className={`mobile-tab-btn ${editorMobileTab === 'details' ? 'active' : ''}`}
+                onClick={() => setEditorMobileTab('details')}
+              >
+                📝 Details & Settings
+              </button>
+              <button 
+                className={`mobile-tab-btn ${editorMobileTab === 'canvas' ? 'active' : ''}`}
+                onClick={() => setEditorMobileTab('canvas')}
+              >
+                🎨 Canvas Editor
+              </button>
+            </div>
+          )}
+
+          {/* 2-Column Editor Workspace */}
+          <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
+            {/* Left: Host Placeholders Sidebar */}
+            {(!isMobile || editorMobileTab === 'details') && (
+              <Col xs={24} lg={6} xl={5}>
+                <Card title={`Host Fields (${inviteEventType})`} size="small" className="host-data-sidebar">
+                  <Paragraph className="sidebar-description">
+                    Update details below to merge text automatically on the canvas preview placeholders.
+                  </Paragraph>
+                  <Space direction="vertical" style={{ width: '100%' }} size={16}>
+                    {hostFieldConfig.map((field) => (
+                      <div key={field.key} className="studio-form-group">
+                        <label className="studio-form-label">{field.label}</label>
                         <Input
-                          value={activePlaceholderValue}
-                          onChange={(eventInput) => {
-                            if (!activePlaceholderEditTarget) return;
-                            patchMergeData(activePlaceholderEditTarget.scope, activePlaceholderEditTarget.key, eventInput.target.value);
-                          }}
-                          style={{ marginTop: 8 }}
-                          placeholder="Value"
-                          disabled={!activePlaceholderEditTarget}
+                          className="studio-form-input"
+                          value={mergeData.hosts?.[field.key] || ''}
+                          onChange={(e) => patchMergeData('hosts', field.key, e.target.value)}
+                          placeholder={field.placeholder}
                         />
-                        <Text type="secondary" style={{ display: 'block', marginTop: 6 }}>
-                          {activePlaceholderEditTarget
-                            ? `Editing ${activePlaceholderEditTarget.scope}.${activePlaceholderEditTarget.key} for this design.`
-                            : 'This placeholder is read-only here (example: guest tokens).'}
-                        </Text>
                       </div>
-                      <div className="invite-studio-placeholder-groups">
-                        {placeholderGroups.map((group) => (
-                          <div key={group.label} className="invite-studio-placeholder-group">
-                            <Text strong>{group.label}</Text>
-                            <Space wrap style={{ marginTop: 8 }}>
-                              {group.items.map((item) => (
-                                <Tag
-                                  key={item.token}
-                                  color="purple"
-                                  className="invite-studio-placeholder-tag"
-                                  onClick={() => handleCopyPlaceholder(item.token)}
-                                >
-                                  {item.label}: {item.token}
-                                </Tag>
-                              ))}
-                            </Space>
-                          </div>
-                        ))}
-                        <div className="invite-studio-placeholder-group">
-                          <Text strong>Custom Fields</Text>
-                          <Row gutter={8} style={{ marginTop: 6 }}>
-                            <Col span={10}>
-                              <Input
-                                placeholder="key (e.g. dressCode)"
-                                value={customKey}
-                                onChange={(eventInput) => setCustomKey(eventInput.target.value)}
-                              />
-                            </Col>
-                            <Col span={10}>
-                              <Input
-                                placeholder="value"
-                                value={customValue}
-                                onChange={(eventInput) => setCustomValue(eventInput.target.value)}
-                              />
-                            </Col>
-                            <Col span={4}>
-                              <Button type="primary" onClick={addOrUpdateCustomField} style={{ width: '100%' }}>
-                                Add
-                              </Button>
-                            </Col>
-                          </Row>
-                          {Object.keys(mergeData.custom || {}).length ? (
-                            <Space wrap style={{ marginTop: 8 }}>
-                              {Object.entries(mergeData.custom || {}).map(([key, value]) => (
-                                <Tag
-                                  key={key}
-                                  color="geekblue"
-                                  className="invite-studio-placeholder-tag"
-                                  onClick={() => handleCopyPlaceholder(`{{custom.${key}}}`)}
-                                >
-                                  {`{{custom.${key}}}`} = {String(value || '')}
-                                  <Button
-                                    type="link"
-                                    size="small"
-                                    onClick={(eventInput) => {
-                                      eventInput.stopPropagation();
-                                      removeCustomField(key);
-                                    }}
-                                  >
-                                    x
-                                  </Button>
-                                </Tag>
-                              ))}
-                            </Space>
-                          ) : (
-                            <Text type="secondary" style={{ marginTop: 8, display: 'block' }}>
-                              No custom fields yet.
-                            </Text>
+                    ))}
+                    
+                    <Divider style={{ margin: '8px 0' }} />
+                    
+                    <div className="studio-form-group">
+                      <label className="studio-form-label">Live Stream Link</label>
+                      <Input
+                        className="studio-form-input"
+                        value={mergeData.custom?.liveStreamUrl || ''}
+                        onChange={(e) => patchMergeData('custom', 'liveStreamUrl', e.target.value)}
+                        placeholder="https://youtube.com/live/..."
+                      />
+                    </div>
+
+                    <div className="studio-form-group">
+                      <label className="studio-form-label">Event Profile Type</label>
+                      <Select
+                        style={{ width: '100%' }}
+                        value={inviteEventType}
+                        onChange={(val) => {
+                          setCanvasLayout((prev) => ({
+                            ...prev,
+                            eventType: val,
+                            mergeData: buildDefaultMergeData(val, prev.mergeData),
+                          }));
+                        }}
+                        options={EVENT_TYPE_OPTIONS}
+                      />
+                    </div>
+                  </Space>
+                </Card>
+              </Col>
+            )}
+
+            {/* Right: The Complete Canvas Canvas Panel */}
+            {(!isMobile || editorMobileTab === 'canvas') && (
+              <Col xs={24} lg={18} xl={19}>
+                <InviteDesignCanvas
+                  layout={canvasLayout}
+                  templateMeta={selectedTemplateMeta}
+                  onLayoutChange={setCanvasLayout}
+                  placeholderTokens={flatPlaceholderTokens}
+                  previewMergeContext={previewMergeContext}
+                  quickTextBlocks={quickTextBlocks}
+                  sectionBlocks={sectionBlocks}
+                  fullPageMode={true}
+                />
+              </Col>
+            )}
+          </Row>
+        </div>
+      )}
+
+      {/* ── STEP 3: PREVIEW & SEND ─────────────────────────────────────── */}
+      {step === 'preview' && (
+        <div className="preview-view-container">
+          <div style={{ marginBottom: 16 }}>
+            <Button icon={<ArrowLeftOutlined />} onClick={() => setStep('editor')}>
+              Back to Design Editor
+            </Button>
+          </div>
+
+          {/* Mobile responsive Tabs for Preview & Send */}
+          {isMobile && (
+            <div className="mobile-tab-navbar" style={{ marginBottom: 16 }}>
+              <button 
+                className={`mobile-tab-btn ${previewMobileTab === 'preview' ? 'active' : ''}`}
+                onClick={() => setPreviewMobileTab('preview')}
+              >
+                👁️ Preview Invite
+              </button>
+              <button 
+                className={`mobile-tab-btn ${previewMobileTab === 'send' ? 'active' : ''}`}
+                onClick={() => setPreviewMobileTab('send')}
+              >
+                ✉️ Send Dispatch
+              </button>
+            </div>
+          )}
+
+          <Row gutter={[24, 24]}>
+            {/* Column 1: Live Guest Mock Phone Frame */}
+            {(!isMobile || previewMobileTab === 'preview') && (
+              <Col xs={24} lg={10} xl={9}>
+              <Card title="Live Guest View Mockup" size="small" className="mock-phone-panel">
+                <div style={{ marginBottom: 16 }}>
+                  <Text strong style={{ display: 'block', marginBottom: 6 }}>Choose Guest Context to Preview:</Text>
+                  <Select
+                    style={{ width: '100%' }}
+                    value={previewGuest?.id}
+                    onChange={setPreviewGuestId}
+                    placeholder="Select guest"
+                    options={guests.map((g) => ({
+                      value: g.id,
+                      label: `${g.name} (${g.relationship || 'Guest'})`,
+                    }))}
+                  />
+                </div>
+
+                <div className="phone-mockup-wrapper" ref={previewContainerRef}>
+                  <div 
+                    className="mock-canvas-container"
+                    style={{
+                      aspectRatio: '1080/1920',
+                      width: '100%',
+                      backgroundColor: canvasLayout.backgroundColor || '#fffaf6',
+                      position: 'relative',
+                      overflow: 'hidden',
+                      borderRadius: 16,
+                      border: '1px solid rgba(255,255,255,0.1)',
+                    }}
+                  >
+                    {canvasLayout?.elements?.map((el) => {
+                      const scaleVal = previewContainerWidth / 1080;
+                      const style = {
+                        position: 'absolute',
+                        left: el.x * scaleVal,
+                        top: el.y * scaleVal,
+                        width: el.width * scaleVal,
+                        height: el.height === 'auto' ? 'auto' : el.height * scaleVal,
+                        zIndex: el.z || 1,
+                      };
+
+                      return (
+                        <div key={el.id} style={style}>
+                          {el.type === 'text' && (
+                            <span
+                              style={{
+                                fontSize: el.fontSize * scaleVal,
+                                fontWeight: el.fontWeight,
+                                color: el.color,
+                                fontFamily: el.fontFamily,
+                                textAlign: el.textAlign,
+                                display: 'block',
+                                wordWrap: 'break-word',
+                                whiteSpace: 'pre-wrap',
+                              }}
+                            >
+                              {resolveMockPlaceholderText(el.text, previewMergeContext)}
+                            </span>
+                          )}
+
+                          {el.type === 'image' && (
+                            <img
+                              src={el.src}
+                              alt="preview"
+                              style={{ width: '100%', height: '100%', objectFit: el.objectFit || 'cover' }}
+                            />
+                          )}
+
+                          {el.type === 'shape' && el.shapeType === 'rectangle' && (
+                            <div
+                              style={{
+                                width: '100%',
+                                height: '100%',
+                                backgroundColor: el.fillColor,
+                                border: `${el.strokeWidth * scaleVal}px solid ${el.strokeColor}`,
+                                borderRadius: el.borderRadius * scaleVal,
+                              }}
+                            />
+                          )}
+
+                          {el.type === 'divider' && el.orientation === 'horizontal' && (
+                            <div
+                              style={{
+                                width: '100%',
+                                height: el.thickness * scaleVal,
+                                backgroundColor: el.color,
+                              }}
+                            />
+                          )}
+
+                          {el.type === 'lottie' && (
+                            (() => {
+                              const lottieUrl = resolveLottieUrl(el.lottieSource);
+                              const animationData = lottieDataMap[lottieUrl];
+                              if (!animationData) return null;
+                              return (
+                                <Lottie
+                                  animationData={animationData}
+                                  loop={el.loop !== false}
+                                  autoplay={el.autoPlay !== false}
+                                  style={{ width: '100%', height: '100%' }}
+                                />
+                              );
+                            })()
+                          )}
+
+                          {el.type === 'action' && (
+                            <div
+                              style={{
+                                width: '100%',
+                                height: '100%',
+                                border: `${el.strokeWidth || 2}px solid ${el.strokeColor || '#c9b07d'}`,
+                                borderRadius: (el.borderRadius || 28) * scaleVal,
+                                backgroundColor: el.fillColor || '#ffffff',
+                                color: el.textColor || '#374151',
+                                fontSize: el.fontSize * scaleVal,
+                                fontWeight: el.fontWeight || 'bold',
+                                fontFamily: el.fontFamily || 'Arial',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                padding: '0 4px',
+                                textAlign: 'center',
+                              }}
+                            >
+                              {resolveMockPlaceholderText(el.label || 'Action', previewMergeContext)}
+                            </div>
                           )}
                         </div>
-                      </div>
-                    </Card>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {previewGuest?.inviteToken && (
+                  <div style={{ marginTop: 16 }}>
+                    <Button
+                      type="dashed"
+                      block
+                      icon={<CopyOutlined />}
+                      onClick={() => {
+                        const url = `${window.location.origin}/invite/${previewGuest.inviteToken}`;
+                        navigator.clipboard.writeText(url);
+                        message.success('Invite link copied to clipboard!');
+                      }}
+                    >
+                      Copy Digital Invite Link
+                    </Button>
+                  </div>
+                )}
+              </Card>
+            </Col>
+            )}
+
+            {/* Column 2: Guest Checklist & Send Dispatcher */}
+            {(!isMobile || previewMobileTab === 'send') && (
+              <Col xs={24} lg={14} xl={15}>
+              <Card title="Send Digital Invites to Guests" size="small" className="send-pipeline-panel">
+                <Row gutter={[16, 16]} align="middle" style={{ marginBottom: 16 }}>
+                  <Col span={12}>
+                    <Input
+                      placeholder="Search guests by name..."
+                      value={guestSearchQuery}
+                      onChange={(e) => setGuestSearchQuery(e.target.value)}
+                    />
+                  </Col>
+                  <Col span={12} style={{ textAlign: 'right' }}>
+                    <Checkbox
+                      checked={selectedGuests.length === filteredGuests.length && filteredGuests.length > 0}
+                      indeterminate={selectedGuests.length > 0 && selectedGuests.length < filteredGuests.length}
+                      onChange={handleToggleSelectAll}
+                    >
+                      Select All ({filteredGuests.length})
+                    </Checkbox>
                   </Col>
                 </Row>
 
-                <Space wrap size={[10, 10]}>
-                  <Button
-                    icon={<ExpandOutlined />}
-                    type="default"
-                    onClick={() => navigate(`/invite-studio/${eventId}/canvas/${selectedDesignId}`)}
-                    disabled={!selectedDesignId}
-                    style={{ background: '#1e293b', color: '#60a5fa', borderColor: '#3b82f6', fontWeight: 600 }}
-                  >
-                    Open Full Canvas Editor
-                  </Button>
-                  <Button icon={<SaveOutlined />} type="primary" onClick={handleSaveDesign} loading={saving}>
-                    Save Design
-                  </Button>
-                  <Button icon={<CopyOutlined />} onClick={handleDuplicate} loading={duplicating}>
-                    Duplicate
-                  </Button>
-                  <Button icon={<ExportOutlined />} onClick={handleExportPdf} loading={exportingPdf}>
-                    Export PDF
-                  </Button>
-                  <Button
-                    type="primary"
-                    onClick={handlePublishDesign}
-                    loading={publishing}
-                    disabled={!selectedDesignId}
-                  >
-                    {designStatus === 'published' ? 'Republish Design' : 'Publish Design'}
-                  </Button>
-                </Space>
+                {/* Guest List Checklist */}
+                <div className="guest-checklist-scroll">
+                  {filteredGuests.length > 0 ? (
+                    <Table
+                      rowKey="id"
+                      size="small"
+                      pagination={false}
+                      dataSource={filteredGuests}
+                      columns={[
+                        {
+                          title: 'Select',
+                          key: 'select',
+                          width: 60,
+                          render: (_, row) => (
+                            <Checkbox
+                              checked={selectedGuests.includes(row.id)}
+                              onChange={() => handleToggleGuest(row.id)}
+                            />
+                          ),
+                        },
+                        {
+                          title: 'Guest Name',
+                          dataIndex: 'name',
+                          key: 'name',
+                        },
+                        {
+                          title: 'Relationship',
+                          dataIndex: 'relationship',
+                          key: 'relationship',
+                          render: (v) => <Tag color="gold">{v || 'Guest'}</Tag>,
+                        },
+                        {
+                          title: 'Delivery Contact',
+                          key: 'contact',
+                          render: (_, row) => (
+                            <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>
+                              {[row.email, row.phone].filter(Boolean).join(' | ') || 'No contact info'}
+                            </span>
+                          ),
+                        },
+                      ]}
+                    />
+                  ) : (
+                    <Empty description="No guests match search" />
+                  )}
+                </div>
 
                 <Divider />
 
-                <div>
-                  <Text strong>Exports</Text>
-                  {exportsList.length ? (
-                    <ul className="invite-studio-export-list">
-                      {exportsList.map((item) => (
-                        <li key={item.id}>
-                          <Tag>{item.format.toUpperCase()}</Tag>
-                          <a href={item.fileUrl} target="_blank" rel="noreferrer">{item.fileUrl}</a>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <Empty description="No exports yet" image={Empty.PRESENTED_IMAGE_SIMPLE} />
-                  )}
+                {/* Dispatch Controls */}
+                <div className="dispatch-controls-container">
+                  <div className="control-group">
+                    <Text strong style={{ display: 'block', marginBottom: 8 }}>Delivery Channel:</Text>
+                    <Select
+                      style={{ width: 220 }}
+                      value={sendViaChannel}
+                      onChange={setSendViaChannel}
+                      options={[
+                        { value: 'both', label: 'WhatsApp + Email (Recommended)' },
+                        { value: 'whatsapp', label: 'WhatsApp Only' },
+                        { value: 'email', label: 'Email Only' },
+                      ]}
+                    />
+                  </div>
+
+                  <Button
+                    type="primary"
+                    size="large"
+                    icon={<SendOutlined />}
+                    onClick={handleSendInvites}
+                    loading={isSending}
+                    disabled={selectedGuests.length === 0}
+                    style={{
+                      background: 'linear-gradient(135deg, #d4af37 0%, #b8901c 100%)',
+                      borderColor: 'transparent',
+                      color: '#000',
+                      fontWeight: 700,
+                    }}
+                  >
+                    Send Interactive Invites ({selectedGuests.length})
+                  </Button>
                 </div>
-              </Space>
-            ) : (
-              <Empty description="Select or create a design to start editing" />
+
+                {/* Bulk Progress Reporting */}
+                {isSending && (
+                  <div style={{ marginTop: 24, padding: 16, background: 'rgba(255,255,255,0.03)', borderRadius: 12 }}>
+                    <Text style={{ display: 'block', marginBottom: 8 }}>Processing batch delivery...</Text>
+                    <Progress percent={Math.round((sentCount / selectedGuests.length) * 100)} status="active" strokeColor="#d4af37" />
+                  </div>
+                )}
+
+                {sendFailures.length > 0 && (
+                  <div style={{ marginTop: 24 }}>
+                    <Text type="danger" strong>Delivery Failures ({sendFailures.length}):</Text>
+                    <div className="failure-list-scroll">
+                      {sendFailures.map((fail, idx) => (
+                        <div key={idx} style={{ fontSize: 12, color: '#ff4d4f', padding: '4px 0' }}>
+                          • {fail.name}: {fail.error || 'Unknown network error'}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </Card>
+            </Col>
             )}
-          </Card>
-        </Col>
-      </Row>
-      
-      <PaymentConfirmationModal
-        visible={paymentReceiptVisible}
-        receipt={paymentReceipt}
-        loading={loadingReceipt}
-        onClose={() => setPaymentReceiptVisible(false)}
-      />
+          </Row>
+        </div>
+      )}
     </div>
   );
 };

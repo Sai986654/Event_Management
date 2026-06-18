@@ -1,0 +1,592 @@
+/* DigitalInvitePage.css - Premium Guest-Facing Experience */
+
+/* Google Fonts Import inside CSS */
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Alex+Brush&display=swap');
+
+:root {
+  --primary-color: #d4af37; /* Gold */
+  --primary-glow: rgba(212, 175, 55, 0.35);
+  --dark-bg: #0b090a;
+  --panel-bg: rgba(26, 20, 22, 0.65);
+  --text-main: #f5f3f4;
+  --text-muted: #b1a7a6;
+  --card-border: rgba(212, 175, 55, 0.15);
+  --font-heading: 'Playfair Display', serif;
+  --font-body: 'Montserrat', sans-serif;
+  --font-accent: 'Alex Brush', cursive;
+}
+
+/* Base Page Styling */
+.digital-invite-page {
+  min-height: 100vh;
+  background-color: var(--dark-bg);
+  background-image: 
+    radial-gradient(at 10% 20%, rgba(30, 20, 25, 0.8) 0px, transparent 50%),
+    radial-gradient(at 90% 10%, rgba(20, 30, 40, 0.7) 0px, transparent 50%),
+    radial-gradient(at 50% 80%, rgba(60, 40, 30, 0.6) 0px, transparent 50%);
+  color: var(--text-main);
+  font-family: var(--font-body);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 0;
+  margin: 0;
+  overflow-x: hidden;
+  position: relative;
+}
+
+/* Background floating particles */
+.floating-decorations {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.floating-sparkle {
+  position: absolute;
+  color: rgba(212, 175, 55, 0.45);
+  font-size: 20px;
+  animation: floatUp 8s ease-in infinite;
+  opacity: 0;
+}
+
+@keyframes floatUp {
+  0% { transform: translateY(105vh) scale(0.5) rotate(0deg); opacity: 0; }
+  10% { opacity: 0.8; }
+  90% { opacity: 0.8; }
+  100% { transform: translateY(-5vh) scale(1.2) rotate(360deg); opacity: 0; }
+}
+
+/* Main Container Layout */
+.invite-container {
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  position: relative;
+  z-index: 2;
+  min-height: 100vh;
+  box-sizing: border-box;
+}
+
+@media (max-width: 991px) {
+  .invite-container {
+    flex-direction: column;
+    align-items: center;
+    padding: 16px 8px;
+    gap: 24px;
+  }
+}
+
+/* Column 1: Invitation Card Viewport */
+.invite-card-column {
+  flex: 1.1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  box-sizing: border-box;
+}
+
+@media (max-width: 991px) {
+  .invite-card-column {
+    position: relative;
+    top: auto;
+    height: auto;
+    padding: 16px 0;
+    width: 100%;
+    max-width: 480px;
+  }
+}
+
+/* Phone Mockup Frame */
+.phone-mockup {
+  width: 100%;
+  max-width: 440px;
+  aspect-ratio: 1080 / 1920;
+  background: #151113;
+  border: 12px solid #2d2529;
+  border-radius: 40px;
+  box-shadow: 
+    0 25px 50px -12px rgba(0, 0, 0, 0.75),
+    0 0 40px var(--primary-glow);
+  position: relative;
+  overflow: hidden;
+  box-sizing: border-box;
+  animation: slideUpFade 1.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes slideUpFade {
+  0% { transform: translateY(60px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
+/* The scaled Canvas inside phone frame */
+.canvas-viewport-container {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+}
+
+.canvas-scaler {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1080px;
+  height: 1920px;
+  transform-origin: top left;
+  box-sizing: border-box;
+}
+
+/* Fallback Card when no template is loaded */
+.fallback-invite-card {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  padding: 48px 24px;
+  box-sizing: border-box;
+  text-align: center;
+  background: linear-gradient(180deg, #1f1418 0%, #0c080a 100%);
+  border: 1px solid rgba(212, 175, 55, 0.15);
+  position: relative;
+}
+
+.fallback-invite-card::before {
+  content: '';
+  position: absolute;
+  inset: 12px;
+  border: 1px solid rgba(212, 175, 55, 0.3);
+  pointer-events: none;
+}
+
+.fallback-invite-card .accent-ornament {
+  font-family: var(--font-accent);
+  color: var(--primary-color);
+  font-size: 40px;
+  margin: 0;
+}
+
+.fallback-invite-card .wedding-couple {
+  font-family: var(--font-heading);
+  font-size: 32px;
+  color: var(--text-main);
+  font-weight: 600;
+  margin: 16px 0;
+}
+
+.fallback-invite-card .invite-meta {
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+/* Column 2: Interactive RSVP & Details Panel */
+.invite-details-column {
+  flex: 0.9;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  padding: 40px 20px;
+  overflow-y: auto;
+  box-sizing: border-box;
+  z-index: 5;
+}
+
+@media (max-width: 991px) {
+  .invite-details-column {
+    padding: 0 12px 64px 12px;
+    width: 100%;
+    max-width: 480px;
+    gap: 24px;
+  }
+}
+
+/* Glassmorphic Info Card Panels */
+.glass-panel {
+  background: var(--panel-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--card-border);
+  border-radius: 24px;
+  padding: 32px;
+  box-sizing: border-box;
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5);
+  transition: transform 0.3s ease, border-color 0.3s ease;
+  animation: fadeIn 1s ease both;
+}
+
+.glass-panel:hover {
+  border-color: rgba(212, 175, 55, 0.35);
+  transform: translateY(-2px);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Typography styles */
+.greeting-title {
+  font-family: var(--font-accent);
+  font-size: 42px;
+  color: var(--primary-color);
+  margin-top: 0;
+  margin-bottom: 8px;
+  text-align: center;
+}
+
+.personal-message {
+  font-family: var(--font-heading);
+  font-size: 18px;
+  line-height: 1.6;
+  text-align: center;
+  color: var(--text-main);
+  margin-bottom: 0;
+}
+
+/* RSVP Buttons / Selectors */
+.rsvp-section-title {
+  font-family: var(--font-heading);
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--text-main);
+  margin-top: 0;
+  margin-bottom: 24px;
+  text-align: center;
+  letter-spacing: 1px;
+}
+
+.rsvp-status-selector {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.rsvp-status-card {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  padding: 16px 8px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  user-select: none;
+}
+
+.rsvp-status-card.active {
+  background: rgba(212, 175, 55, 0.15);
+  border-color: var(--primary-color);
+  box-shadow: 0 0 15px rgba(212, 175, 55, 0.2);
+}
+
+.rsvp-status-card .status-emoji {
+  font-size: 24px;
+  margin-bottom: 6px;
+  display: block;
+}
+
+.rsvp-status-card .status-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+}
+
+.rsvp-status-card.active .status-label {
+  color: var(--primary-color);
+}
+
+/* Form Styles */
+.form-group {
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--text-muted);
+}
+
+.form-input {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  padding: 12px 16px;
+  color: var(--text-main);
+  font-family: var(--font-body);
+  font-size: 14px;
+  transition: all 0.3s ease;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 8px rgba(212, 175, 55, 0.25);
+}
+
+.submit-btn {
+  background: linear-gradient(135deg, #d4af37 0%, #b8901c 100%);
+  border: none;
+  border-radius: 14px;
+  padding: 16px 24px;
+  color: #0b090a;
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  width: 100%;
+  box-shadow: 0 8px 20px rgba(212, 175, 55, 0.25);
+}
+
+.submit-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px rgba(212, 175, 55, 0.4);
+}
+
+.submit-btn:disabled {
+  background: #2d2d2d;
+  color: #666;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* Event Microsite / Details */
+.microsite-section-title {
+  font-family: var(--font-heading);
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--text-main);
+  margin-top: 0;
+  margin-bottom: 24px;
+  position: relative;
+  padding-bottom: 8px;
+}
+
+.microsite-section-title::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 40px;
+  height: 2px;
+  background-color: var(--primary-color);
+}
+
+.event-details-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.detail-item {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.detail-icon {
+  background: rgba(212, 175, 55, 0.15);
+  color: var(--primary-color);
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.detail-content h4 {
+  font-family: var(--font-body);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--text-muted);
+  margin: 0 0 4px 0;
+}
+
+.detail-content p {
+  font-size: 15px;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.detail-content p.address-line {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+/* Microsite Interactive Links/Actions */
+.link-action-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.action-link-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  padding: 14px 20px;
+  color: var(--text-main);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  transition: all 0.3s ease;
+}
+
+.action-link-btn:hover {
+  background: rgba(212, 175, 55, 0.08);
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+  transform: translateX(3px);
+}
+
+/* Success & Error Overlays */
+.status-toast {
+  text-align: center;
+  animation: scaleIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+}
+
+@keyframes scaleIn {
+  from { transform: scale(0.9); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.success-icon {
+  font-size: 48px;
+  color: #43e97b;
+  margin-bottom: 16px;
+  display: block;
+}
+
+.success-message {
+  font-family: var(--font-heading);
+  font-size: 20px;
+  margin-top: 0;
+  margin-bottom: 8px;
+}
+
+.success-subtext {
+  font-size: 14px;
+  color: var(--text-muted);
+  margin-bottom: 24px;
+}
+
+/* Utility classes */
+.mt-4 { margin-top: 16px; }
+.text-center { text-align: center; }
+
+/* Canvas custom elements styling override */
+.invite-canvas-scaler-element {
+  pointer-events: none; /* Guest page canvas is non-interactive except action elements */
+}
+
+.invite-canvas-scaler-element.interactive-action-element {
+  pointer-events: auto !important; /* Enable clicks on actions inside canvas */
+  cursor: pointer !important;
+}
+
+.invite-canvas-scaler-element.interactive-action-element:hover {
+  transform: scale(1.03);
+  transition: transform 0.2s ease;
+}
+
+/* Spinner */
+.loading-viewport {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  background: var(--dark-bg);
+}
+
+.loading-spinner {
+  border: 4px solid rgba(255, 255, 255, 0.1);
+  border-left-color: var(--primary-color);
+  border-radius: 50%;
+  width: 48px;
+  height: 48px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Error State */
+.error-viewport {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background: var(--dark-bg);
+  padding: 24px;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.error-card {
+  background: rgba(255, 82, 82, 0.05);
+  border: 1px solid rgba(255, 82, 82, 0.2);
+  border-radius: 20px;
+  padding: 40px;
+  max-width: 400px;
+  width: 100%;
+}
+
+.error-icon {
+  font-size: 64px;
+  margin-bottom: 20px;
+  display: block;
+}
+
+.error-title {
+  font-family: var(--font-heading);
+  font-size: 22px;
+  margin: 0 0 12px 0;
+  color: #ff5252;
+}
+
+.error-text {
+  font-size: 14px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin: 0 0 24px 0;
+}
