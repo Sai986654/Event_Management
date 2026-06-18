@@ -1,16 +1,12 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import Lottie from 'lottie-react';
 import {
   CalendarOutlined,
   EnvironmentOutlined,
-  CheckCircleOutlined,
   CompassOutlined,
   YoutubeOutlined,
   InfoCircleOutlined,
-  SmileOutlined,
-  CloseCircleOutlined,
-  FrownOutlined,
 } from '@ant-design/icons';
 import { publicInviteService } from '../services/publicInviteService';
 import './DigitalInvitePage.css';
@@ -266,8 +262,8 @@ const DigitalInvitePage = () => {
     );
   }
 
-  const { guest, event, design, resolvedLayout } = inviteData;
-  const [canvasWidth, canvasHeight] = (resolvedLayout?.canvasSize || '1080x1920').split('x').map(Number);
+  const { guest, event, resolvedLayout } = inviteData;
+  const [canvasWidth] = (resolvedLayout?.canvasSize || '1080x1920').split('x').map(Number);
   const scale = containerWidth / canvasWidth;
 
   const bgStyle = resolvedLayout?.backgroundColor 

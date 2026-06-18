@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
-import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
+import { useParams, Link, useLocation } from 'react-router-dom';
 import {
   Button,
   Card,
@@ -25,12 +25,8 @@ import {
   CopyOutlined,
   SaveOutlined,
   ReloadOutlined,
-  BgColorsOutlined,
-  EditOutlined,
   EyeOutlined,
   SendOutlined,
-  CheckOutlined,
-  SettingOutlined,
 } from '@ant-design/icons';
 import { eventService } from '../services/eventService';
 import { guestService } from '../services/guestService';
@@ -51,7 +47,7 @@ import {
 } from '../utils/invitePlaceholders';
 import './InviteDesignStudio.css';
 
-const { Text, Title, Paragraph } = Typography;
+const { Text, Paragraph } = Typography;
 
 /* ── Lottie Utilities ───────────────────────────────────────────────── */
 
@@ -81,7 +77,6 @@ const getLottieMirrorUrls = (url) => {
 const InviteDesignStudio = () => {
   const { eventId } = useParams();
   const location = useLocation();
-  const navigate = useNavigate();
 
   // Workflow steps: 'template' | 'editor' | 'preview'
   const [step, setStep] = useState('template');
@@ -95,7 +90,6 @@ const InviteDesignStudio = () => {
   const [event, setEvent] = useState(null);
   const [guests, setGuests] = useState([]);
   const [templates, setTemplates] = useState([]);
-  const [designs, setDesigns] = useState([]);
   const [lottieDataMap, setLottieDataMap] = useState({});
 
   // Active Design State
@@ -110,7 +104,6 @@ const InviteDesignStudio = () => {
   // UI States
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [creating, setCreating] = useState(false);
   
   // Preview & Send States
   const [previewGuestId, setPreviewGuestId] = useState(null);
@@ -214,50 +207,8 @@ const InviteDesignStudio = () => {
   }, [step]);
 
   // Load initial studio context
-  const loadStudioData = useCallback(async () => {
-    try {
-      setLoading(true);
-      const [eventRes, guestsRes, templatesRes, designsRes] = await Promise.all([
-        eventService.getEventById(eventId),
-        guestService.getEventGuests(eventId),
-        inviteDesignService.getTemplates(),
-        inviteDesignService.listDesigns(eventId),
-      ]);
-
-      setEvent(eventRes.event || null);
-      setGuests(guestsRes.guests || []);
-      setTemplates(templatesRes.templates || []);
-      setDesigns(designsRes.designs || []);
-
-      const designsList = designsRes.designs || [];
-      const query = new URLSearchParams(location.search);
-      const preferredDesignId = Number(query.get('designId'));
-      
-      const preferredDesign = Number.isInteger(preferredDesignId) && preferredDesignId > 0
-        ? designsList.find((d) => d.id === preferredDesignId)
-        : null;
-
-      const activeDesign = preferredDesign || designsList[0];
-
-      if (activeDesign) {
-        await loadDesignDetails(activeDesign.id, templatesRes.templates || []);
-        setStep('editor');
-      } else {
-        setStep('template');
-      }
-    } catch (error) {
-      message.error(getErrorMessage(error));
-    } finally {
-      setLoading(false);
-    }
-  }, [eventId, location.search]);
-
-  useEffect(() => {
-    loadStudioData();
-  }, [loadStudioData]);
-
   // Load selected design details
-  const loadDesignDetails = async (designId, templateCatalog = []) => {
+  const loadDesignDetails = useCallback(async (designId, templateCatalog = []) => {
     if (!designId) return;
 
     try {
@@ -308,7 +259,49 @@ const InviteDesignStudio = () => {
     } catch (error) {
       message.error(getErrorMessage(error));
     }
-  };
+  }, [event, templates]);
+
+  // Load initial studio context
+  const loadStudioData = useCallback(async () => {
+    try {
+      setLoading(true);
+      const [eventRes, guestsRes, templatesRes, designsRes] = await Promise.all([
+        eventService.getEventById(eventId),
+        guestService.getEventGuests(eventId),
+        inviteDesignService.getTemplates(),
+        inviteDesignService.listDesigns(eventId),
+      ]);
+
+      setEvent(eventRes.event || null);
+      setGuests(guestsRes.guests || []);
+      setTemplates(templatesRes.templates || []);
+
+      const designsList = designsRes.designs || [];
+      const query = new URLSearchParams(location.search);
+      const preferredDesignId = Number(query.get('designId'));
+      
+      const preferredDesign = Number.isInteger(preferredDesignId) && preferredDesignId > 0
+        ? designsList.find((d) => d.id === preferredDesignId)
+        : null;
+
+      const activeDesign = preferredDesign || designsList[0];
+
+      if (activeDesign) {
+        await loadDesignDetails(activeDesign.id, templatesRes.templates || []);
+        setStep('editor');
+      } else {
+        setStep('template');
+      }
+    } catch (error) {
+      message.error(getErrorMessage(error));
+    } finally {
+      setLoading(false);
+    }
+  }, [eventId, location.search, loadDesignDetails]);
+
+  useEffect(() => {
+    loadStudioData();
+  }, [loadStudioData]);
 
   // Build template parser
   const buildCanvasLayoutFromTemplate = ({ templateMeta, baseLayout = {}, eventType }) => {

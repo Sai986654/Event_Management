@@ -1,9 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import { Card, Row, Col, Button, Tag, Space, Typography, Input, Select } from 'antd';
-import { BgColorsOutlined, SearchOutlined, CheckOutlined } from '@ant-design/icons';
+import { BgColorsOutlined, SearchOutlined } from '@ant-design/icons';
 import './InviteTemplateGallery.css';
 
-const { Title, Text, Paragraph } = Typography;
+const { Title, Paragraph } = Typography;
 
 const InviteTemplateGallery = ({
   templates = [],
@@ -14,14 +14,6 @@ const InviteTemplateGallery = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(defaultEventType || 'all');
 
-  const categories = useMemo(() => {
-    const list = new Set(['all']);
-    templates.forEach((t) => {
-      if (t.ornamentStyle) list.add(t.ornamentStyle.toLowerCase());
-      if (t.templateEngine) list.add(t.templateEngine.toLowerCase());
-    });
-    return Array.from(list);
-  }, [templates]);
 
   const filteredTemplates = useMemo(() => {
     return templates.filter((t) => {
