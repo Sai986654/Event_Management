@@ -13,6 +13,7 @@ const LoginScreen = ({ navigation }) => {
   const [error, setError] = useState('');
   const [secureEntry, setSecureEntry] = useState(true);
   const [inviteSlug, setInviteSlug] = useState('');
+  const [inviteToken, setInviteToken] = useState('');
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -106,7 +107,7 @@ const LoginScreen = ({ navigation }) => {
             <View style={styles.divider} />
           </View>
 
-          <Text variant="labelLarge" style={styles.inviteLabel}>Have an invite link?</Text>
+          <Text variant="labelLarge" style={styles.inviteLabel}>Have an invite link or token?</Text>
           <TextInput
             label="Event slug from link"
             value={inviteSlug}
@@ -126,10 +127,35 @@ const LoginScreen = ({ navigation }) => {
               navigation.navigate('PublicEvent', { slug: s });
             }}
             disabled={!inviteSlug.trim()}
-            style={styles.outlineBtn}
+            style={[styles.outlineBtn, { marginBottom: Spacing.sm }]}
             icon="open-in-new"
           >
-            Open wedding invite page
+            Open wedding page
+          </Button>
+
+          <TextInput
+            label="Personalized Invite Token"
+            value={inviteToken}
+            onChangeText={setInviteToken}
+            mode="outlined"
+            autoCapitalize="none"
+            placeholder="paste-token-here"
+            left={<TextInput.Icon icon="ticket-confirmation" />}
+            style={styles.input}
+            outlineStyle={styles.inputOutline}
+          />
+          <Button
+            mode="outlined"
+            onPress={() => {
+              const t = inviteToken.trim();
+              if (!t) return;
+              navigation.navigate('DigitalInvite', { token: t });
+            }}
+            disabled={!inviteToken.trim()}
+            style={styles.outlineBtn}
+            icon="card-text-outline"
+          >
+            Open personalized invite
           </Button>
         </View>
       </ScrollView>

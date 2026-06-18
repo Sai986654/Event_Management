@@ -420,7 +420,7 @@ const DigitalInvitePage = () => {
                 <div className="fallback-invite-card">
                   <p className="accent-ornament">Welcome</p>
                   <div>
-                    <span style={{ fontSize: '11px', textTransform: 'uppercase', letter-spacing: '2px', color: 'var(--primary-color)' }}>
+                    <span style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '2px', color: 'var(--primary-color)' }}>
                       Cordially Invited to
                     </span>
                     <h1 className="wedding-couple">{event?.title || 'Our Special Day'}</h1>

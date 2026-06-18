@@ -318,6 +318,20 @@ const EventDetailScreen = ({ route, navigation }) => {
               {event.isPublic && event.slug && (
                 <IconButton icon="link-variant" iconColor={Colors.primary} size={20} style={styles.qAction} onPress={() => navigation.navigate('PublicEvent', { slug: event.slug, eventTitle: event.title })} />
               )}
+              <IconButton
+                icon="card-text-outline"
+                iconColor={Colors.primary}
+                size={20}
+                style={styles.qAction}
+                onPress={() => {
+                  const guestWithToken = guests.find(g => g.inviteToken);
+                  if (guestWithToken) {
+                    navigation.navigate('DigitalInvite', { token: guestWithToken.inviteToken });
+                  } else {
+                    Alert.alert('Preview Unavailable', 'Please add a guest and generate/send their invite link first to create their token.');
+                  }
+                }}
+              />
               {isOrganizer && (
                 <IconButton icon="delete-outline" iconColor={Colors.danger} size={20} style={styles.qAction} onPress={handleDeleteEvent} />
               )}
@@ -673,6 +687,24 @@ const EventDetailScreen = ({ route, navigation }) => {
                     View Public Invite Page
                   </Button>
                 )}
+                <Button
+                  mode="contained-tonal"
+                  icon="cellphone-play"
+                  style={styles.manageBtn}
+                  onPress={() => {
+                    const guestWithToken = guests.find(g => g.inviteToken);
+                    if (guestWithToken) {
+                      navigation.navigate('DigitalInvite', { token: guestWithToken.inviteToken });
+                    } else {
+                      Alert.alert(
+                        'Preview Unavailable',
+                        'To preview the personalized invite, please ensure you have added a guest and generated/sent an invitation link to create their token.'
+                      );
+                    }
+                  }}
+                >
+                  Preview Personalized Mobile Invite
+                </Button>
                 <Button mode="contained-tonal" icon="share-variant" style={styles.manageBtn} onPress={handleShareEvent}>
                   Share with Guests
                 </Button>

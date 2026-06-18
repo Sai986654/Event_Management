@@ -3,6 +3,7 @@ import { Alert, Modal, ScrollView, StyleSheet, View, Linking, Share } from 'reac
 import { Button, Card, Chip, Divider, Text, TextInput } from 'react-native-paper';
 import { inviteDesignService } from '../services/inviteDesignService';
 import { eventService } from '../services/eventService';
+import { guestService } from '../services/guestService';
 import { getErrorMessage } from '../utils/helpers';
 import { Colors, Radius, Spacing } from '../theme';
 import { runWithPaymentRetry } from '../utils/paymentRetry';
@@ -622,6 +623,33 @@ const InviteDesignStudioScreen = ({ route }) => {
               <Button mode="contained" onPress={saveDesign} loading={busy} disabled={busy}>Save</Button>
               <Button mode="contained-tonal" onPress={duplicateDesign} loading={busy} disabled={busy}>Duplicate</Button>
               <Button mode="contained-tonal" onPress={exportPdf} loading={busy} disabled={busy}>Export PDF</Button>
+              <Button
+                mode="outlined"
+                icon="cellphone-play"
+                textColor={Colors.primary}
+                style={{ borderColor: Colors.primary }}
+                onPress={async () => {
+                  setBusy(true);
+                  try {
+                    const gData = await guestService.getEventGuests(eventId);
+                    const guestWithToken = gData.guests?.find((g) => g.inviteToken);
+                    if (guestWithToken) {
+                      navigation.navigate('DigitalInvite', { token: guestWithToken.inviteToken });
+                    } else {
+                      Alert.alert(
+                        'Preview Unavailable',
+                        'To preview the personalized invite, make sure you have added at least one guest and generated their invite token under Guest Management.'
+                      );
+                    }
+                  } catch (err) {
+                    Alert.alert('Preview Error', getErrorMessage(err));
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+              >
+                Preview Mobile
+              </Button>
             </View>
 
             <Divider style={{ marginVertical: 12 }} />

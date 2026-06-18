@@ -35,6 +35,7 @@ import ChatListScreen from '../screens/ChatListScreen';
 import ChatScreen from '../screens/ChatScreen';
 import SurprisePagesScreen from '../screens/SurprisePagesScreen';
 import SurpriseViewerScreen from '../screens/SurpriseViewerScreen';
+import DigitalInviteScreen from '../screens/DigitalInviteScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -88,6 +89,7 @@ const DashboardStack = () => (
     <Stack.Screen name="ChatConversation" component={ChatScreen} options={({ route }) => ({ title: route.params?.threadSubject || 'Chat' })} />
     <Stack.Screen name="SurprisePages" component={SurprisePagesScreen} options={{ title: 'Surprise Pages ✨' }} />
     <Stack.Screen name="SurpriseViewer" component={SurpriseViewerScreen} options={{ headerShown: false }} />
+    <Stack.Screen name="DigitalInvite" component={DigitalInviteScreen} options={{ headerShown: false }} />
     <Stack.Screen
       name="PublicEvent"
       component={PublicEventScreen}
@@ -194,6 +196,11 @@ const AuthStack = () => (
         title: route.params?.eventTitle || 'Event invite',
         ...headerScreenOptions,
       })}
+    />
+    <Stack.Screen
+      name="DigitalInvite"
+      component={DigitalInviteScreen}
+      options={{ headerShown: false }}
     />
   </Stack.Navigator>
 );
