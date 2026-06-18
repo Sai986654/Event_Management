@@ -90,7 +90,7 @@ const InviteDesignStudio = () => {
   const [event, setEvent] = useState(null);
   const [guests, setGuests] = useState([]);
   const [templates, setTemplates] = useState([]);
-  const [designs, setDesigns] = useState([]);
+  const [, setDesigns] = useState([]);
   const [lottieDataMap, setLottieDataMap] = useState({});
 
   // Active Design State
@@ -105,7 +105,7 @@ const InviteDesignStudio = () => {
   // UI States
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [creating, setCreating] = useState(false);
+  const [, setCreating] = useState(false);
   
   // Preview & Send States
   const [previewGuestId, setPreviewGuestId] = useState(null);
@@ -261,6 +261,7 @@ const InviteDesignStudio = () => {
     } catch (error) {
       message.error(getErrorMessage(error));
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [event, templates]);
 
   // Load initial studio context
