@@ -210,14 +210,15 @@ const InviteDesignStudio = () => {
 
   // Load initial studio context
   // Load selected design details
-  const loadDesignDetails = useCallback(async (designId, templateCatalog = []) => {
+  const loadDesignDetails = useCallback(async (designId, templateCatalog = [], eventData = null) => {
     if (!designId) return;
 
     try {
+      const currentEvent = eventData || event;
       const designRes = await inviteDesignService.getDesign(designId);
       const design = designRes.design;
       const designLayout = design.jsonLayout && typeof design.jsonLayout === 'object' ? design.jsonLayout : {};
-      const designEventType = designLayout.eventType || event?.type || design.category || 'other';
+      const designEventType = designLayout.eventType || currentEvent?.type || design.category || 'other';
 
       const hasRenderableElements = Array.isArray(designLayout.elements) && designLayout.elements.length > 0;
       const availableTemplates = templateCatalog.length ? templateCatalog : templates;
@@ -242,7 +243,7 @@ const InviteDesignStudio = () => {
         ? templateDrivenLayout
         : buildStarterLayout({
             eventType: designEventType,
-            event,
+            event: currentEvent,
             templateKey: fallbackTemplateKey,
             mergeData: designLayout.mergeData,
             canvasSize: designLayout.canvasSize || design.canvasSize || '1080x1920',
@@ -262,7 +263,7 @@ const InviteDesignStudio = () => {
       message.error(getErrorMessage(error));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [event, templates]);
+  }, []);
 
   // Load initial studio context
   const loadStudioData = useCallback(async () => {
@@ -290,7 +291,7 @@ const InviteDesignStudio = () => {
       const activeDesign = preferredDesign || designsList[0];
 
       if (activeDesign) {
-        await loadDesignDetails(activeDesign.id, templatesRes.templates || []);
+        await loadDesignDetails(activeDesign.id, templatesRes.templates || [], eventRes.event || null);
         setStep('editor');
       } else {
         setStep('template');
