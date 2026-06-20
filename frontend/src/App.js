@@ -31,9 +31,6 @@ import AdminControlCenter from './pages/AdminControlCenter';
 import EventPlanner from './pages/EventPlanner';
 import ActivityTracker from './pages/ActivityTracker';
 import InviteDesignStudio from './pages/InviteDesignStudio';
-import InviteCanvasEditor from './pages/InviteCanvasEditor';
-import InviteStudioLauncher from './pages/InviteStudioLauncher';
-import InviteTemplateLibrary from './pages/InviteTemplateLibrary';
 import DigitalInvitePage from './pages/DigitalInvitePage';
 
 import NotificationsPage from './pages/NotificationsPage';
@@ -242,52 +239,6 @@ const AppInner = () => {
               <AppLayout>
                 <InviteDesignStudio />
               </AppLayout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/invite-studio"
-          element={
-            <ProtectedRoute allowedRoles={['admin', 'organizer']}>
-              <AppLayout>
-                <InviteTemplateLibrary />
-              </AppLayout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/invite-studio/home"
-          element={
-            <ProtectedRoute allowedRoles={['admin', 'organizer']}>
-              <AppLayout>
-                <InviteStudioLauncher />
-              </AppLayout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/invite-studio/:eventId"
-          element={
-            <ProtectedRoute allowedRoles={['admin', 'organizer']}>
-              <AppLayout>
-                <InviteDesignStudio />
-              </AppLayout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/events/:eventId/invite-studio/canvas/:designId"
-          element={
-            <ProtectedRoute allowedRoles={['admin', 'organizer']}>
-              <InviteCanvasEditor />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/invite-studio/:eventId/canvas/:designId"
-          element={
-            <ProtectedRoute allowedRoles={['admin', 'organizer']}>
-              <InviteCanvasEditor />
             </ProtectedRoute>
           }
         />

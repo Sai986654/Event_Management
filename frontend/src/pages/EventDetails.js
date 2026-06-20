@@ -434,7 +434,7 @@ const EventDetails = () => {
                 </Link>
               )}
               {isOrgOrAdmin && (
-                <Link to={`/invite-studio/${eventId}`}>
+                <Link to={`/events/${eventId}/invite-studio`}>
                   <Button icon={<BgColorsOutlined />}>Invite Studio</Button>
                 </Link>
               )}

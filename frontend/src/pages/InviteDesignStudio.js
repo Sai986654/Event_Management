@@ -867,8 +867,8 @@ const InviteDesignStudio = () => {
       {step === 'template' && (
         <Card className="studio-card-panel">
           <div style={{ marginBottom: 16 }}>
-            <Link to="/invite-studio">
-              <Button icon={<ArrowLeftOutlined />}>Exit to Studio Home</Button>
+            <Link to={`/events/${eventId}`}>
+              <Button icon={<ArrowLeftOutlined />}>Exit to Event Details</Button>
             </Link>
           </div>
           <InviteTemplateGallery
