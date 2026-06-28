@@ -33,6 +33,9 @@ const webhookRoutes = require('./routes/webhookRoutes');
 const vendorFormSchemaRoutes = require('./routes/vendorFormSchemaRoutes');
 const surpriseRoutes = require('./routes/surpriseRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
+const homepageRoutes = require('./routes/homepageRoutes');
+const compression = require('compression');
+const { slidingWindowRateLimiter } = require('./middleware/rateLimiter');
 
 const app = express();
 const server = http.createServer(app);
@@ -45,6 +48,9 @@ const io = new Server(server, {
 });
 app.set('io', io);
 initSocket(io);
+
+app.use(compression());
+app.use('/api', slidingWindowRateLimiter({ windowMs: 60 * 1000, max: 200 }));
 
 // Middleware (explicit headers so preflight with Authorization succeeds reliably)
 app.use(
@@ -106,6 +112,7 @@ app.use('/api/webhooks', webhookRoutes);
 app.use('/api/public', vendorFormSchemaRoutes);
 app.use('/api/surprises', surpriseRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/homepage', homepageRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

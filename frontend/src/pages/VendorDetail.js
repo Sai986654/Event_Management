@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import {
   Card, Row, Col, Button, Spin, message, Rate, Tag, Divider, List, Modal,
   Form, Select, DatePicker, InputNumber, Input, Badge, Empty, Image, Space, Typography,
@@ -112,9 +113,22 @@ const VendorDetail = () => {
   const navigate = useNavigate();
   const { user } = useContext(AuthContext);
 
-  const [vendor, setVendor] = useState(null);
-  const [reviews, setReviews] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { data: vendorData, isLoading: loadingVendor, error: vendorError } = useQuery({
+    queryKey: ['vendor', vendorId],
+    queryFn: () => vendorService.getVendorById(vendorId),
+    enabled: !!vendorId,
+  });
+
+  const { data: reviewsData, isLoading: loadingReviews } = useQuery({
+    queryKey: ['vendor-reviews', vendorId],
+    queryFn: () => vendorService.getVendorReviews(vendorId).catch(() => ({ reviews: [] })),
+    enabled: !!vendorId,
+  });
+
+  const vendor = vendorData?.vendor;
+  const reviews = reviewsData?.reviews || [];
+  const loading = loadingVendor || loadingReviews;
+
   const [selectedPackage, setSelectedPackage] = useState(null);
   const [bookingVisible, setBookingVisible] = useState(false);
   const [bookingLoading, setBookingLoading] = useState(false);
@@ -129,23 +143,10 @@ const VendorDetail = () => {
   const [loadingReceipt] = useState(false);
 
   useEffect(() => {
-    const load = async () => {
-      try {
-        setLoading(true);
-        const [vendorRes, reviewsRes] = await Promise.all([
-          vendorService.getVendorById(vendorId),
-          vendorService.getVendorReviews(vendorId).catch(() => ({ reviews: [] })),
-        ]);
-        setVendor(vendorRes.vendor);
-        setReviews(reviewsRes.reviews || []);
-      } catch (error) {
-        message.error(getErrorMessage(error));
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
-  }, [vendorId]);
+    if (vendorError) {
+      message.error(getErrorMessage(vendorError));
+    }
+  }, [vendorError]);
 
   useEffect(() => {
     if (!selectedPackage) return;
@@ -262,8 +263,23 @@ const VendorDetail = () => {
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 'calc(100vh - 128px)' }}>
-        <Spin size="large" />
+      <div className="vendor-detail-container skeleton-detail" style={{ maxWidth: 1200, margin: '0 auto', padding: '24px 20px' }}>
+        <div className="skeleton-line animate-pulse" style={{ width: '150px', height: '32px', marginBottom: '24px', background: '#e5e7eb', borderRadius: '4px' }} />
+        <Card style={{ marginBottom: '24px' }}>
+          <Row gutter={[24, 24]}>
+            <Col xs={24} md={16}>
+              <div className="skeleton-line animate-pulse" style={{ width: '50%', height: '32px', marginBottom: '16px', background: '#e5e7eb', borderRadius: '4px' }} />
+              <div className="skeleton-line animate-pulse" style={{ width: '30%', height: '20px', marginBottom: '12px', background: '#e5e7eb', borderRadius: '4px' }} />
+              <div className="skeleton-line animate-pulse" style={{ width: '80%', height: '16px', marginBottom: '8px', background: '#e5e7eb', borderRadius: '4px' }} />
+              <div className="skeleton-line animate-pulse" style={{ width: '60%', height: '16px', background: '#e5e7eb', borderRadius: '4px' }} />
+            </Col>
+            <Col xs={24} md={8}>
+              <div className="skeleton-line animate-pulse" style={{ width: '100%', height: '60px', borderRadius: '12px', background: '#e5e7eb' }} />
+            </Col>
+          </Row>
+        </Card>
+        <Divider />
+        <Card style={{ height: '300px', background: '#ffffff' }} className="animate-pulse" />
       </div>
     );
   }

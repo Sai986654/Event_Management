@@ -1,6 +1,8 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { View, StyleSheet, FlatList, RefreshControl, TouchableOpacity, Alert, Platform } from 'react-native';
 import { Searchbar, Card, Text, Chip, ActivityIndicator, Button, Menu, IconButton, Divider } from 'react-native-paper';
+import { useInfiniteQuery } from '@tanstack/react-query';
+import FastImage from 'react-native-fast-image';
 import * as Location from 'expo-location';
 import { vendorService } from '../services/vendorService';
 import { formatCurrency, getErrorMessage } from '../utils/helpers';
@@ -30,12 +32,6 @@ const SORT_OPTIONS = [
 ];
 
 const VendorListScreen = ({ navigation }) => {
-  const [vendors, setVendors] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [vendorPage, setVendorPage] = useState(1);
-  const [vendorTotal, setVendorTotal] = useState(0);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [category, setCategory] = useState('all');
@@ -49,9 +45,7 @@ const VendorListScreen = ({ navigation }) => {
   const [userLocation, setUserLocation] = useState(null); // { latitude, longitude }
   const [locationCity, setLocationCity] = useState('');
   const [radiusKm, setRadiusKm] = useState(50);
-  const [nearbyCount, setNearbyCount] = useState(null);
   const [locationLoading, setLocationLoading] = useState(false);
-  const locationRequested = useRef(false);
 
   // Request location permission and get current position
   const requestLocation = useCallback(async () => {
@@ -68,13 +62,12 @@ const VendorListScreen = ({ navigation }) => {
       const coords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
       setUserLocation(coords);
 
-      // Reverse-geocode to get city name
       try {
         const [place] = await Location.reverseGeocodeAsync(coords);
         if (place) {
           setLocationCity(place.city || place.subregion || place.region || '');
         }
-      } catch (_) { /* ignore reverse geocode failures */ }
+      } catch (_) {}
 
       return coords;
     } catch (err) {
@@ -94,95 +87,49 @@ const VendorListScreen = ({ navigation }) => {
     return () => clearTimeout(timeoutId);
   }, [search]);
 
-  const fetchVendors = useCallback(async (locOverride, page = 1, append = false) => {
-    if (page === 1) setLoading(true);
-    else setLoadingMore(true);
-    try {
-      const isTextSearchMode = !nearMe && Boolean(debouncedSearch);
-      const params = { page, limit: isTextSearchMode ? 100 : VENDORS_PER_PAGE };
+  // Infinite Query for mobile marketplace loading
+  const {
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isLoading,
+    isRefetching,
+    refetch,
+  } = useInfiniteQuery({
+    queryKey: ['vendors-mobile', category, debouncedSearch, nearMe, userLocation, radiusKm],
+    queryFn: async ({ pageParam = undefined }) => {
+      const params = { pageSize: VENDORS_PER_PAGE, cursor: pageParam };
       if (category !== 'all') params.category = category;
 
-      const loc = locOverride || userLocation;
-      if (nearMe && loc) {
-        params.lat = loc.latitude;
-        params.lng = loc.longitude;
+      if (nearMe && userLocation) {
+        params.lat = userLocation.latitude;
+        params.lng = userLocation.longitude;
         params.radius = radiusKm;
       } else if (debouncedSearch) {
         params.q = debouncedSearch;
       }
+      return vendorService.searchVendors(params);
+    },
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+  });
 
-      const data = await vendorService.searchVendors(params);
-      const rawVendors = data.vendors || [];
-      const keyword = String(debouncedSearch || '').toLowerCase();
-      const newVendors = !nearMe && keyword
-        ? rawVendors.filter((v) => {
-          const haystack = [
-            v.businessName,
-            v.city,
-            v.state,
-            v.description,
-            v.category,
-          ]
-            .map((s) => String(s || '').toLowerCase())
-            .join(' ');
-          return haystack.includes(keyword);
-        })
-        : rawVendors;
-      
-      // Deduplicate vendors by ID when appending
-      if (append) {
-        setVendors((prev) => {
-          const vendorIds = new Set(prev.map(v => v.id));
-          const dedupedNew = newVendors.filter(v => !vendorIds.has(v.id));
-          return [...prev, ...dedupedNew];
-        });
-      } else {
-        setVendors(newVendors);
-      }
-      
-      setVendorPage(page);
-      setVendorTotal(!nearMe && keyword ? newVendors.length : (data.total || 0));
-      setNearbyCount(data.nearby != null ? data.nearby : null);
-    } catch (err) {
-      console.warn(getErrorMessage(err));
-    } finally {
-      if (page === 1) setLoading(false);
-      else setLoadingMore(false);
-      setRefreshing(false);
-    }
-  }, [debouncedSearch, category, nearMe, userLocation, radiusKm, VENDORS_PER_PAGE]);
+  const vendors = data ? data.pages.flatMap((page) => page.data || []) : [];
+  const vendorTotal = data ? data.pages[0]?.totalCount || 0 : 0;
+  const nearbyCount = data ? data.pages[0]?.nearbyCount ?? null : null;
 
-  // Load more vendors
-  const loadMore = useCallback(() => {
-    if (loadingMore || vendors.length >= vendorTotal) return;
-    fetchVendors(undefined, vendorPage + 1, true);
-  }, [loadingMore, vendors.length, vendorTotal, vendorPage, fetchVendors]);
-
-  // Toggle "Near Me" - request location on first enable
   const handleToggleNearMe = useCallback(async () => {
     if (!nearMe) {
-      // Turning ON
       setNearMe(true);
-      setVendorPage(1);
       if (!userLocation) {
-        const coords = await requestLocation();
-        if (!coords) { setLoading(false); return; }
-        fetchVendors(coords, 1, false);
-      } else {
-        fetchVendors(undefined, 1, false);
+        await requestLocation();
       }
     } else {
-      // Turning OFF
       setNearMe(false);
       setUserLocation(null);
       setLocationCity('');
-      setNearbyCount(null);
-      setVendorPage(1);
-      fetchVendors(undefined, 1, false);
     }
-  }, [nearMe, userLocation, requestLocation, fetchVendors]);
-
-  useEffect(() => { setVendorPage(1); fetchVendors(undefined, 1, false); }, [fetchVendors]);
+  }, [nearMe, userLocation, requestLocation]);
 
   const sortedVendors = useMemo(() => {
     const sorted = [...vendors];
@@ -198,10 +145,18 @@ const VendorListScreen = ({ navigation }) => {
         });
         break;
       case 'price-low':
-        sorted.sort((a, b) => Number(a.basePrice || 0) - Number(b.basePrice || 0));
+        sorted.sort((a, b) => {
+          const pA = a.startingPrice ?? a.basePrice ?? 0;
+          const pB = b.startingPrice ?? b.basePrice ?? 0;
+          return Number(pA) - Number(pB);
+        });
         break;
       case 'price-high':
-        sorted.sort((a, b) => Number(b.basePrice || 0) - Number(a.basePrice || 0));
+        sorted.sort((a, b) => {
+          const pA = a.startingPrice ?? a.basePrice ?? 0;
+          const pB = b.startingPrice ?? b.basePrice ?? 0;
+          return Number(pB) - Number(pA);
+        });
         break;
       case 'most-reviews':
         sorted.sort((a, b) => Number(b.totalReviews || 0) - Number(a.totalReviews || 0));
@@ -212,12 +167,38 @@ const VendorListScreen = ({ navigation }) => {
 
   const renderVendor = ({ item }) => {
     const packages = item.packages || [];
-    const minPrice = packages.length > 0 ? Math.min(...packages.map((p) => Number(p.basePrice ?? p.price ?? 0))) : Number(item.basePrice);
-    const maxPrice = packages.length > 0 ? Math.max(...packages.map((p) => Number(p.basePrice ?? p.price ?? 0))) : Number(item.basePrice);
+    const minPrice = packages.length > 0 ? Math.min(...packages.map((p) => Number(p.basePrice ?? p.price ?? 0))) : (item.startingPrice ?? Number(item.basePrice));
+    const maxPrice = packages.length > 0 ? Math.max(...packages.map((p) => Number(p.basePrice ?? p.price ?? 0))) : (item.startingPrice ?? Number(item.basePrice));
     const ratingVal = item.averageRating ? Number(item.averageRating).toFixed(1) : null;
+
+    const portfolio = Array.isArray(item.portfolio) ? item.portfolio : [];
+    const firstPhoto = portfolio.find((p) => p.type === 'photo');
+    const vendorPhoto = firstPhoto?.cardUrl || firstPhoto?.url || item.coverImageUrl || item.coverImage || item.profileImage || undefined;
+    const blurPlaceholder = firstPhoto?.blurDataUrl;
 
     return (
       <Card style={styles.vendorCard} onPress={() => navigation.navigate('VendorDetail', { vendorId: item.id })}>
+        {vendorPhoto ? (
+          <View style={{ position: 'relative', height: 160, overflow: 'hidden' }}>
+            {blurPlaceholder && (
+              <FastImage
+                style={[StyleSheet.absoluteFill, { filter: 'blur(10px)' }]}
+                source={{ uri: blurPlaceholder }}
+                resizeMode={FastImage.resizeMode.cover}
+              />
+            )}
+            <FastImage
+              style={{ width: '100%', height: 160 }}
+              source={{
+                uri: vendorPhoto,
+                priority: FastImage.priority.normal,
+                cache: FastImage.cacheControl.immutable,
+              }}
+              resizeMode={FastImage.resizeMode.cover}
+            />
+          </View>
+        ) : null}
+        
         <Card.Content style={styles.cardContent}>
           {/* Top row: Icon + Name + Verified */}
           <View style={styles.topRow}>
@@ -297,7 +278,7 @@ const VendorListScreen = ({ navigation }) => {
               ) : (
                 <>
                   <Text style={styles.priceLabel}>Starting from</Text>
-                  <Text style={styles.priceValue}>{formatCurrency(item.basePrice)}</Text>
+                  <Text style={styles.priceValue}>{formatCurrency(item.startingPrice ?? item.basePrice)}</Text>
                 </>
               )}
             </View>
@@ -318,6 +299,26 @@ const VendorListScreen = ({ navigation }) => {
 
   const sortLabel = SORT_OPTIONS.find((s) => s.value === sortBy)?.label || 'Sort';
   const isSearchPending = !nearMe && String(search || '').trim() !== debouncedSearch;
+
+  const VendorCardSkeleton = () => (
+    <Card style={styles.vendorCard}>
+      <Card.Content style={styles.cardContent}>
+        <View style={styles.topRow}>
+          <View style={[styles.iconCircle, { backgroundColor: '#e5e7eb' }]} />
+          <View style={styles.nameBlock}>
+            <View style={{ height: 16, backgroundColor: '#e5e7eb', width: '60%', borderRadius: 4, marginBottom: 8 }} />
+            <View style={{ height: 12, backgroundColor: '#e5e7eb', width: '30%', borderRadius: 4 }} />
+          </View>
+        </View>
+        <View style={{ height: 14, backgroundColor: '#e5e7eb', width: '90%', borderRadius: 4, marginTop: 12, marginBottom: 8 }} />
+        <View style={{ height: 14, backgroundColor: '#e5e7eb', width: '80%', borderRadius: 4 }} />
+        <View style={[styles.ratingRow, { marginTop: 12 }]}>
+          <View style={{ height: 14, backgroundColor: '#e5e7eb', width: '25%', borderRadius: 4 }} />
+          <View style={{ height: 14, backgroundColor: '#e5e7eb', width: '35%', borderRadius: 4 }} />
+        </View>
+      </Card.Content>
+    </Card>
+  );
 
   return (
     <View style={styles.container}>
@@ -355,7 +356,7 @@ const VendorListScreen = ({ navigation }) => {
             <TouchableOpacity
               key={r}
               style={[styles.radiusChip, radiusKm === r && styles.radiusChipActive]}
-              onPress={() => { setRadiusKm(r); setLoading(true); }}
+              onPress={() => { setRadiusKm(r); }}
             >
               <Text style={[styles.radiusChipText, radiusKm === r && styles.radiusChipTextActive]}>{r} km</Text>
             </TouchableOpacity>
@@ -419,14 +420,31 @@ const VendorListScreen = ({ navigation }) => {
         </Menu>
       </View>
 
-      {loading ? (
-        <ActivityIndicator style={styles.loader} size="large" color={Colors.primary} />
+      {isLoading ? (
+        <FlatList
+          data={[1, 2, 3, 4]}
+          keyExtractor={(item) => String(item)}
+          renderItem={VendorCardSkeleton}
+          contentContainerStyle={styles.listContent}
+        />
       ) : (
         <FlatList
           data={sortedVendors}
           keyExtractor={(item) => String(item.id)}
           renderItem={renderVendor}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); setVendorPage(1); fetchVendors(undefined, 1, false); }} colors={[Colors.primary]} />}
+          onEndReached={() => {
+            if (hasNextPage && !isFetchingNextPage) {
+              fetchNextPage();
+            }
+          }}
+          onEndReachedThreshold={0.5}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefetching}
+              onRefresh={refetch}
+              colors={[Colors.primary]}
+            />
+          }
           contentContainerStyle={styles.listContent}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
@@ -436,16 +454,8 @@ const VendorListScreen = ({ navigation }) => {
             </View>
           }
           ListFooterComponent={
-            vendors.length < vendorTotal ? (
-              <Button
-                mode="contained-tonal"
-                loading={loadingMore}
-                disabled={loadingMore}
-                onPress={loadMore}
-                style={{ marginTop: Spacing.md, marginBottom: Spacing.lg }}
-              >
-                Load More ({vendors.length} of {vendorTotal})
-              </Button>
+            isFetchingNextPage ? (
+              <ActivityIndicator size="small" color={Colors.primary} style={{ marginVertical: 20 }} />
             ) : null
           }
         />

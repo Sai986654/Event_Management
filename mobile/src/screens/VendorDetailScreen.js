@@ -2,6 +2,8 @@ import React, { useContext, useEffect, useRef, useState } from 'react';
 import { View, StyleSheet, ScrollView, Alert, Image, Dimensions, Modal as RNModal, TouchableOpacity, Animated, FlatList } from 'react-native';
 import { Text, Card, Button, Chip, Divider, ActivityIndicator } from 'react-native-paper';
 import { PinchGestureHandler, State as GestureState } from 'react-native-gesture-handler';
+import { useQuery } from '@tanstack/react-query';
+import FastImage from 'react-native-fast-image';
 import { AuthContext } from '../context/AuthContext';
 import { vendorService } from '../services/vendorService';
 import { aiService } from '../services/aiService';
@@ -11,13 +13,15 @@ import { Colors, Spacing, Radius } from '../theme';
 const { width: SCREEN_W } = Dimensions.get('window');
 
 const VendorDetailScreen = ({ route, navigation }) => {
-  // Context
   const { vendorId } = route.params;
   const { user } = useContext(AuthContext);
 
-  // State
-  const [vendor, setVendor] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const { data: vendorData, isLoading: loading, error: vendorError } = useQuery({
+    queryKey: ['vendor', vendorId],
+    queryFn: () => vendorService.getVendorById(vendorId),
+    enabled: !!vendorId,
+  });
+
   const [reviewSummary, setReviewSummary] = useState(null);
   const [loadingReviewSummary, setLoadingReviewSummary] = useState(false);
   const [viewerVisible, setViewerVisible] = useState(false);
@@ -35,20 +39,13 @@ const VendorDetailScreen = ({ route, navigation }) => {
   const animatedScale = Animated.multiply(baseScale, pinchScale);
 
   useEffect(() => {
-    const load = async () => {
-      try {
-        const data = await vendorService.getVendorById(vendorId);
-        setVendor(data.vendor || data);
-      } catch (err) {
-        Alert.alert('Error', getErrorMessage(err));
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
-  }, [vendorId]);
+    if (vendorError) {
+      Alert.alert('Error', getErrorMessage(vendorError));
+    }
+  }, [vendorError]);
 
-  // Early render for loading/error states - AFTER all hooks
+  const vendor = vendorData?.vendor || vendorData;
+
   if (loading) return <ActivityIndicator style={{ flex: 1 }} size="large" color={Colors.primary} />;
   if (!vendor) return <Text style={{ textAlign: 'center', marginTop: 40 }}>Wedding vendor not found</Text>;
 

@@ -1,6 +1,7 @@
 import 'react-native-reanimated';
 import React, { useContext, useCallback, useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Platform } from 'react-native';
 import * as NavigationBar from 'expo-navigation-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -49,6 +50,15 @@ const AppInner = () => {
   );
 };
 
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000,
+      retry: 1,
+    },
+  },
+});
+
 export default function App() {
   useEffect(() => {
     if (Platform.OS === 'android') {
@@ -58,18 +68,20 @@ export default function App() {
   }, []);
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaProvider>
-        <AuthProvider>
-          <PushNotificationProvider>
-            <SocketProvider>
-              <PaperProvider theme={AppTheme}>
-                <AppInner />
-              </PaperProvider>
-            </SocketProvider>
-          </PushNotificationProvider>
-        </AuthProvider>
-      </SafeAreaProvider>
-    </GestureHandlerRootView>
+    <QueryClientProvider client={queryClient}>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <SafeAreaProvider>
+          <AuthProvider>
+            <PushNotificationProvider>
+              <SocketProvider>
+                <PaperProvider theme={AppTheme}>
+                  <AppInner />
+                </PaperProvider>
+              </SocketProvider>
+            </PushNotificationProvider>
+          </AuthProvider>
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
+    </QueryClientProvider>
   );
 }

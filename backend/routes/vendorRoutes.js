@@ -18,9 +18,15 @@ const {
   createRawMaterialItem,
   updateRawMaterialItem,
   deleteRawMaterialItem,
+  getSuggestions,
+  getPopularSearches,
+  getThemes,
 } = require('../controllers/vendorController');
 
 router.get('/', getVendors);
+router.get('/search/suggestions', getSuggestions);
+router.get('/search/popular', getPopularSearches);
+router.get('/themes', getThemes);
 router.get('/raw-materials', getRawMaterialItems);
 router.get('/:id', getVendor);
 router.get('/:id/reviews', getReviews);

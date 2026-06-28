@@ -327,6 +327,10 @@ model Vendor {
   verifiedAt    DateTime?      @map("verified_at")
   verifiedByAdminId Int?       @map("verified_by_admin_id")
   verificationNotes String?    @db.Text @map("verification_notes")
+  featured      Boolean        @default(false)
+  startingPrice Int?           @map("starting_price")
+  minPrice      Int?           @map("min_price")
+  maxPrice      Int?           @map("max_price")
   createdAt     DateTime       @default(now()) @map("created_at")
   updatedAt     DateTime       @updatedAt @map("updated_at")
 
@@ -342,7 +346,11 @@ model Vendor {
 
   @@index([category])
   @@index([city])
-  @@index([averageRating])
+  @@index([averageRating(sort: Desc)])
+  @@index([isVerified])
+  @@index([featured])
+  @@index([startingPrice])
+  @@index([createdAt(sort: Desc)])
   @@map("vendors")
 }
 
@@ -490,6 +498,7 @@ model Booking {
   organizer User   @relation("OrganizerBookings", fields: [organizerId], references: [id])
 
   @@unique([eventId, vendorId])
+  @@index([vendorId, serviceDate])
   @@map("bookings")
 }
 
@@ -559,6 +568,7 @@ model Review {
   event  Event? @relation(fields: [eventId], references: [id], onDelete: SetNull)
 
   @@unique([vendorId, userId])
+  @@index([vendorId, rating(sort: Desc)])
   @@map("reviews")
 }
 

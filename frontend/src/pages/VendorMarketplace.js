@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { Input, Select, Card, Row, Col, Spin, message, Rate, Button, Empty, Tag, Modal, Pagination } from 'antd';
+import React, { useState, useEffect, useRef } from 'react';
+import { Input, Select, Card, Row, Col, Spin, message, Rate, Button, Empty, Tag, Modal } from 'antd';
 import { SearchOutlined, ShopOutlined, CheckCircleOutlined, EnvironmentOutlined, CalendarOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import { vendorService } from '../services/vendorService';
 import { eventService } from '../services/eventService';
 import { aiService } from '../services/aiService';
@@ -11,9 +12,6 @@ import './VendorMarketplace.css';
 
 const VendorMarketplace = () => {
   const navigate = useNavigate();
-  const [vendors, setVendors] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [vendorPagination, setVendorPagination] = useState({ current: 1, pageSize: 12, total: 0 });
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [locationFilter, setLocationFilter] = useState('');
@@ -23,6 +21,8 @@ const VendorMarketplace = () => {
   const [eventId, setEventId] = useState();
   const [fitMap, setFitMap] = useState({});
   const [compareTarget, setCompareTarget] = useState(null);
+  
+  const loadMoreRef = useRef();
 
   useEffect(() => {
     eventService.getEvents({ limit: 100 })
@@ -46,28 +46,60 @@ const VendorMarketplace = () => {
       .catch(() => setFitMap({}));
   }, [eventId, selectedCategory]);
 
-  useEffect(() => {
-    setVendorPagination({ current: 1, pageSize: vendorPagination.pageSize, total: 0 });
-    fetchVendors(1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedCategory, locationFilter, stateFilter]);
-
-  const fetchVendors = async (page = 1) => {
-    try {
-      setLoading(true);
-      const params = { page, limit: vendorPagination.pageSize };
+  // TanStack Query for Infinite Scrolling
+  const {
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isLoading,
+    isError,
+    error,
+  } = useInfiniteQuery({
+    queryKey: ['vendors', selectedCategory, locationFilter, stateFilter],
+    queryFn: ({ pageParam = undefined }) => {
+      const params = { pageSize: 12, cursor: pageParam };
       if (selectedCategory) params.category = selectedCategory;
       if (locationFilter.trim()) params.city = locationFilter.trim();
       if (stateFilter) params.state = stateFilter;
-      const data = await vendorService.searchVendors(params);
-      setVendors(data.vendors || []);
-      setVendorPagination({ current: page, pageSize: vendorPagination.pageSize, total: data.total || 0 });
-    } catch (error) {
+      return vendorService.searchVendors(params);
+    },
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+  });
+
+  useEffect(() => {
+    if (isError) {
       message.error(getErrorMessage(error));
-    } finally {
-      setLoading(false);
     }
-  };
+  }, [isError, error]);
+
+  // Infinite Scroll Trigger
+  useEffect(() => {
+    if (!hasNextPage || isFetchingNextPage) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          fetchNextPage();
+        }
+      },
+      { threshold: 0.8 }
+    );
+
+    const currentRef = loadMoreRef.current;
+    if (currentRef) {
+      observer.observe(currentRef);
+    }
+
+    return () => {
+      if (currentRef) {
+        observer.unobserve(currentRef);
+      }
+    };
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+
+  // Flatten the pages data into a single vendor array
+  const vendors = data ? data.pages.flatMap((page) => page.data || []) : [];
 
   const handleSearch = (value) => {
     setSearchTerm(value);
@@ -83,8 +115,16 @@ const VendorMarketplace = () => {
         return Number(fitMap[b.id]?.fitScore || 0) - Number(fitMap[a.id]?.fitScore || 0);
       }
       if (sortBy === 'top-rated') return Number(b.averageRating || 0) - Number(a.averageRating || 0);
-      if (sortBy === 'price-low') return Number(a.basePrice || 0) - Number(b.basePrice || 0);
-      if (sortBy === 'price-high') return Number(b.basePrice || 0) - Number(a.basePrice || 0);
+      if (sortBy === 'price-low') {
+        const pA = a.startingPrice ?? a.basePrice ?? 0;
+        const pB = b.startingPrice ?? b.basePrice ?? 0;
+        return Number(pA) - Number(pB);
+      }
+      if (sortBy === 'price-high') {
+        const pA = a.startingPrice ?? a.basePrice ?? 0;
+        const pB = b.startingPrice ?? b.basePrice ?? 0;
+        return Number(pB) - Number(pA);
+      }
       return 0;
     });
 
@@ -125,16 +165,17 @@ const VendorMarketplace = () => {
   };
 
   const getVendorPhoto = (vendor) => {
-    const firstGalleryUrl = Array.isArray(vendor.gallery)
-      ? (vendor.gallery[0]?.url || vendor.gallery[0]?.imageUrl)
-      : undefined;
-
-    return vendor.coverImageUrl
-      || vendor.coverImage
-      || vendor.profileImage
-      || vendor.imageUrl
-      || firstGalleryUrl
-      || undefined;
+    const portfolio = Array.isArray(vendor.portfolio) ? vendor.portfolio : [];
+    const firstPhoto = portfolio.find((p) => p.type === 'photo');
+    return (
+      firstPhoto?.cardUrl ||
+      firstPhoto?.url ||
+      vendor.coverImageUrl ||
+      vendor.coverImage ||
+      vendor.profileImage ||
+      vendor.imageUrl ||
+      undefined
+    );
   };
 
   const getAvailabilityLabel = (vendor) => {
@@ -149,7 +190,11 @@ const VendorMarketplace = () => {
 
     const byFit = [...filteredVendors].sort((a, b) => Number(fitMap[b.id]?.fitScore || 0) - Number(fitMap[a.id]?.fitScore || 0));
     const bestFit = byFit[0] || null;
-    const bestValue = [...filteredVendors].sort((a, b) => Number(a.basePrice || 0) - Number(b.basePrice || 0))[0] || null;
+    const bestValue = [...filteredVendors].sort((a, b) => {
+      const pA = a.startingPrice ?? a.basePrice ?? 0;
+      const pB = b.startingPrice ?? b.basePrice ?? 0;
+      return Number(pA) - Number(pB);
+    })[0] || null;
     const premium = [...filteredVendors]
       .sort((a, b) => {
         const left = Number(a.averageRating || 0) * 100 + (a.isVerified ? 10 : 0) + Number(a.basePrice || 0) / 1000;
@@ -159,6 +204,24 @@ const VendorMarketplace = () => {
 
     return { bestFit, bestValue, premium };
   })();
+
+  const SkeletonGrid = () => (
+    <Row gutter={[16, 16]}>
+      {[1, 2, 3, 4, 5, 6].map((i) => (
+        <Col xs={24} sm={12} md={8} key={i}>
+          <Card className="vendor-card skeleton-card">
+            <div className="skeleton-media animate-pulse" />
+            <div className="skeleton-info">
+              <div className="skeleton-line title animate-pulse" />
+              <div className="skeleton-line category animate-pulse" style={{ width: '40%' }} />
+              <div className="skeleton-line desc animate-pulse" style={{ width: '90%', height: '36px' }} />
+              <div className="skeleton-line footer animate-pulse" style={{ width: '50%' }} />
+            </div>
+          </Card>
+        </Col>
+      ))}
+    </Row>
+  );
 
   return (
     <div className="vendor-marketplace-container">
@@ -249,7 +312,7 @@ const VendorMarketplace = () => {
             <Card className="marketplace-ai-pick-card">
               <div className="marketplace-ai-label">Best Value</div>
               <h3>{recommendations.bestValue?.businessName || '—'}</h3>
-              <p>From {formatCurrency(recommendations.bestValue?.basePrice || 0)}</p>
+              <p>From {formatCurrency(recommendations.bestValue?.startingPrice ?? recommendations.bestValue?.basePrice ?? 0)}</p>
             </Card>
           </Col>
           <Col xs={24} md={8}>
@@ -262,18 +325,23 @@ const VendorMarketplace = () => {
         </Row>
       ) : null}
 
-      <Spin spinning={loading}>
-        {filteredVendors.length === 0 ? (
-          <Empty description="No vendors found. Try adjusting your search or filters." />
-        ) : (
-          <>
-            <Row gutter={[16, 16]} className="vendors-grid">
-              {filteredVendors.map((vendor) => {
-                const pkgRange = getPackageRange(vendor);
-                  const vendorPhoto = getVendorPhoto(vendor);
-                  const availability = getAvailabilityLabel(vendor);
-                return (
-                  <Col xs={24} sm={12} md={8} key={vendor.id}>
+      {isLoading ? (
+        <SkeletonGrid />
+      ) : filteredVendors.length === 0 ? (
+        <Empty description="No vendors found. Try adjusting your search or filters." />
+      ) : (
+        <>
+          <Row gutter={[16, 16]} className="vendors-grid">
+            {filteredVendors.map((vendor) => {
+              const pkgRange = getPackageRange(vendor);
+              const vendorPhoto = getVendorPhoto(vendor);
+              const availability = getAvailabilityLabel(vendor);
+              const portfolio = Array.isArray(vendor.portfolio) ? vendor.portfolio : [];
+              const firstPhoto = portfolio.find((p) => p.type === 'photo');
+              const blurPlaceholder = firstPhoto?.blurDataUrl;
+
+              return (
+                <Col xs={24} sm={12} md={8} key={vendor.id}>
                   <Card
                     hoverable
                     className="vendor-card"
@@ -281,13 +349,36 @@ const VendorMarketplace = () => {
                   >
                     <div className="vendor-media-wrap">
                       {vendorPhoto ? (
-                        <img className="vendor-media" src={vendorPhoto} alt={vendor.businessName} />
+                        <div style={{ position: 'relative', overflow: 'hidden' }}>
+                          {blurPlaceholder && (
+                            <img
+                              src={blurPlaceholder}
+                              alt="blur placeholder"
+                              style={{
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                width: '100%',
+                                height: '186px',
+                                filter: 'blur(10px)',
+                                transform: 'scale(1.1)',
+                              }}
+                            />
+                          )}
+                          <img
+                            className="vendor-media"
+                            src={vendorPhoto}
+                            alt={vendor.businessName}
+                            loading="lazy"
+                            style={{ position: 'relative', zIndex: 1 }}
+                          />
+                        </div>
                       ) : (
                         <div className="vendor-media vendor-media-fallback">
                           <ShopOutlined />
                         </div>
                       )}
-                      <div className="vendor-media-overlay">
+                      <div className="vendor-media-overlay" style={{ zIndex: 2 }}>
                         <Tag className="vendor-overlay-tag" icon={<CalendarOutlined />}>
                           {availability}
                         </Tag>
@@ -326,12 +417,6 @@ const VendorMarketplace = () => {
                       </p>
                     )}
 
-                    {vendor.experienceYears ? (
-                      <p className="vendor-location" style={{ margin: '4px 0' }}>
-                        {vendor.experienceYears}+ years wedding experience
-                      </p>
-                    ) : null}
-
                     <div className="vendor-pricing" style={{ marginTop: 12, padding: '8px 0', borderTop: '1px solid #f0f0f0' }}>
                       {pkgRange ? (
                         <>
@@ -342,7 +427,7 @@ const VendorMarketplace = () => {
                         </>
                       ) : (
                         <span style={{ fontSize: 18, fontWeight: 600, color: '#5e4716' }}>
-                          From {formatCurrency(vendor.basePrice)}
+                          From {formatCurrency(vendor.startingPrice ?? vendor.basePrice ?? 0)}
                         </span>
                       )}
                     </div>
@@ -356,28 +441,23 @@ const VendorMarketplace = () => {
                     <Button type="primary" block style={{ marginTop: 12 }} onClick={(e) => { e.stopPropagation(); navigate(`/vendors/${vendor.id}`); }}>
                       View Packages & Book
                     </Button>
-                    {recommendations?.bestFit && recommendations.bestFit.id !== vendor.id ? (
-                      <Button type="default" block style={{ marginTop: 8 }} onClick={(e) => { e.stopPropagation(); setCompareTarget(vendor); }}>
-                        Why not this vendor?
-                      </Button>
-                    ) : null}
                   </Card>
                 </Col>
               );
             })}
-            </Row>
-            <div style={{ marginTop: 24, textAlign: 'center' }}>
-              <Pagination
-                current={vendorPagination.current}
-                pageSize={vendorPagination.pageSize}
-                total={vendorPagination.total}
-                onChange={(page) => fetchVendors(page)}
-                style={{ marginTop: 24 }}
-              />
+          </Row>
+
+          {hasNextPage && (
+            <div ref={loadMoreRef} style={{ padding: '24px 0', textAlign: 'center' }}>
+              {isFetchingNextPage ? (
+                <Spin size="large" />
+              ) : (
+                <Button onClick={() => fetchNextPage()}>Load More Vendors</Button>
+              )}
             </div>
-          </>
-        )}
-      </Spin>
+          )}
+        </>
+      )}
 
       <Modal
         open={Boolean(compareTarget)}

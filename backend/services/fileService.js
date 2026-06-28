@@ -25,7 +25,8 @@ const uploadFile = async (fileBuffer, folder = 'vedika360', opts = {}) => {
     })
   );
 
-  const url = `${R2_PUBLIC_URL}/${key}`;
+  const base = process.env.CLOUDFLARE_CDN_URL || R2_PUBLIC_URL;
+  const url = `${base.replace(/\/+$/, '')}/${key}`;
   return { url, publicId: key };
 };
 
