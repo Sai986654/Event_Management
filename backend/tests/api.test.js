@@ -223,7 +223,10 @@ describe('Vendors API', () => {
   it('GET /api/vendors — should list vendors (public)', async () => {
     const res = await request(app).get('/api/vendors');
     expect(res.statusCode).toBe(200);
-    expect(Array.isArray(res.body.vendors)).toBe(true);
+    expect(Array.isArray(res.body.data)).toBe(true);
+    expect(res.body).toHaveProperty('nextCursor');
+    expect(res.body).toHaveProperty('hasMore');
+    expect(res.body).toHaveProperty('totalCount');
   });
 });
 

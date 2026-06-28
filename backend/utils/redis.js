@@ -3,7 +3,7 @@ const { createClient } = require('redis');
 let redisClient = null;
 let isRedisConnected = false;
 
-if (process.env.REDIS_URL) {
+if (process.env.REDIS_URL && process.env.NODE_ENV !== 'test') {
   redisClient = createClient({
     url: process.env.REDIS_URL,
     socket: {

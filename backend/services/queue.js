@@ -4,7 +4,7 @@ const Redis = require('ioredis');
 let connection = null;
 let queue = null;
 
-if (process.env.REDIS_URL) {
+if (process.env.REDIS_URL && process.env.NODE_ENV !== 'test') {
   try {
     connection = new Redis(process.env.REDIS_URL, {
       maxRetriesPerRequest: null,

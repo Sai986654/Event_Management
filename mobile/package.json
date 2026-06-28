@@ -67,5 +67,10 @@
       }
     }
   },
+  "overrides": {
+    "react-native-fast-image": {
+      "react": "$react"
+    }
+  },
   "private": true
 }

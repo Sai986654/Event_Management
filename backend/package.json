@@ -19,7 +19,7 @@
     "templates:validate:adobe": "node scripts/validate-adobe-express-manifest.js",
     "dev": "nodemon server.js",
     "seed": "node seeds/seed.js",
-    "test": "jest --forceExit --detectOpenHandles",
+    "test": "jest --runInBand --forceExit --detectOpenHandles",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:push": "prisma db push"
