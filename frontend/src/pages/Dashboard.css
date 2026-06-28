@@ -255,3 +255,90 @@
     flex-direction: column;
   }
 }
+
+/* ─── Premium Card Banners ─── */
+.stat-card-with-banner {
+  padding: 0 !important;
+  overflow: hidden;
+  border-color: #e7d8bd !important;
+  transition: transform 280ms var(--ease-standard), box-shadow 280ms var(--ease-standard) !important;
+}
+
+.stat-card-with-banner:hover {
+  transform: translateY(-4px) !important;
+  box-shadow: 0 16px 36px rgba(88, 28, 32, 0.12) !important;
+}
+
+.stat-card-banner {
+  height: 90px;
+  width: 100%;
+  background-size: cover;
+  background-position: center;
+  border-bottom: 1px solid #e7d8bd;
+}
+
+.stat-card-banner.banner-events {
+  background: 
+    radial-gradient(circle at 10% 20%, rgba(255, 255, 255, 0.15) 0%, transparent 60%),
+    linear-gradient(135deg, #6b1921 0%, #2d0a0d 100%);
+  position: relative;
+}
+
+.stat-card-banner.banner-events::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  opacity: 0.14;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60' viewBox='0 0 60 60'%3E%3Cpath d='M30 0 L60 30 L30 60 L0 30 Z' fill='%23bfa36c'/%3E%3C/svg%3E");
+  background-size: 24px 24px;
+}
+
+.stat-card-banner.banner-functions {
+  background: 
+    radial-gradient(circle at 90% 80%, rgba(191, 163, 108, 0.25) 0%, transparent 60%),
+    linear-gradient(135deg, #bfa36c 0%, #581c20 100%);
+  position: relative;
+}
+
+.stat-card-banner.banner-functions::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  opacity: 0.1;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Ccircle cx='40' cy='40' r='30' stroke='%23ffffff' stroke-width='2' fill='none'/%3E%3C/svg%3E");
+  background-size: 26px 26px;
+}
+
+.stat-card-banner.banner-guests {
+  background: 
+    radial-gradient(circle at 50% 50%, rgba(211, 190, 141, 0.2) 0%, transparent 70%),
+    linear-gradient(135deg, #581c20 0%, #bfa36c 100%);
+  position: relative;
+}
+
+.stat-card-banner.banner-guests::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  opacity: 0.08;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Crect x='20' y='20' width='60' height='60' rx='10' stroke='%23ffffff' stroke-width='2' fill='none'/%3E%3C/svg%3E");
+  background-size: 22px 22px;
+}
+
+.stat-card-banner.banner-budget {
+  background: 
+    repeating-linear-gradient(45deg, #581c20 0px, #581c20 12px, #bfa36c 12px, #bfa36c 14px, #581c20 14px, #581c20 26px);
+  position: relative;
+}
+
+.stat-card-banner.banner-budget::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: linear-gradient(180deg, rgba(88, 28, 32, 0.1) 0%, rgba(88, 28, 32, 0.7) 100%);
+}
+
+.stat-card-body {
+  padding: 18px 20px 20px;
+}
+

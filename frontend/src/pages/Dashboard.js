@@ -413,19 +413,49 @@ const OrganizerDashboard = ({ user }) => {
       </Card>
 
       <Row gutter={[16, 16]} className="stats-grid">
-        <Col xs={24} sm={12} lg={6}><Card className="dashboard-stat-card"><Statistic title="Wedding Events" value={stats.totalEvents} prefix={<CalendarOutlined />} />{renderSparkline(kpiSparklineSeries.totalEvents, 'gold')}{renderTrendChip(trendStats.totalEvents)}</Card></Col>
-        <Col xs={24} sm={12} lg={6}><Card className="dashboard-stat-card"><Statistic title="Upcoming Functions" value={stats.upcomingEvents} valueStyle={{ color: '#b28822' }} />{renderSparkline(kpiSparklineSeries.upcomingEvents, 'amber')}{renderTrendChip(trendStats.upcomingEvents)}</Card></Col>
-        <Col xs={24} sm={12} lg={6}><Card className="dashboard-stat-card"><Statistic title="Guest Families" value={stats.totalGuests} prefix={<TeamOutlined />} />{renderSparkline(kpiSparklineSeries.totalGuests, 'navy')}{renderTrendChip(trendStats.totalGuests)}</Card></Col>
         <Col xs={24} sm={12} lg={6}>
-          <Card className="dashboard-stat-card">
-            <Statistic
-              title="Budget Planned"
-              value={stats.totalBudget}
-              formatter={(v) => formatCurrency(v)}
-              valueStyle={{ color: '#1f2937' }}
-            />
-            {renderSparkline(kpiSparklineSeries.totalBudget, 'sage')}
-            {renderTrendChip(trendStats.totalBudget)}
+          <Card className="dashboard-stat-card stat-card-with-banner" bodyStyle={{ padding: 0 }}>
+            <div className="stat-card-banner banner-events" />
+            <div className="stat-card-body">
+              <Statistic title="Wedding Events" value={stats.totalEvents} prefix={<CalendarOutlined />} />
+              {renderSparkline(kpiSparklineSeries.totalEvents, 'gold')}
+              {renderTrendChip(trendStats.totalEvents)}
+            </div>
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} lg={6}>
+          <Card className="dashboard-stat-card stat-card-with-banner" bodyStyle={{ padding: 0 }}>
+            <div className="stat-card-banner banner-functions" />
+            <div className="stat-card-body">
+              <Statistic title="Upcoming Functions" value={stats.upcomingEvents} valueStyle={{ color: '#581c20' }} />
+              {renderSparkline(kpiSparklineSeries.upcomingEvents, 'amber')}
+              {renderTrendChip(trendStats.upcomingEvents)}
+            </div>
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} lg={6}>
+          <Card className="dashboard-stat-card stat-card-with-banner" bodyStyle={{ padding: 0 }}>
+            <div className="stat-card-banner banner-guests" />
+            <div className="stat-card-body">
+              <Statistic title="Guest Families" value={stats.totalGuests} prefix={<TeamOutlined />} />
+              {renderSparkline(kpiSparklineSeries.totalGuests, 'navy')}
+              {renderTrendChip(trendStats.totalGuests)}
+            </div>
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} lg={6}>
+          <Card className="dashboard-stat-card stat-card-with-banner" bodyStyle={{ padding: 0 }}>
+            <div className="stat-card-banner banner-budget" />
+            <div className="stat-card-body">
+              <Statistic
+                title="Budget Planned"
+                value={stats.totalBudget}
+                formatter={(v) => formatCurrency(v)}
+                valueStyle={{ color: '#2d1618' }}
+              />
+              {renderSparkline(kpiSparklineSeries.totalBudget, 'sage')}
+              {renderTrendChip(trendStats.totalBudget)}
+            </div>
           </Card>
         </Col>
       </Row>
@@ -496,17 +526,41 @@ const VendorDashboard = ({ user }) => {
       </div>
 
       <Row gutter={[16, 16]} className="stats-grid">
-        <Col xs={24} sm={12} md={6}><Card><Statistic title="Wedding Bookings" value={stats.total} prefix={<ShopOutlined />} /></Card></Col>
-        <Col xs={24} sm={12} md={6}><Card><Statistic title="Pending Replies" value={stats.pending} valueStyle={{ color: '#fa8c16' }} /></Card></Col>
-        <Col xs={24} sm={12} md={6}><Card><Statistic title="Confirmed" value={stats.confirmed} prefix={<CheckCircleOutlined />} valueStyle={{ color: '#22c55e' }} /></Card></Col>
         <Col xs={24} sm={12} md={6}>
-          <Card>
-            <Statistic
-              title="Confirmed Revenue"
-              value={stats.revenue}
-              formatter={(v) => formatCurrency(v)}
-              valueStyle={{ color: '#1f2937' }}
-            />
+          <Card className="dashboard-stat-card stat-card-with-banner" bodyStyle={{ padding: 0 }}>
+            <div className="stat-card-banner banner-events" />
+            <div className="stat-card-body">
+              <Statistic title="Wedding Bookings" value={stats.total} prefix={<ShopOutlined />} />
+            </div>
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} md={6}>
+          <Card className="dashboard-stat-card stat-card-with-banner" bodyStyle={{ padding: 0 }}>
+            <div className="stat-card-banner banner-functions" />
+            <div className="stat-card-body">
+              <Statistic title="Pending Replies" value={stats.pending} valueStyle={{ color: '#581c20' }} />
+            </div>
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} md={6}>
+          <Card className="dashboard-stat-card stat-card-with-banner" bodyStyle={{ padding: 0 }}>
+            <div className="stat-card-banner banner-guests" />
+            <div className="stat-card-body">
+              <Statistic title="Confirmed" value={stats.confirmed} prefix={<CheckCircleOutlined />} valueStyle={{ color: '#22c55e' }} />
+            </div>
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} md={6}>
+          <Card className="dashboard-stat-card stat-card-with-banner" bodyStyle={{ padding: 0 }}>
+            <div className="stat-card-banner banner-budget" />
+            <div className="stat-card-body">
+              <Statistic
+                title="Confirmed Revenue"
+                value={stats.revenue}
+                formatter={(v) => formatCurrency(v)}
+                valueStyle={{ color: '#2d1618' }}
+              />
+            </div>
           </Card>
         </Col>
       </Row>
@@ -580,16 +634,33 @@ const CustomerDashboard = ({ user }) => {
       </div>
 
       <Row gutter={[16, 16]} className="stats-grid">
-        <Col xs={24} sm={8}><Card><Statistic title="My Functions" value={events.length} prefix={<CalendarOutlined />} /></Card></Col>
-        <Col xs={24} sm={8}><Card><Statistic title="Active Bookings" value={bookings.filter(b => b.status === 'confirmed').length} prefix={<CheckCircleOutlined />} valueStyle={{ color: '#22c55e' }} /></Card></Col>
         <Col xs={24} sm={8}>
-          <Card>
-            <Statistic
-              title="Total Wedding Spend"
-              value={totalSpentInr}
-              formatter={(v) => formatCurrency(v)}
-              valueStyle={{ color: '#1f2937' }}
-            />
+          <Card className="dashboard-stat-card stat-card-with-banner" bodyStyle={{ padding: 0 }}>
+            <div className="stat-card-banner banner-events" />
+            <div className="stat-card-body">
+              <Statistic title="My Functions" value={events.length} prefix={<CalendarOutlined />} />
+            </div>
+          </Card>
+        </Col>
+        <Col xs={24} sm={8}>
+          <Card className="dashboard-stat-card stat-card-with-banner" bodyStyle={{ padding: 0 }}>
+            <div className="stat-card-banner banner-functions" />
+            <div className="stat-card-body">
+              <Statistic title="Active Bookings" value={bookings.filter(b => b.status === 'confirmed').length} prefix={<CheckCircleOutlined />} valueStyle={{ color: '#22c55e' }} />
+            </div>
+          </Card>
+        </Col>
+        <Col xs={24} sm={8}>
+          <Card className="dashboard-stat-card stat-card-with-banner" bodyStyle={{ padding: 0 }}>
+            <div className="stat-card-banner banner-budget" />
+            <div className="stat-card-body">
+              <Statistic
+                title="Total Wedding Spend"
+                value={totalSpentInr}
+                formatter={(v) => formatCurrency(v)}
+                valueStyle={{ color: '#2d1618' }}
+              />
+            </div>
           </Card>
         </Col>
       </Row>
