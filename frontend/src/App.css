@@ -7,18 +7,18 @@
 }
 
 :root {
-  --gold-primary: #d4af37;
-  --gold-soft: #e8c86b;
-  --gold-light: #f5e6b3;
-  --navy-premium: #0f172a;
-  --surface-dark: #1e293b;
-  --cream-bg: #faf8f2;
+  --gold-primary: #bfa36c;
+  --gold-soft: #d3be8d;
+  --gold-light: #f8f4e8;
+  --navy-premium: #581c20;
+  --surface-dark: #6b1921;
+  --cream-bg: #faf7f0;
   --pure-white: #ffffff;
-  --text-primary: #1f2937;
-  --text-secondary: #6b7280;
-  --line: #e6dbc0;
-  --brand: #d4af37;
-  --brand-2: #0f172a;
+  --text-primary: #2d1618;
+  --text-secondary: #6b5c5d;
+  --line: #e7d8bd;
+  --brand: #bfa36c;
+  --brand-2: #581c20;
   --success: #22c55e;
   --warning: #f59e0b;
   --error: #ef4444;
@@ -27,7 +27,7 @@
   --dur-normal: 320ms;
   --mobile-dock-height: 86px;
   --card-radius: 22px;
-  --card-shadow: 0 16px 38px rgba(15, 23, 42, 0.1);
+  --card-shadow: 0 16px 38px rgba(88, 28, 32, 0.08);
 }
 
 html {

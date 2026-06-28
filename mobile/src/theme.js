@@ -3,35 +3,35 @@ import { StyleSheet } from 'react-native';
 
 // ── Brand Palette ──
 export const Colors = {
-  primary: '#D4AF37',
-  primaryDark: '#B9942A',
-  secondary: '#0F172A',
-  accent: '#E8C86B',
+  primary: '#bfa36c',
+  primaryDark: '#a8884c',
+  secondary: '#581c20',
+  accent: '#d3be8d',
   success: '#22C55E',
   warning: '#f59e0b',
   danger: '#EF4444',
   info: '#8B6A1F',
 
-  background: '#FAF8F2',
+  background: '#faf7f0',
   surface: '#FFFFFF',
-  surfaceVariant: '#F5E6B3',
+  surfaceVariant: '#f8f4e8',
   card: '#FFFFFF',
-  darkSurface: '#1E293B',
+  darkSurface: '#6b1921',
 
-  textPrimary: '#1F2937',
-  textSecondary: '#6B7280',
+  textPrimary: '#2d1618',
+  textSecondary: '#6b5c5d',
   textMuted: '#9CA3AF',
-  textOnPrimary: '#2F2309',
-  textOnDark: '#F9F4E8',
+  textOnPrimary: '#2d1618',
+  textOnDark: '#faf7f0',
 
-  border: '#E6DBC0',
-  divider: '#ECE1C8',
+  border: '#e7d8bd',
+  divider: '#e7d8bd',
 
   statusPending: '#f59e0b',
   statusConfirmed: '#22C55E',
   statusCancelled: '#EF4444',
   statusCompleted: '#334155',
-  statusPlanning: '#D4AF37',
+  statusPlanning: '#bfa36c',
   statusDraft: '#9CA3AF',
 };
 
